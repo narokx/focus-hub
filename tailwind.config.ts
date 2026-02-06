@@ -57,6 +57,28 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Heatmap
+        heatmap: {
+          empty: "hsl(var(--heatmap-empty))",
+          low: "hsl(var(--heatmap-low))",
+          mid: "hsl(var(--heatmap-mid))",
+          high: "hsl(var(--heatmap-high))",
+        },
+        // Task palette
+        task: {
+          coral: "hsl(var(--task-coral))",
+          orange: "hsl(var(--task-orange))",
+          amber: "hsl(var(--task-amber))",
+          lime: "hsl(var(--task-lime))",
+          emerald: "hsl(var(--task-emerald))",
+          teal: "hsl(var(--task-teal))",
+          cyan: "hsl(var(--task-cyan))",
+          blue: "hsl(var(--task-blue))",
+          indigo: "hsl(var(--task-indigo))",
+          violet: "hsl(var(--task-violet))",
+          pink: "hsl(var(--task-pink))",
+          rose: "hsl(var(--task-rose))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -65,25 +87,36 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.95)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.7" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.2s ease-out",
+        "scale-in": "scale-in 0.15s ease-out",
+        "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+      },
+      boxShadow: {
+        window: "var(--window-shadow)",
+        "window-active": "var(--window-shadow-active)",
       },
     },
   },
