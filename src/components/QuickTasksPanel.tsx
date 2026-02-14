@@ -3,6 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { Plus, Trash2, List } from 'lucide-react';
 import { QuickTask, TaskColor, TASK_COLORS, TASK_COLOR_MAP } from '@/types';
 import { TaskChip } from './TaskChip';
+import { AutocompleteInput } from './AutocompleteInput';
 import { cn } from '@/lib/utils';
 
 interface QuickTasksPanelProps {
@@ -44,6 +45,11 @@ export function QuickTasksPanel({
     }
   };
 
+  const handleAutocompleteSelect = (task: QuickTask) => {
+    setNewTaskName(task.name);
+    setNewTaskColor(task.color);
+  };
+
   return (
     <div ref={setNodeRef} className="flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
@@ -59,19 +65,19 @@ export function QuickTasksPanel({
         </button>
       </div>
 
-      {/* Add new task form */}
       {isAdding && (
         <div className="mb-4 p-3 bg-secondary/50 rounded-lg animate-scale-in">
-          <input
-            type="text"
+          <AutocompleteInput
             value={newTaskName}
-            onChange={(e) => setNewTaskName(e.target.value)}
-            onKeyDown={handleKeyDown}
+            onChange={setNewTaskName}
+            onSelect={handleAutocompleteSelect}
+            suggestions={tasks}
             placeholder="Task name..."
-            className="w-full px-2 py-1.5 text-sm bg-background rounded border border-input focus:outline-none focus:ring-2 focus:ring-ring mb-3"
             autoFocus
+            onKeyDown={handleKeyDown}
+            className="mb-3"
           />
-          
+
           {/* Color picker */}
           <div className="flex flex-wrap gap-1.5 mb-3">
             {TASK_COLORS.map(color => (
@@ -96,10 +102,7 @@ export function QuickTasksPanel({
               Add Task
             </button>
             <button
-              onClick={() => {
-                setIsAdding(false);
-                setNewTaskName('');
-              }}
+              onClick={() => { setIsAdding(false); setNewTaskName(''); }}
               className="px-3 py-1.5 text-sm bg-secondary text-secondary-foreground rounded-md hover:opacity-80 transition-opacity"
             >
               Cancel
@@ -108,17 +111,9 @@ export function QuickTasksPanel({
         </div>
       )}
 
-      {/* Task list */}
-      <div 
-        className={cn(
-          'flex-1 flex flex-wrap content-start gap-2',
-          isOver && 'bg-accent/30 rounded-lg'
-        )}
-      >
+      <div className={cn('flex-1 flex flex-wrap content-start gap-2', isOver && 'bg-accent/30 rounded-lg')}>
         {tasks.length === 0 ? (
-          <p className="text-sm text-muted-foreground italic w-full text-center py-4">
-            No tasks yet. Add your first task!
-          </p>
+          <p className="text-sm text-muted-foreground italic w-full text-center py-4">No tasks yet. Add your first task!</p>
         ) : (
           tasks.map(task => (
             <div key={task.id} className="group relative">
@@ -141,11 +136,8 @@ export function QuickTasksPanel({
         )}
       </div>
 
-      {/* Instructions */}
       <div className="mt-4 pt-3 border-t border-border/50">
-        <p className="text-xs text-muted-foreground text-center">
-          Drag tasks to calendar or routines
-        </p>
+        <p className="text-xs text-muted-foreground text-center">Drag tasks to calendar or routines</p>
       </div>
     </div>
   );

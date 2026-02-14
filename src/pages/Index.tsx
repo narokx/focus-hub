@@ -5,28 +5,22 @@ import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
 import { RoutinesPanel } from '@/components/RoutinesPanel';
-import { TaskChip } from '@/components/TaskChip';
 import { useAppState } from '@/hooks/useAppState';
 import { TaskColor, TASK_COLOR_MAP, getContrastColor } from '@/types';
 
 export default function Index() {
   const {
     state,
-    addQuickTask,
-    updateQuickTask,
-    deleteQuickTask,
-    addRoutine,
-    updateRoutine,
-    deleteRoutine,
-    addTaskToRoutine,
-    removeTaskFromRoutine,
-    getDayData,
-    addTaskToDay,
-    toggleDayTask,
-    updateDayTask,
-    removeDayTask,
+    addQuickTask, updateQuickTask, deleteQuickTask,
+    addRoutine, updateRoutine, deleteRoutine,
+    addTaskToRoutine, removeTaskFromRoutine,
+    assignTaskToRoutineSlot, moveRoutineSlotToUnassigned,
+    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime,
+    addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
+    assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
+    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime,
     applyRoutineToDay,
-    updateWindowPosition,
+    updateWindowPosition, updateWindowTitle,
   } = useAppState();
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -53,36 +47,68 @@ export default function Index() {
     const activeData = active.data.current as any;
     const overData = over.data.current as any;
 
-    // Handle routine drag to calendar
+    // Handle routine drag to calendar cell
     if (activeData?.type === 'routine' && overData?.type === 'day') {
-      const routine = activeData.routine;
-      const date = overData.date;
-      applyRoutineToDay(date, routine);
-      setSelectedDate(date);
+      applyRoutineToDay(overData.date, activeData.routine);
+      setSelectedDate(overData.date);
       return;
     }
 
-    // Handle task drag to calendar day
+    // Handle task drag to time slot
+    if (activeData?.type === 'task' && overData?.type === 'timeslot') {
+      const { prefix, slotId } = overData;
+      const task = { name: activeData.name, color: activeData.color, taskId: activeData.taskId };
+
+      if (prefix.startsWith('day-')) {
+        const date = prefix.substring(4); // "day-YYYY-MM-DD" → "YYYY-MM-DD"
+        assignTaskToDaySlot(date, slotId, task);
+        // If source was unassigned in same day, remove it
+        if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
+          removeDayTask(date, activeData.unassignedTaskId);
+        }
+        // If source was unassigned in a routine, remove it
+        if (activeData.source === 'unassigned' && activeData.sourcePrefix?.startsWith('routine-')) {
+          const routineId = activeData.sourcePrefix.substring(8);
+          removeTaskFromRoutine(routineId, activeData.unassignedTaskId);
+        }
+        setSelectedDate(date);
+      } else if (prefix.startsWith('routine-')) {
+        const routineId = prefix.substring(8);
+        assignTaskToRoutineSlot(routineId, slotId, task);
+        // If source was unassigned in same routine, remove it
+        if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
+          removeTaskFromRoutine(routineId, activeData.unassignedTaskId);
+        }
+      }
+      return;
+    }
+
+    // Handle task drag to unassigned zone
+    if (activeData?.type === 'task' && overData?.type === 'unassigned-zone') {
+      const { prefix } = overData;
+      if (prefix.startsWith('day-')) {
+        const date = prefix.substring(4);
+        addTaskToDay(date, { name: activeData.name, color: activeData.color, taskId: activeData.taskId });
+        setSelectedDate(date);
+      } else if (prefix.startsWith('routine-')) {
+        const routineId = prefix.substring(8);
+        addTaskToRoutine(routineId, { id: activeData.taskId || (active.id as string), name: activeData.name, color: activeData.color } as any);
+      }
+      return;
+    }
+
+    // Handle task drag to calendar day cell (goes to unassigned)
     if (activeData?.type === 'task' && overData?.type === 'day') {
       const date = overData.date;
-      addTaskToDay(date, {
-        name: activeData.name,
-        color: activeData.color,
-        taskId: activeData.taskId,
-      });
+      addTaskToDay(date, { name: activeData.name, color: activeData.color, taskId: activeData.taskId });
       setSelectedDate(date);
       return;
     }
 
-    // Handle task drag to routine
+    // Handle task drag to routine drop zone (goes to unassigned)
     if (activeData?.type === 'task' && overData?.type === 'routine-drop') {
       const routineId = overData.routineId;
-      const task = {
-        id: activeData.taskId || active.id,
-        name: activeData.name,
-        color: activeData.color,
-      };
-      addTaskToRoutine(routineId, task as any);
+      addTaskToRoutine(routineId, { id: activeData.taskId || (active.id as string), name: activeData.name, color: activeData.color } as any);
       return;
     }
   };
@@ -94,26 +120,22 @@ export default function Index() {
       onDragEnd={handleDragEnd}
     >
       <div className="min-h-screen bg-background p-4 overflow-hidden relative">
-        {/* App title */}
         <div className="absolute top-4 left-4 z-0">
-          <h1 className="text-xl font-bold text-foreground/80 tracking-tight">
-            Productivity Heatmap
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Track your daily habits
-          </p>
+          <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Track your daily habits</p>
         </div>
 
-        {/* Floating Windows */}
+        {/* Routines Window */}
         <FloatingWindow
-          title="Routines"
+          title={state.windowTitles.routines}
           icon={<Layers className="w-4 h-4 text-muted-foreground" />}
           defaultPosition={{ x: state.windowPositions.routines.x, y: state.windowPositions.routines.y }}
           defaultSize={{ width: state.windowPositions.routines.width, height: state.windowPositions.routines.height }}
-          minWidth={250}
+          minWidth={300}
           minHeight={200}
           onPositionChange={(pos) => updateWindowPosition('routines', pos)}
           onSizeChange={(size) => updateWindowPosition('routines', size)}
+          onTitleChange={(title) => updateWindowTitle('routines', title)}
         >
           <RoutinesPanel
             routines={state.routines}
@@ -121,11 +143,16 @@ export default function Index() {
             onUpdateRoutine={updateRoutine}
             onDeleteRoutine={deleteRoutine}
             onRemoveTaskFromRoutine={removeTaskFromRoutine}
+            onAddRoutineTimeSlot={addRoutineTimeSlot}
+            onDeleteRoutineTimeSlot={deleteRoutineTimeSlot}
+            onUpdateRoutineSlotTime={updateRoutineSlotTime}
+            onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
           />
         </FloatingWindow>
 
+        {/* Quick Tasks Window */}
         <FloatingWindow
-          title="Quick Tasks"
+          title={state.windowTitles.quickTasks}
           icon={<List className="w-4 h-4 text-muted-foreground" />}
           defaultPosition={{ x: state.windowPositions.quickTasks.x, y: state.windowPositions.quickTasks.y }}
           defaultSize={{ width: state.windowPositions.quickTasks.width, height: state.windowPositions.quickTasks.height }}
@@ -133,6 +160,7 @@ export default function Index() {
           minHeight={200}
           onPositionChange={(pos) => updateWindowPosition('quickTasks', pos)}
           onSizeChange={(size) => updateWindowPosition('quickTasks', size)}
+          onTitleChange={(title) => updateWindowTitle('quickTasks', title)}
         >
           <QuickTasksPanel
             tasks={state.quickTasks}
@@ -142,8 +170,9 @@ export default function Index() {
           />
         </FloatingWindow>
 
+        {/* Calendar Window */}
         <FloatingWindow
-          title="Calendar"
+          title={state.windowTitles.calendar}
           icon={<Calendar className="w-4 h-4 text-muted-foreground" />}
           defaultPosition={{ x: state.windowPositions.calendar.x, y: state.windowPositions.calendar.y }}
           defaultSize={{ width: state.windowPositions.calendar.width, height: state.windowPositions.calendar.height }}
@@ -151,15 +180,21 @@ export default function Index() {
           minHeight={400}
           onPositionChange={(pos) => updateWindowPosition('calendar', pos)}
           onSizeChange={(size) => updateWindowPosition('calendar', size)}
+          onTitleChange={(title) => updateWindowTitle('calendar', title)}
         >
           <HeatmapCalendar
             calendar={state.calendar}
             onDayClick={setSelectedDate}
-            onToggleTask={toggleDayTask}
-            onUpdateTask={(date, taskId, name) => updateDayTask(date, taskId, { name })}
-            onRemoveTask={removeDayTask}
             selectedDate={selectedDate}
             onCloseDay={() => setSelectedDate(null)}
+            onToggleDayTask={toggleDayTask}
+            onUpdateDayTask={(date, taskId, name) => updateDayTask(date, taskId, { name })}
+            onRemoveDayTask={removeDayTask}
+            onAddDayTimeSlot={addDayTimeSlot}
+            onDeleteDayTimeSlot={deleteDayTimeSlot}
+            onUpdateDaySlotTime={updateDaySlotTime}
+            onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
+            onToggleDaySlotTask={toggleDaySlotTask}
           />
         </FloatingWindow>
 
@@ -180,7 +215,7 @@ export default function Index() {
             <div className="px-3 py-2 bg-card border border-border rounded-lg shadow-lg">
               <span className="text-sm font-medium">{activeDragData.routine?.name}</span>
               <span className="text-xs text-muted-foreground ml-2">
-                ({activeDragData.routine?.tasks.length} tasks)
+                ({(activeDragData.routine?.tasks.length || 0) + ((activeDragData.routine?.timeSlots || []).filter(s => s.task).length || 0)} tasks)
               </span>
             </div>
           )}

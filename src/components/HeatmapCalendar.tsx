@@ -1,42 +1,44 @@
 import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
-import { DayData } from '@/types';
-import { TaskChip } from './TaskChip';
+import { DayData, generateDefaultTimeSlots } from '@/types';
+import { TimelineView } from './TimelineView';
 import { cn } from '@/lib/utils';
 
 interface HeatmapCalendarProps {
   calendar: Record<string, DayData>;
   onDayClick: (date: string) => void;
-  onToggleTask: (date: string, taskId: string) => void;
-  onUpdateTask: (date: string, taskId: string, name: string) => void;
-  onRemoveTask: (date: string, taskId: string) => void;
   selectedDate: string | null;
   onCloseDay: () => void;
+  // Day time slot operations
+  onToggleDayTask: (date: string, taskId: string) => void;
+  onUpdateDayTask: (date: string, taskId: string, name: string) => void;
+  onRemoveDayTask: (date: string, taskId: string) => void;
+  onAddDayTimeSlot: (date: string) => void;
+  onDeleteDayTimeSlot: (date: string, slotId: string) => void;
+  onUpdateDaySlotTime: (date: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onMoveDaySlotToUnassigned: (date: string, slotId: string) => void;
+  onToggleDaySlotTask: (date: string, slotId: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
-  if (!dayData || dayData.tasks.length === 0) return 'empty';
-  const completed = dayData.tasks.filter(t => t.completed).length;
-  const percentage = (completed / dayData.tasks.length) * 100;
+  if (!dayData) return 'empty';
+  const slotTasks = (dayData.timeSlots || []).filter(s => s.task).length;
+  const unassignedTasks = dayData.tasks.length;
+  const totalTasks = slotTasks + unassignedTasks;
+  if (totalTasks === 0) return 'empty';
+  const completedSlots = (dayData.timeSlots || []).filter(s => s.task?.completed).length;
+  const completedUnassigned = dayData.tasks.filter(t => t.completed).length;
+  const completed = completedSlots + completedUnassigned;
+  const percentage = (completed / totalTasks) * 100;
   if (percentage < 30) return 'low';
   if (percentage < 70) return 'mid';
   return 'high';
 }
 
-function DayCell({ 
-  date, 
-  dayData, 
-  currentMonth, 
-  onClick, 
-  isSelected 
-}: { 
-  date: Date; 
-  dayData?: DayData; 
-  currentMonth: Date;
-  onClick: () => void;
-  isSelected: boolean;
+function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
+  date: Date; dayData?: DayData; currentMonth: Date; onClick: () => void; isSelected: boolean;
 }) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({
@@ -47,10 +49,9 @@ function DayCell({
   const inMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
   const future = isFuture(date) && !today;
-  
-  // Only color past dates and today
-  const level = (!future && dayData?.tasks.length) ? getCompletionLevel(dayData) : 'empty';
-  const taskCount = dayData?.tasks.length || 0;
+  const level = (!future && dayData) ? getCompletionLevel(dayData) : 'empty';
+  const slotCount = (dayData?.timeSlots || []).filter(s => s.task).length;
+  const taskCount = (dayData?.tasks.length || 0) + slotCount;
 
   return (
     <div
@@ -70,9 +71,7 @@ function DayCell({
     >
       <div className="flex flex-col items-center gap-0.5">
         <span className="text-xs font-medium">{format(date, 'd')}</span>
-        {taskCount > 0 && (
-          <span className="text-[10px] opacity-70">{taskCount}</span>
-        )}
+        {taskCount > 0 && <span className="text-[10px] opacity-70">{taskCount}</span>}
       </div>
     </div>
   );
@@ -81,11 +80,16 @@ function DayCell({
 export function HeatmapCalendar({
   calendar,
   onDayClick,
-  onToggleTask,
-  onUpdateTask,
-  onRemoveTask,
   selectedDate,
   onCloseDay,
+  onToggleDayTask,
+  onUpdateDayTask,
+  onRemoveDayTask,
+  onAddDayTimeSlot,
+  onDeleteDayTimeSlot,
+  onUpdateDaySlotTime,
+  onMoveDaySlotToUnassigned,
+  onToggleDaySlotTask,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -93,7 +97,6 @@ export function HeatmapCalendar({
   const monthEnd = endOfMonth(currentMonth);
   const calendarStart = startOfWeek(monthStart);
   const calendarEnd = endOfWeek(monthEnd);
-  
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -103,36 +106,23 @@ export function HeatmapCalendar({
     <div className="flex flex-col h-full gap-4">
       {/* Month navigation */}
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-          className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-        >
+        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
           <ChevronLeft className="w-5 h-5" />
         </button>
-        <h2 className="text-lg font-semibold">
-          {format(currentMonth, 'MMMM yyyy')}
-        </h2>
-        <button
-          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          className="p-1.5 rounded-md hover:bg-secondary transition-colors"
-        >
+        <h2 className="text-lg font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
+        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
 
       {/* Calendar grid */}
-      <div className="flex-1 flex flex-col">
-        {/* Week day headers */}
+      <div className="flex-shrink-0">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {weekDays.map(day => (
-            <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">
-              {day}
-            </div>
+            <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">{day}</div>
           ))}
         </div>
-
-        {/* Day cells */}
-        <div className="grid grid-cols-7 gap-1 flex-1 auto-rows-fr">
+        <div className="grid grid-cols-7 gap-1">
           {days.map(date => {
             const dateStr = format(date, 'yyyy-MM-dd');
             return (
@@ -169,9 +159,9 @@ export function HeatmapCalendar({
         </div>
       </div>
 
-      {/* Selected day tasks panel */}
+      {/* Selected day timeline panel */}
       {selectedDate && (
-        <div className="border-t pt-4 animate-fade-in">
+        <div className="border-t pt-4 animate-fade-in flex-1 overflow-auto scrollbar-thin">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <CalendarIcon className="w-4 h-4 text-muted-foreground" />
@@ -179,37 +169,25 @@ export function HeatmapCalendar({
                 {format(new Date(selectedDate), 'EEEE, MMMM d')}
               </h3>
             </div>
-            <button
-              onClick={onCloseDay}
-              className="p-1 rounded hover:bg-secondary transition-colors"
-            >
+            <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
-          
-          <div className="flex flex-wrap gap-2 min-h-[40px]">
-            {selectedDayData?.tasks.length ? (
-              selectedDayData.tasks.map(task => (
-                <TaskChip
-                  key={task.id}
-                  id={`day-task-${task.id}`}
-                  name={task.name}
-                  color={task.color}
-                  draggable={false}
-                  editable={true}
-                  completed={task.completed}
-                  onToggleComplete={() => onToggleTask(selectedDate, task.id)}
-                  onNameChange={(name) => onUpdateTask(selectedDate, task.id, name)}
-                  onDelete={() => onRemoveTask(selectedDate, task.id)}
-                  showDelete
-                />
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Drop tasks or routines here
-              </p>
-            )}
-          </div>
+
+          <TimelineView
+            timeSlots={selectedDayData?.timeSlots || generateDefaultTimeSlots()}
+            unassignedTasks={selectedDayData?.tasks || []}
+            droppablePrefix={`day-${selectedDate}`}
+            showCompleted={true}
+            onAddTimeSlot={() => onAddDayTimeSlot(selectedDate)}
+            onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate, slotId)}
+            onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate, slotId, field, value)}
+            onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate, slotId)}
+            onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate, slotId)}
+            onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
+            onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
+            onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
+          />
         </div>
       )}
     </div>
