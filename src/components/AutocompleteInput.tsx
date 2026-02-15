@@ -86,7 +86,7 @@ export function AutocompleteInput({
         autoFocus={autoFocus}
       />
       {isOpen && filtered.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-[160px] overflow-y-auto">
+        <div className="absolute z-[9999] top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg overflow-hidden max-h-[160px] overflow-y-auto">
           {filtered.map((task, i) => (
             <button
               key={task.id}

@@ -202,9 +202,9 @@ export function TimelineView({
   onUpdateUnassignedName,
 }: TimelineViewProps) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 h-full">
       {/* Timeline slots */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 flex-1 overflow-auto scrollbar-thin min-h-0">
         {timeSlots.map(slot => (
           <TimeSlotRow
             key={slot.id}
