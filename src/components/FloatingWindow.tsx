@@ -159,9 +159,9 @@ export function FloatingWindow({
                   onMouseDown={(e) => e.stopPropagation()}
                 />
               ) : (
-                <span
-                  className="window-title cursor-default"
-                  onDoubleClick={handleTitleDoubleClick}
+              <span
+                  className="window-title cursor-pointer hover:text-primary transition-colors"
+                  onClick={(e) => { e.stopPropagation(); handleTitleDoubleClick(); }}
                 >
                   {title}
                 </span>

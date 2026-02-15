@@ -11,7 +11,6 @@ interface HeatmapCalendarProps {
   onDayClick: (date: string) => void;
   selectedDate: string | null;
   onCloseDay: () => void;
-  // Day time slot operations
   onToggleDayTask: (date: string, taskId: string) => void;
   onUpdateDayTask: (date: string, taskId: string, name: string) => void;
   onRemoveDayTask: (date: string, taskId: string) => void;
@@ -103,65 +102,10 @@ export function HeatmapCalendar({
   const selectedDayData = selectedDate ? calendar[selectedDate] : null;
 
   return (
-    <div className="flex flex-col h-full gap-4">
-      {/* Month navigation */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <h2 className="text-lg font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
-        <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Calendar grid */}
-      <div className="flex-shrink-0">
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {weekDays.map(day => (
-            <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">{day}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {days.map(date => {
-            const dateStr = format(date, 'yyyy-MM-dd');
-            return (
-              <DayCell
-                key={dateStr}
-                date={date}
-                dayData={calendar[dateStr]}
-                currentMonth={currentMonth}
-                onClick={() => onDayClick(dateStr)}
-                isSelected={selectedDate === dateStr}
-              />
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />
-            <span>None</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-heatmap-low" />
-            <span>&lt;30%</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-heatmap-mid" />
-            <span>30-69%</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm bg-heatmap-high" />
-            <span>≥70%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Selected day timeline panel */}
+    <div className="flex h-full gap-4">
+      {/* Selected day timeline panel - LEFT SIDE */}
       {selectedDate && (
-        <div className="border-t pt-4 animate-fade-in flex-1 overflow-auto scrollbar-thin">
+        <div className="w-[280px] flex-shrink-0 border-r border-border/50 pr-4 animate-fade-in flex flex-col overflow-hidden">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <CalendarIcon className="w-4 h-4 text-muted-foreground" />
@@ -174,22 +118,81 @@ export function HeatmapCalendar({
             </button>
           </div>
 
-          <TimelineView
-            timeSlots={selectedDayData?.timeSlots || generateDefaultTimeSlots()}
-            unassignedTasks={selectedDayData?.tasks || []}
-            droppablePrefix={`day-${selectedDate}`}
-            showCompleted={true}
-            onAddTimeSlot={() => onAddDayTimeSlot(selectedDate)}
-            onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate, slotId)}
-            onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate, slotId, field, value)}
-            onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate, slotId)}
-            onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate, slotId)}
-            onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
-            onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
-            onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
-          />
+          <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
+            <TimelineView
+              timeSlots={selectedDayData?.timeSlots || generateDefaultTimeSlots()}
+              unassignedTasks={selectedDayData?.tasks || []}
+              droppablePrefix={`day-${selectedDate}`}
+              showCompleted={true}
+              onAddTimeSlot={() => onAddDayTimeSlot(selectedDate)}
+              onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate, slotId)}
+              onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate, slotId, field, value)}
+              onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate, slotId)}
+              onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate, slotId)}
+              onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
+              onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
+              onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
+            />
+          </div>
         </div>
       )}
+
+      {/* Calendar grid - RIGHT SIDE */}
+      <div className="flex-1 flex flex-col gap-4 min-w-0">
+        {/* Month navigation */}
+        <div className="flex items-center justify-between">
+          <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-lg font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
+          <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-shrink-0">
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {weekDays.map(day => (
+              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">{day}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {days.map(date => {
+              const dateStr = format(date, 'yyyy-MM-dd');
+              return (
+                <DayCell
+                  key={dateStr}
+                  date={date}
+                  dayData={calendar[dateStr]}
+                  currentMonth={currentMonth}
+                  onClick={() => onDayClick(dateStr)}
+                  isSelected={selectedDate === dateStr}
+                />
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />
+              <span>None</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-heatmap-low" />
+              <span>&lt;30%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-heatmap-mid" />
+              <span>30-69%</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm bg-heatmap-high" />
+              <span>≥70%</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

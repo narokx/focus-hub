@@ -124,7 +124,7 @@ function RoutineItem({
 
       {/* Routine timeline */}
       {isExpanded && (
-        <div ref={setNodeRef} className={cn('p-2 transition-colors', isOver && 'bg-accent/20')}>
+        <div ref={setNodeRef} className={cn('p-2 transition-colors overflow-auto scrollbar-thin max-h-[400px]', isOver && 'bg-accent/20')}>
           <TimelineView
             timeSlots={routine.timeSlots || generateDefaultTimeSlots()}
             unassignedTasks={routine.tasks}
