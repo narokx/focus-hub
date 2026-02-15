@@ -151,8 +151,8 @@ function UnassignedZone({
       <div
         ref={setNodeRef}
         className={cn(
-          'flex flex-wrap gap-1.5 min-h-[36px] p-2 rounded-lg border border-dashed border-border/40 transition-all',
-          isOver && 'border-primary bg-accent/30'
+          'flex flex-wrap gap-1.5 min-h-[36px] p-2 rounded-lg border-2 border-dashed border-border/60 bg-muted/30 transition-all',
+          isOver && 'border-primary bg-accent/40'
         )}
       >
         {tasks.length === 0 ? (
@@ -161,25 +161,26 @@ function UnassignedZone({
           </span>
         ) : (
           tasks.map(task => (
-            <TaskChip
-              key={task.id}
-              id={`${droppablePrefix}-unassigned-${task.id}`}
-              name={task.name}
-              color={task.color}
-              draggable={true}
-              dragData={{
-                taskId: task.taskId || task.id,
-                source: 'unassigned',
-                sourcePrefix: droppablePrefix,
-                unassignedTaskId: task.id,
-              }}
-              editable={!!onUpdateName}
-              onNameChange={onUpdateName ? (name) => onUpdateName(task.id, name) : undefined}
-              completed={task.completed}
-              onToggleComplete={showCompleted && onToggle ? () => onToggle(task.id) : undefined}
-              onDelete={() => onRemove(task.id)}
-              showDelete
-            />
+            <div key={task.id} onClick={(e) => e.stopPropagation()}>
+              <TaskChip
+                id={`${droppablePrefix}-unassigned-${task.id}`}
+                name={task.name}
+                color={task.color}
+                draggable={true}
+                dragData={{
+                  taskId: task.taskId || task.id,
+                  source: 'unassigned',
+                  sourcePrefix: droppablePrefix,
+                  unassignedTaskId: task.id,
+                }}
+                editable={!!onUpdateName}
+                onNameChange={onUpdateName ? (name) => onUpdateName(task.id, name) : undefined}
+                completed={task.completed}
+                onToggleComplete={showCompleted && onToggle ? () => onToggle(task.id) : undefined}
+                onDelete={() => onRemove(task.id)}
+                showDelete
+              />
+            </div>
           ))
         )}
       </div>

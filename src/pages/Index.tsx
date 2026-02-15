@@ -86,13 +86,39 @@ export default function Index() {
     // Handle task drag to unassigned zone
     if (activeData?.type === 'task' && overData?.type === 'unassigned-zone') {
       const { prefix } = overData;
+
+      // Skip if dropping back on the same unassigned zone (prevents duplication on click)
+      if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
+        return;
+      }
+
       if (prefix.startsWith('day-')) {
         const date = prefix.substring(4);
         addTaskToDay(date, { name: activeData.name, color: activeData.color, taskId: activeData.taskId });
+        // If source was unassigned in a different zone, remove from source (MOVE)
+        if (activeData.source === 'unassigned' && activeData.sourcePrefix) {
+          if (activeData.sourcePrefix.startsWith('day-')) {
+            const srcDate = activeData.sourcePrefix.substring(4);
+            removeDayTask(srcDate, activeData.unassignedTaskId);
+          } else if (activeData.sourcePrefix.startsWith('routine-')) {
+            const srcRoutineId = activeData.sourcePrefix.substring(8);
+            removeTaskFromRoutine(srcRoutineId, activeData.unassignedTaskId);
+          }
+        }
         setSelectedDate(date);
       } else if (prefix.startsWith('routine-')) {
         const routineId = prefix.substring(8);
         addTaskToRoutine(routineId, { id: activeData.taskId || (active.id as string), name: activeData.name, color: activeData.color } as any);
+        // If source was unassigned in a different zone, remove from source (MOVE)
+        if (activeData.source === 'unassigned' && activeData.sourcePrefix) {
+          if (activeData.sourcePrefix.startsWith('day-')) {
+            const srcDate = activeData.sourcePrefix.substring(4);
+            removeDayTask(srcDate, activeData.unassignedTaskId);
+          } else if (activeData.sourcePrefix.startsWith('routine-')) {
+            const srcRoutineId = activeData.sourcePrefix.substring(8);
+            removeTaskFromRoutine(srcRoutineId, activeData.unassignedTaskId);
+          }
+        }
       }
       return;
     }
@@ -101,6 +127,16 @@ export default function Index() {
     if (activeData?.type === 'task' && overData?.type === 'day') {
       const date = overData.date;
       addTaskToDay(date, { name: activeData.name, color: activeData.color, taskId: activeData.taskId });
+      // If source was unassigned, remove from source (MOVE)
+      if (activeData.source === 'unassigned' && activeData.sourcePrefix) {
+        if (activeData.sourcePrefix.startsWith('day-')) {
+          const srcDate = activeData.sourcePrefix.substring(4);
+          removeDayTask(srcDate, activeData.unassignedTaskId);
+        } else if (activeData.sourcePrefix.startsWith('routine-')) {
+          const srcRoutineId = activeData.sourcePrefix.substring(8);
+          removeTaskFromRoutine(srcRoutineId, activeData.unassignedTaskId);
+        }
+      }
       setSelectedDate(date);
       return;
     }
