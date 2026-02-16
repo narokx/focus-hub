@@ -43,7 +43,6 @@ const getDefaultState = (): AppState => ({
   windowTitles: defaultWindowTitles,
 });
 
-// Helper to ensure DayData has timeSlots
 function ensureDayData(date: string, existing?: Partial<DayData>): DayData {
   return {
     date,
@@ -52,12 +51,8 @@ function ensureDayData(date: string, existing?: Partial<DayData>): DayData {
   };
 }
 
-// Helper to ensure Routine has timeSlots
 function ensureRoutine(r: any): Routine {
-  return {
-    ...r,
-    timeSlots: r.timeSlots || generateDefaultTimeSlots(),
-  };
+  return { ...r, timeSlots: r.timeSlots || generateDefaultTimeSlots() };
 }
 
 export function useAppState() {
@@ -66,9 +61,7 @@ export function useAppState() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Migrate: ensure all routines have timeSlots
         const routines = (parsed.routines || []).map(ensureRoutine);
-        // Migrate: ensure all calendar entries have timeSlots
         const calendar: Record<string, DayData> = {};
         if (parsed.calendar) {
           for (const [date, data] of Object.entries(parsed.calendar)) {
@@ -80,14 +73,8 @@ export function useAppState() {
           ...parsed,
           routines,
           calendar,
-          windowPositions: {
-            ...defaultWindowPositions,
-            ...parsed.windowPositions,
-          },
-          windowTitles: {
-            ...defaultWindowTitles,
-            ...parsed.windowTitles,
-          },
+          windowPositions: { ...defaultWindowPositions, ...parsed.windowPositions },
+          windowTitles: { ...defaultWindowTitles, ...parsed.windowTitles },
         };
       }
     } catch (e) {
@@ -105,7 +92,7 @@ export function useAppState() {
   }, [state]);
 
   // Quick Tasks
-  const addQuickTask = useCallback((name: string, color: typeof TASK_COLORS[number]) => {
+  const addQuickTask = useCallback((name: string, color: string) => {
     setState(prev => ({
       ...prev,
       quickTasks: [...prev.quickTasks, { id: `qt-${Date.now()}`, name, color }],
@@ -124,6 +111,15 @@ export function useAppState() {
       ...prev,
       quickTasks: prev.quickTasks.filter(t => t.id !== id),
     }));
+  }, []);
+
+  const reorderQuickTasks = useCallback((fromIndex: number, toIndex: number) => {
+    setState(prev => {
+      const tasks = [...prev.quickTasks];
+      const [moved] = tasks.splice(fromIndex, 1);
+      tasks.splice(toIndex, 0, moved);
+      return { ...prev, quickTasks: tasks };
+    });
   }, []);
 
   // Routines
@@ -169,7 +165,7 @@ export function useAppState() {
   }, []);
 
   // Routine Time Slots
-  const assignTaskToRoutineSlot = useCallback((routineId: string, slotId: string, task: { name: string; color: typeof TASK_COLORS[number]; taskId?: string }) => {
+  const assignTaskToRoutineSlot = useCallback((routineId: string, slotId: string, task: { name: string; color: string; taskId?: string }) => {
     setState(prev => ({
       ...prev,
       routines: prev.routines.map(r =>
@@ -225,15 +221,7 @@ export function useAppState() {
       ...prev,
       routines: prev.routines.map(r =>
         r.id === routineId
-          ? {
-              ...r,
-              timeSlots: [...r.timeSlots, {
-                id: `ts-${Date.now()}`,
-                startTime: '12:00 PM',
-                endTime: '01:00 PM',
-                task: null,
-              }],
-            }
+          ? { ...r, timeSlots: [...r.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00 PM', endTime: '01:00 PM', task: null }] }
           : r
       ),
     }));
@@ -261,12 +249,23 @@ export function useAppState() {
     }));
   }, []);
 
+  const updateRoutineSlotTaskName = useCallback((routineId: string, slotId: string, name: string) => {
+    setState(prev => ({
+      ...prev,
+      routines: prev.routines.map(r =>
+        r.id === routineId
+          ? { ...r, timeSlots: r.timeSlots.map(s => s.id === slotId && s.task ? { ...s, task: { ...s.task, name } } : s) }
+          : r
+      ),
+    }));
+  }, []);
+
   // Calendar
   const getDayData = useCallback((date: string): DayData => {
     return state.calendar[date] || ensureDayData(date);
   }, [state.calendar]);
 
-  const addTaskToDay = useCallback((date: string, task: { name: string; color: typeof TASK_COLORS[number]; taskId?: string }) => {
+  const addTaskToDay = useCallback((date: string, task: { name: string; color: string; taskId?: string }) => {
     setState(prev => {
       const dayData = ensureDayData(date, prev.calendar[date]);
       return {
@@ -331,7 +330,7 @@ export function useAppState() {
   }, []);
 
   // Day Time Slots
-  const assignTaskToDaySlot = useCallback((date: string, slotId: string, task: { name: string; color: typeof TASK_COLORS[number]; taskId?: string }) => {
+  const assignTaskToDaySlot = useCallback((date: string, slotId: string, task: { name: string; color: string; taskId?: string }) => {
     setState(prev => {
       const dayData = ensureDayData(date, prev.calendar[date]);
       return {
@@ -435,10 +434,97 @@ export function useAppState() {
     });
   }, []);
 
+  const updateDaySlotTaskName = useCallback((date: string, slotId: string, name: string) => {
+    setState(prev => {
+      const dayData = prev.calendar[date];
+      if (!dayData) return prev;
+      return {
+        ...prev,
+        calendar: {
+          ...prev.calendar,
+          [date]: { ...dayData, timeSlots: dayData.timeSlots.map(s => s.id === slotId && s.task ? { ...s, task: { ...s.task, name } } : s) },
+        },
+      };
+    });
+  }, []);
+
+  // Move task between slots (slot-to-slot)
+  const moveSlotToSlot = useCallback((
+    sourcePrefix: string, sourceSlotId: string,
+    targetPrefix: string, targetSlotId: string
+  ) => {
+    setState(prev => {
+      // Helper to get/set data
+      const getContext = (prefix: string) => {
+        if (prefix.startsWith('day-')) {
+          const date = prefix.substring(4);
+          return { type: 'day' as const, date, data: ensureDayData(date, prev.calendar[date]) };
+        } else if (prefix.startsWith('routine-')) {
+          const routineId = prefix.substring(8);
+          const routine = prev.routines.find(r => r.id === routineId);
+          return { type: 'routine' as const, routineId, data: routine };
+        }
+        return null;
+      };
+
+      const src = getContext(sourcePrefix);
+      const tgt = getContext(targetPrefix);
+      if (!src?.data || !tgt?.data) return prev;
+
+      // Get source task
+      const srcSlots = 'timeSlots' in src.data ? src.data.timeSlots : [];
+      const srcSlot = srcSlots.find(s => s.id === sourceSlotId);
+      if (!srcSlot?.task) return prev;
+      const task = srcSlot.task;
+
+      let newState = { ...prev };
+
+      // Clear source slot
+      if (src.type === 'day') {
+        const dayData = ensureDayData(src.date!, prev.calendar[src.date!]);
+        newState = {
+          ...newState,
+          calendar: {
+            ...newState.calendar,
+            [src.date!]: { ...dayData, timeSlots: dayData.timeSlots.map(s => s.id === sourceSlotId ? { ...s, task: null } : s) },
+          },
+        };
+      } else {
+        newState = {
+          ...newState,
+          routines: newState.routines.map(r =>
+            r.id === src.routineId ? { ...r, timeSlots: r.timeSlots.map(s => s.id === sourceSlotId ? { ...s, task: null } : s) } : r
+          ),
+        };
+      }
+
+      // Set target slot
+      const newTask = { ...task, id: `st-${Date.now()}` };
+      if (tgt.type === 'day') {
+        const dayData = ensureDayData(tgt.date!, newState.calendar[tgt.date!]);
+        newState = {
+          ...newState,
+          calendar: {
+            ...newState.calendar,
+            [tgt.date!]: { ...dayData, timeSlots: dayData.timeSlots.map(s => s.id === targetSlotId ? { ...s, task: newTask } : s) },
+          },
+        };
+      } else {
+        newState = {
+          ...newState,
+          routines: newState.routines.map(r =>
+            r.id === tgt.routineId ? { ...r, timeSlots: r.timeSlots.map(s => s.id === targetSlotId ? { ...s, task: newTask } : s) } : r
+          ),
+        };
+      }
+
+      return newState;
+    });
+  }, []);
+
   const applyRoutineToDay = useCallback((date: string, routine: Routine) => {
     setState(prev => {
       const dayData = ensureDayData(date, prev.calendar[date]);
-      // Copy routine unassigned tasks
       const newUnassigned = routine.tasks.map(t => ({
         id: `dt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         taskId: t.taskId,
@@ -446,7 +532,6 @@ export function useAppState() {
         color: t.color,
         completed: false,
       }));
-      // Copy routine time slot tasks to matching slots
       const newTimeSlots = [...dayData.timeSlots];
       routine.timeSlots.forEach((rSlot, i) => {
         if (rSlot.task && i < newTimeSlots.length && !newTimeSlots[i].task) {
@@ -494,14 +579,15 @@ export function useAppState() {
 
   return {
     state,
-    addQuickTask, updateQuickTask, deleteQuickTask,
+    addQuickTask, updateQuickTask, deleteQuickTask, reorderQuickTasks,
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
-    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime,
+    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, updateRoutineSlotTaskName,
     getDayData, addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
     assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
-    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime,
+    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, updateDaySlotTaskName,
+    moveSlotToSlot,
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
   };

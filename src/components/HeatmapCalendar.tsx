@@ -19,6 +19,7 @@ interface HeatmapCalendarProps {
   onUpdateDaySlotTime: (date: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
   onMoveDaySlotToUnassigned: (date: string, slotId: string) => void;
   onToggleDaySlotTask: (date: string, slotId: string) => void;
+  onUpdateDaySlotTaskName?: (date: string, slotId: string, name: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -89,6 +90,7 @@ export function HeatmapCalendar({
   onUpdateDaySlotTime,
   onMoveDaySlotToUnassigned,
   onToggleDaySlotTask,
+  onUpdateDaySlotTaskName,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -132,6 +134,7 @@ export function HeatmapCalendar({
               onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
               onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
               onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
+              onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate, slotId, name) : undefined}
             />
           </div>
         </div>
@@ -139,7 +142,6 @@ export function HeatmapCalendar({
 
       {/* Calendar grid - RIGHT SIDE */}
       <div className="flex-1 flex flex-col gap-4 min-w-0">
-        {/* Month navigation */}
         <div className="flex items-center justify-between">
           <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
             <ChevronLeft className="w-5 h-5" />
@@ -172,7 +174,6 @@ export function HeatmapCalendar({
             })}
           </div>
 
-          {/* Legend */}
           <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />

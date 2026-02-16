@@ -1,7 +1,7 @@
 import React from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X } from 'lucide-react';
-import { TimeSlot, TaskColor, TASK_COLOR_MAP, getContrastColor } from '@/types';
+import { TimeSlot, TaskColor, getColorValue, getContrastColor } from '@/types';
 import { TaskChip } from './TaskChip';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +18,133 @@ interface TimelineViewProps {
   onToggleUnassigned?: (taskId: string) => void;
   onRemoveUnassigned: (taskId: string) => void;
   onUpdateUnassignedName?: (taskId: string, name: string) => void;
+  onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+}
+
+function DraggableSlotTask({
+  slot,
+  droppablePrefix,
+  showCompleted,
+  onRemoveTaskFromSlot,
+  onToggleSlotTask,
+  onUpdateSlotTaskName,
+}: {
+  slot: TimeSlot;
+  droppablePrefix: string;
+  showCompleted?: boolean;
+  onRemoveTaskFromSlot: (slotId: string) => void;
+  onToggleSlotTask?: (slotId: string) => void;
+  onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+}) {
+  const task = slot.task!;
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editName, setEditName] = React.useState(task.name);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${droppablePrefix}-slottask-${slot.id}`,
+    data: {
+      type: 'task',
+      name: task.name,
+      color: task.color,
+      taskId: task.taskId,
+      source: 'timeslot',
+      sourcePrefix: droppablePrefix,
+      sourceSlotId: slot.id,
+    },
+    disabled: isEditing,
+  });
+
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    : undefined;
+
+  const textColor = getContrastColor(task.color);
+  const bgColor = getColorValue(task.color);
+
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleBlur = () => {
+    setIsEditing(false);
+    if (editName.trim() && editName !== task.name && onUpdateSlotTaskName) {
+      onUpdateSlotTaskName(slot.id, editName.trim());
+    }
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ ...style, backgroundColor: bgColor, color: textColor }}
+      className={cn(
+        'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
+        isDragging && 'opacity-50'
+      )}
+      {...attributes}
+      {...listeners}
+    >
+      {showCompleted && onToggleSlotTask && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleSlotTask(slot.id); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={cn(
+            'w-4 h-4 rounded border-2 flex-shrink-0 transition-colors',
+            textColor === 'white' ? 'border-white/70' : 'border-black/40',
+            task.completed && (textColor === 'white' ? 'bg-white/30' : 'bg-black/20')
+          )}
+        >
+          {task.completed && (
+            <svg viewBox="0 0 12 12" className="w-full h-full">
+              <path d="M2.5 6L5 8.5L9.5 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </button>
+      )}
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleBlur();
+            if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); }
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className="flex-1 bg-transparent min-w-0 text-inherit outline-none"
+          style={{ color: 'inherit' }}
+        />
+      ) : (
+        <span
+          className={cn('flex-1 truncate', task.completed && 'line-through opacity-60')}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (onUpdateSlotTaskName) {
+              setIsEditing(true);
+              setEditName(task.name);
+            }
+          }}
+        >
+          {task.name}
+        </span>
+      )}
+      <button
+        onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
+        onPointerDown={(e) => e.stopPropagation()}
+        className={cn(
+          'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity',
+          textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+        )}
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
 }
 
 function TimeSlotRow({
@@ -28,6 +155,7 @@ function TimeSlotRow({
   onUpdateSlotTime,
   onRemoveTaskFromSlot,
   onToggleSlotTask,
+  onUpdateSlotTaskName,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -36,17 +164,15 @@ function TimeSlotRow({
   onUpdateSlotTime: (slotId: string, field: 'startTime' | 'endTime', value: string) => void;
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
+  onUpdateSlotTaskName?: (slotId: string, name: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
     data: { type: 'timeslot', prefix: droppablePrefix, slotId: slot.id },
   });
 
-  const textColor = slot.task ? getContrastColor(slot.task.color) : undefined;
-
   return (
     <div className="flex items-center gap-1 group">
-      {/* Time labels */}
       <div className="flex items-center gap-0.5 flex-shrink-0">
         <input
           type="text"
@@ -63,58 +189,28 @@ function TimeSlotRow({
         />
       </div>
 
-      {/* Drop zone for task */}
       <div
         ref={setNodeRef}
         className={cn(
           'flex-1 min-h-[32px] rounded-md border border-dashed border-border/50 flex items-center px-2 transition-all',
           isOver && 'border-primary bg-accent/40 scale-[1.02]',
-          slot.task && 'border-transparent'
+          slot.task && 'border-transparent p-0'
         )}
       >
         {slot.task ? (
-          <div
-            className="flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium"
-            style={{
-              backgroundColor: TASK_COLOR_MAP[slot.task.color],
-              color: textColor,
-            }}
-          >
-            {showCompleted && onToggleSlotTask && (
-              <button
-                onClick={() => onToggleSlotTask(slot.id)}
-                className={cn(
-                  'w-4 h-4 rounded border-2 flex-shrink-0 transition-colors',
-                  textColor === 'white' ? 'border-white/70' : 'border-black/40',
-                  slot.task.completed && (textColor === 'white' ? 'bg-white/30' : 'bg-black/20')
-                )}
-              >
-                {slot.task.completed && (
-                  <svg viewBox="0 0 12 12" className="w-full h-full">
-                    <path d="M2.5 6L5 8.5L9.5 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            )}
-            <span className={cn('flex-1 truncate', slot.task.completed && 'line-through opacity-60')}>
-              {slot.task.name}
-            </span>
-            <button
-              onClick={() => onRemoveTaskFromSlot(slot.id)}
-              className={cn(
-                'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity',
-                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-              )}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
+          <DraggableSlotTask
+            slot={slot}
+            droppablePrefix={droppablePrefix}
+            showCompleted={showCompleted}
+            onRemoveTaskFromSlot={onRemoveTaskFromSlot}
+            onToggleSlotTask={onToggleSlotTask}
+            onUpdateSlotTaskName={onUpdateSlotTaskName}
+          />
         ) : (
           <span className="text-[10px] text-muted-foreground/50 italic">Drop task here</span>
         )}
       </div>
 
-      {/* Delete row */}
       <button
         onClick={() => onDeleteTimeSlot(slot.id)}
         className="p-0.5 text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
@@ -201,10 +297,10 @@ export function TimelineView({
   onToggleUnassigned,
   onRemoveUnassigned,
   onUpdateUnassignedName,
+  onUpdateSlotTaskName,
 }: TimelineViewProps) {
   return (
     <div className="flex flex-col gap-1.5 h-full">
-      {/* Timeline slots */}
       <div className="flex flex-col gap-1 flex-1 overflow-auto scrollbar-thin min-h-0">
         {timeSlots.map(slot => (
           <TimeSlotRow
@@ -216,11 +312,11 @@ export function TimelineView({
             onUpdateSlotTime={onUpdateSlotTime}
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
+            onUpdateSlotTaskName={onUpdateSlotTaskName}
           />
         ))}
       </div>
 
-      {/* Add row button */}
       <button
         onClick={onAddTimeSlot}
         className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors w-fit"
@@ -229,7 +325,6 @@ export function TimelineView({
         <span>Add time slot</span>
       </button>
 
-      {/* Unassigned buffer zone */}
       <UnassignedZone
         tasks={unassignedTasks}
         droppablePrefix={droppablePrefix}
