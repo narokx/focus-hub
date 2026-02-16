@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { TaskColor, TASK_COLOR_MAP, getContrastColor } from '@/types';
+import { TaskColor, getColorValue, getContrastColor } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface TaskChipProps {
@@ -78,13 +78,14 @@ export function TaskChip({
   };
 
   const textColor = getContrastColor(color);
+  const bgColor = getColorValue(color);
 
   return (
     <div
       ref={setNodeRef}
       style={{
         ...style,
-        backgroundColor: TASK_COLOR_MAP[color],
+        backgroundColor: bgColor,
         color: textColor,
       }}
       className={cn(
@@ -102,6 +103,7 @@ export function TaskChip({
             e.stopPropagation();
             onToggleComplete();
           }}
+          onPointerDown={(e) => e.stopPropagation()}
           className={cn(
             'w-4 h-4 rounded border-2 flex-shrink-0 transition-colors',
             textColor === 'white' ? 'border-white/70' : 'border-black/40',
@@ -131,6 +133,7 @@ export function TaskChip({
           onChange={(e) => setEditName(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          onPointerDown={(e) => e.stopPropagation()}
           className="editable-text bg-transparent min-w-[60px] text-inherit"
           style={{ color: 'inherit' }}
         />
@@ -142,8 +145,10 @@ export function TaskChip({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
             onDelete();
           }}
+          onPointerDown={(e) => e.stopPropagation()}
           className={cn(
             'w-4 h-4 flex items-center justify-center rounded-full transition-colors ml-1',
             textColor === 'white' 

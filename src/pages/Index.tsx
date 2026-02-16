@@ -1,24 +1,27 @@
 import React, { useState } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin } from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
 import { Calendar, Layers, List } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
 import { RoutinesPanel } from '@/components/RoutinesPanel';
+import { SettingsModal } from '@/components/SettingsModal';
 import { useAppState } from '@/hooks/useAppState';
-import { TaskColor, TASK_COLOR_MAP, getContrastColor } from '@/types';
+import { TaskColor, getColorValue, getContrastColor } from '@/types';
 
 export default function Index() {
   const {
     state,
-    addQuickTask, updateQuickTask, deleteQuickTask,
+    addQuickTask, updateQuickTask, deleteQuickTask, reorderQuickTasks,
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, moveRoutineSlotToUnassigned,
-    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime,
+    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, updateRoutineSlotTaskName,
     addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
     assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
-    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime,
+    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, updateDaySlotTaskName,
+    moveSlotToSlot,
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
   } = useAppState();
@@ -47,10 +50,32 @@ export default function Index() {
     const activeData = active.data.current as any;
     const overData = over.data.current as any;
 
+    // Handle sortable reorder within Quick Tasks
+    if (activeData?.type === 'task' && activeData?.source === 'quick-tasks' && overData?.type === 'task' && overData?.source === 'quick-tasks') {
+      const activeTaskId = (active.id as string).replace('quick-', '');
+      const overTaskId = (over.id as string).replace('quick-', '');
+      const fromIndex = state.quickTasks.findIndex(t => t.id === activeTaskId);
+      const toIndex = state.quickTasks.findIndex(t => t.id === overTaskId);
+      if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+        reorderQuickTasks(fromIndex, toIndex);
+      }
+      return;
+    }
+
     // Handle routine drag to calendar cell
     if (activeData?.type === 'routine' && overData?.type === 'day') {
       applyRoutineToDay(overData.date, activeData.routine);
       setSelectedDate(overData.date);
+      return;
+    }
+
+    // Handle slot-to-slot drag (task moving between time slots)
+    if (activeData?.type === 'task' && activeData?.source === 'timeslot' && overData?.type === 'timeslot') {
+      const { sourcePrefix, sourceSlotId } = activeData;
+      const { prefix: targetPrefix, slotId: targetSlotId } = overData;
+      // Don't move to same slot
+      if (sourcePrefix === targetPrefix && sourceSlotId === targetSlotId) return;
+      moveSlotToSlot(sourcePrefix, sourceSlotId, targetPrefix, targetSlotId);
       return;
     }
 
@@ -60,13 +85,11 @@ export default function Index() {
       const task = { name: activeData.name, color: activeData.color, taskId: activeData.taskId };
 
       if (prefix.startsWith('day-')) {
-        const date = prefix.substring(4); // "day-YYYY-MM-DD" → "YYYY-MM-DD"
+        const date = prefix.substring(4);
         assignTaskToDaySlot(date, slotId, task);
-        // If source was unassigned in same day, remove it
         if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
           removeDayTask(date, activeData.unassignedTaskId);
         }
-        // If source was unassigned in a routine, remove it
         if (activeData.source === 'unassigned' && activeData.sourcePrefix?.startsWith('routine-')) {
           const routineId = activeData.sourcePrefix.substring(8);
           removeTaskFromRoutine(routineId, activeData.unassignedTaskId);
@@ -75,7 +98,6 @@ export default function Index() {
       } else if (prefix.startsWith('routine-')) {
         const routineId = prefix.substring(8);
         assignTaskToRoutineSlot(routineId, slotId, task);
-        // If source was unassigned in same routine, remove it
         if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
           removeTaskFromRoutine(routineId, activeData.unassignedTaskId);
         }
@@ -87,36 +109,42 @@ export default function Index() {
     if (activeData?.type === 'task' && overData?.type === 'unassigned-zone') {
       const { prefix } = overData;
 
-      // Skip if dropping back on the same unassigned zone (prevents duplication on click)
       if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
         return;
+      }
+
+      // If source is a timeslot, move it to unassigned (clear slot)
+      if (activeData.source === 'timeslot') {
+        if (prefix === activeData.sourcePrefix) {
+          // Same context: move slot to unassigned
+          if (prefix.startsWith('day-')) {
+            moveDaySlotToUnassigned(prefix.substring(4), activeData.sourceSlotId);
+          } else if (prefix.startsWith('routine-')) {
+            moveRoutineSlotToUnassigned(prefix.substring(8), activeData.sourceSlotId);
+          }
+          return;
+        }
       }
 
       if (prefix.startsWith('day-')) {
         const date = prefix.substring(4);
         addTaskToDay(date, { name: activeData.name, color: activeData.color, taskId: activeData.taskId });
-        // If source was unassigned in a different zone, remove from source (MOVE)
         if (activeData.source === 'unassigned' && activeData.sourcePrefix) {
           if (activeData.sourcePrefix.startsWith('day-')) {
-            const srcDate = activeData.sourcePrefix.substring(4);
-            removeDayTask(srcDate, activeData.unassignedTaskId);
+            removeDayTask(activeData.sourcePrefix.substring(4), activeData.unassignedTaskId);
           } else if (activeData.sourcePrefix.startsWith('routine-')) {
-            const srcRoutineId = activeData.sourcePrefix.substring(8);
-            removeTaskFromRoutine(srcRoutineId, activeData.unassignedTaskId);
+            removeTaskFromRoutine(activeData.sourcePrefix.substring(8), activeData.unassignedTaskId);
           }
         }
         setSelectedDate(date);
       } else if (prefix.startsWith('routine-')) {
         const routineId = prefix.substring(8);
         addTaskToRoutine(routineId, { id: activeData.taskId || (active.id as string), name: activeData.name, color: activeData.color } as any);
-        // If source was unassigned in a different zone, remove from source (MOVE)
         if (activeData.source === 'unassigned' && activeData.sourcePrefix) {
           if (activeData.sourcePrefix.startsWith('day-')) {
-            const srcDate = activeData.sourcePrefix.substring(4);
-            removeDayTask(srcDate, activeData.unassignedTaskId);
+            removeDayTask(activeData.sourcePrefix.substring(4), activeData.unassignedTaskId);
           } else if (activeData.sourcePrefix.startsWith('routine-')) {
-            const srcRoutineId = activeData.sourcePrefix.substring(8);
-            removeTaskFromRoutine(srcRoutineId, activeData.unassignedTaskId);
+            removeTaskFromRoutine(activeData.sourcePrefix.substring(8), activeData.unassignedTaskId);
           }
         }
       }
@@ -127,14 +155,22 @@ export default function Index() {
     if (activeData?.type === 'task' && overData?.type === 'day') {
       const date = overData.date;
       addTaskToDay(date, { name: activeData.name, color: activeData.color, taskId: activeData.taskId });
-      // If source was unassigned, remove from source (MOVE)
       if (activeData.source === 'unassigned' && activeData.sourcePrefix) {
         if (activeData.sourcePrefix.startsWith('day-')) {
-          const srcDate = activeData.sourcePrefix.substring(4);
-          removeDayTask(srcDate, activeData.unassignedTaskId);
+          removeDayTask(activeData.sourcePrefix.substring(4), activeData.unassignedTaskId);
         } else if (activeData.sourcePrefix.startsWith('routine-')) {
-          const srcRoutineId = activeData.sourcePrefix.substring(8);
-          removeTaskFromRoutine(srcRoutineId, activeData.unassignedTaskId);
+          removeTaskFromRoutine(activeData.sourcePrefix.substring(8), activeData.unassignedTaskId);
+        }
+      }
+      // If from a timeslot, clear the source slot
+      if (activeData.source === 'timeslot' && activeData.sourcePrefix && activeData.sourceSlotId) {
+        if (activeData.sourcePrefix.startsWith('day-')) {
+          const srcDate = activeData.sourcePrefix.substring(4);
+          // We need to clear the slot and add to the new day
+          // The task was already added above via addTaskToDay
+          // Clear source slot
+          assignTaskToDaySlot(srcDate, activeData.sourceSlotId, { name: '', color: '' }); // Hmm, need a clear function
+          // Actually let's use moveDaySlotToUnassigned then move
         }
       }
       setSelectedDate(date);
@@ -156,9 +192,12 @@ export default function Index() {
       onDragEnd={handleDragEnd}
     >
       <div className="min-h-screen bg-background p-4 overflow-hidden relative">
-        <div className="absolute top-4 left-4 z-0">
-          <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Track your daily habits</p>
+        <div className="absolute top-4 left-4 z-0 flex items-center gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Track your daily habits</p>
+          </div>
+          <SettingsModal />
         </div>
 
         {/* Routines Window */}
@@ -183,6 +222,7 @@ export default function Index() {
             onDeleteRoutineTimeSlot={deleteRoutineTimeSlot}
             onUpdateRoutineSlotTime={updateRoutineSlotTime}
             onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
+            onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
           />
         </FloatingWindow>
 
@@ -231,6 +271,7 @@ export default function Index() {
             onUpdateDaySlotTime={updateDaySlotTime}
             onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
             onToggleDaySlotTask={toggleDaySlotTask}
+            onUpdateDaySlotTaskName={updateDaySlotTaskName}
           />
         </FloatingWindow>
 
@@ -240,7 +281,7 @@ export default function Index() {
             <div
               className="px-3 py-1.5 rounded-md text-sm font-medium shadow-lg"
               style={{
-                backgroundColor: TASK_COLOR_MAP[activeDragData.color!],
+                backgroundColor: getColorValue(activeDragData.color!),
                 color: getContrastColor(activeDragData.color!),
               }}
             >

@@ -1,16 +1,4 @@
-export type TaskColor = 
-  | 'coral' 
-  | 'orange' 
-  | 'amber' 
-  | 'lime' 
-  | 'emerald' 
-  | 'teal' 
-  | 'cyan' 
-  | 'blue' 
-  | 'indigo' 
-  | 'violet' 
-  | 'pink' 
-  | 'rose';
+export type TaskColor = string;
 
 export interface QuickTask {
   id: string;
@@ -82,12 +70,39 @@ export interface AppState {
   };
 }
 
-export const TASK_COLORS: TaskColor[] = [
-  'coral', 'orange', 'amber', 'lime', 'emerald', 'teal',
-  'cyan', 'blue', 'indigo', 'violet', 'pink', 'rose',
+export const PRESET_COLORS: { name: string; value: string }[] = [
+  { name: 'coral', value: '#FF6B6B' },
+  { name: 'orange', value: '#FF9F43' },
+  { name: 'amber', value: '#FECA57' },
+  { name: 'lime', value: '#A3CB38' },
+  { name: 'emerald', value: '#10AC84' },
+  { name: 'teal', value: '#0ABDE3' },
+  { name: 'cyan', value: '#48DBFB' },
+  { name: 'blue', value: '#3B82F6' },
+  { name: 'indigo', value: '#6366F1' },
+  { name: 'violet', value: '#8B5CF6' },
+  { name: 'pink', value: '#EC4899' },
+  { name: 'rose', value: '#F43F5E' },
 ];
 
-export const TASK_COLOR_MAP: Record<TaskColor, string> = {
+// Legacy preset name to hex map
+const LEGACY_COLOR_MAP: Record<string, string> = {
+  coral: '#FF6B6B',
+  orange: '#FF9F43',
+  amber: '#FECA57',
+  lime: '#A3CB38',
+  emerald: '#10AC84',
+  teal: '#0ABDE3',
+  cyan: '#48DBFB',
+  blue: '#3B82F6',
+  indigo: '#6366F1',
+  violet: '#8B5CF6',
+  pink: '#EC4899',
+  rose: '#F43F5E',
+};
+
+// Old CSS variable map for backward compat
+const CSS_VAR_MAP: Record<string, string> = {
   coral: 'hsl(var(--task-coral))',
   orange: 'hsl(var(--task-orange))',
   amber: 'hsl(var(--task-amber))',
@@ -102,9 +117,37 @@ export const TASK_COLOR_MAP: Record<TaskColor, string> = {
   rose: 'hsl(var(--task-rose))',
 };
 
+export const TASK_COLORS: string[] = [
+  'coral', 'orange', 'amber', 'lime', 'emerald', 'teal',
+  'cyan', 'blue', 'indigo', 'violet', 'pink', 'rose',
+];
+
+export const TASK_COLOR_MAP: Record<string, string> = CSS_VAR_MAP;
+
+export function getColorValue(color: TaskColor): string {
+  // If it's a CSS variable preset name, use that
+  if (CSS_VAR_MAP[color]) return CSS_VAR_MAP[color];
+  // Otherwise it's a raw hex/color value
+  return color;
+}
+
 export function getContrastColor(color: TaskColor): 'white' | 'black' {
-  const darkColors: TaskColor[] = ['coral', 'emerald', 'teal', 'blue', 'indigo', 'violet', 'pink', 'rose'];
-  return darkColors.includes(color) ? 'white' : 'black';
+  // Known dark preset names
+  const darkPresets = ['coral', 'emerald', 'teal', 'blue', 'indigo', 'violet', 'pink', 'rose'];
+  if (darkPresets.includes(color)) return 'white';
+  // Known light preset names
+  const lightPresets = ['amber', 'lime', 'cyan', 'orange'];
+  if (lightPresets.includes(color)) return 'black';
+  // Custom hex: calculate luminance
+  if (color.startsWith('#')) {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? 'black' : 'white';
+  }
+  return 'white';
 }
 
 function formatHour(hour: number): string {
