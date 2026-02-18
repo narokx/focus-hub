@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Resizable, Enable } from 're-resizable';
-import { GripHorizontal } from 'lucide-react';
+import { GripHorizontal, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FloatingWindowProps {
@@ -18,6 +18,9 @@ interface FloatingWindowProps {
   onTitleChange?: (title: string) => void;
   className?: string;
   headerActions?: React.ReactNode;
+  windowKey?: string;
+  minimized?: boolean;
+  onMinimizeChange?: (minimized: boolean) => void;
 }
 
 export function FloatingWindow({
@@ -35,6 +38,8 @@ export function FloatingWindow({
   onTitleChange,
   className,
   headerActions,
+  minimized = false,
+  onMinimizeChange,
 }: FloatingWindowProps) {
   const [position, setPosition] = useState(defaultPosition);
   const [size, setSize] = useState(defaultSize);
@@ -46,6 +51,7 @@ export function FloatingWindow({
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.no-drag')) return;
+    if (minimized) return;
 
     setIsDragging(true);
     setZIndex(100);
@@ -81,7 +87,7 @@ export function FloatingWindow({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [position, onPositionChange]);
+  }, [position, onPositionChange, minimized]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
@@ -103,7 +109,10 @@ export function FloatingWindow({
     }
   };
 
-  const enableResize: Enable = {
+  const enableResize: Enable = minimized ? {
+    top: false, right: false, bottom: false, left: false,
+    topRight: false, bottomRight: false, bottomLeft: false, topLeft: false,
+  } : {
     top: true, right: true, bottom: true, left: true,
     topRight: true, bottomRight: true, bottomLeft: true, topLeft: true,
   };
@@ -115,11 +124,11 @@ export function FloatingWindow({
       onMouseDown={() => setZIndex(50)}
     >
       <Resizable
-        size={size}
+        size={minimized ? { width: size.width, height: 44 } : size}
         minWidth={minWidth}
-        minHeight={minHeight}
+        minHeight={minimized ? 44 : minHeight}
         maxWidth={maxWidth}
-        maxHeight={maxHeight}
+        maxHeight={minimized ? 44 : maxHeight}
         enable={enableResize}
         onResizeStop={handleResizeStop}
         handleStyles={{
@@ -139,8 +148,8 @@ export function FloatingWindow({
           bottomLeft: 'resize-handle rounded-bl-lg', bottomRight: 'resize-handle rounded-br-lg',
         }}
       >
-        <div className={cn('window-panel flex flex-col h-full', className)}>
-          <div className="window-header" onMouseDown={handleMouseDown}>
+        <div className={cn('window-panel flex flex-col', minimized ? 'h-11 overflow-hidden' : 'h-full', className)}>
+          <div className="window-header flex-shrink-0" onMouseDown={handleMouseDown}>
             <div className="flex items-center gap-2">
               {icon}
               {isEditingTitle ? (
@@ -159,7 +168,7 @@ export function FloatingWindow({
                   onMouseDown={(e) => e.stopPropagation()}
                 />
               ) : (
-              <span
+                <span
                   className="window-title cursor-pointer hover:text-primary transition-colors"
                   onClick={(e) => { e.stopPropagation(); handleTitleDoubleClick(); }}
                 >
@@ -167,14 +176,24 @@ export function FloatingWindow({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               {headerActions}
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onMinimizeChange?.(!minimized); }}
+                className="no-drag p-1 rounded hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors"
+                title={minimized ? 'Restore' : 'Minimize'}
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
               <GripHorizontal className="w-4 h-4 text-muted-foreground opacity-50" />
             </div>
           </div>
-          <div className="window-content flex-1 overflow-auto scrollbar-thin">
-            {children}
-          </div>
+          {!minimized && (
+            <div className="window-content flex-1 overflow-auto scrollbar-thin">
+              {children}
+            </div>
+          )}
         </div>
       </Resizable>
     </div>

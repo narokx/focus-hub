@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, X, Pencil } from 'lucide-react';
 import { TimeSlot, TaskColor, getColorValue, getContrastColor } from '@/types';
 import { TaskChip } from './TaskChip';
+import { TaskNotesModal } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
 
 interface TimelineViewProps {
@@ -19,6 +20,8 @@ interface TimelineViewProps {
   onRemoveUnassigned: (taskId: string) => void;
   onUpdateUnassignedName?: (taskId: string, name: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  timeColumnWidth?: number;
+  onTimeColumnWidthChange?: (width: number) => void;
 }
 
 function DraggableSlotTask({
@@ -39,6 +42,8 @@ function DraggableSlotTask({
   const task = slot.task!;
   const [isEditing, setIsEditing] = React.useState(false);
   const [editName, setEditName] = React.useState(task.name);
+  const [notesOpen, setNotesOpen] = React.useState(false);
+  const [hovered, setHovered] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -76,74 +81,110 @@ function DraggableSlotTask({
     }
   };
 
+  // Unique id for notes: use slot id + task id combo
+  const noteId = `${slot.id}-${task.taskId || task.id}`;
+
   return (
-    <div
-      ref={setNodeRef}
-      style={{ ...style, backgroundColor: bgColor, color: textColor }}
-      className={cn(
-        'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
-        isDragging && 'opacity-50'
-      )}
-      {...attributes}
-      {...listeners}
-    >
-      {showCompleted && onToggleSlotTask && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleSlotTask(slot.id); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={cn(
-            'w-4 h-4 rounded border-2 flex-shrink-0 transition-colors',
-            textColor === 'white' ? 'border-white/70' : 'border-black/40',
-            task.completed && (textColor === 'white' ? 'bg-white/30' : 'bg-black/20')
-          )}
-        >
-          {task.completed && (
-            <svg viewBox="0 0 12 12" className="w-full h-full">
-              <path d="M2.5 6L5 8.5L9.5 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-        </button>
-      )}
-      {isEditing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleBlur();
-            if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); }
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="flex-1 bg-transparent min-w-0 text-inherit outline-none"
-          style={{ color: 'inherit' }}
-        />
-      ) : (
-        <span
-          className={cn('flex-1 truncate', task.completed && 'line-through opacity-60')}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            if (onUpdateSlotTaskName) {
+    <>
+      <div
+        ref={setNodeRef}
+        style={{ ...style, backgroundColor: bgColor, color: textColor }}
+        className={cn(
+          'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
+          isDragging && 'opacity-50'
+        )}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        {...attributes}
+        {...listeners}
+      >
+        {showCompleted && onToggleSlotTask && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSlotTask(slot.id); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 rounded border-2 flex-shrink-0 transition-colors',
+              textColor === 'white' ? 'border-white/70' : 'border-black/40',
+              task.completed && (textColor === 'white' ? 'bg-white/30' : 'bg-black/20')
+            )}
+          >
+            {task.completed && (
+              <svg viewBox="0 0 12 12" className="w-full h-full">
+                <path d="M2.5 6L5 8.5L9.5 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </button>
+        )}
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleBlur();
+              if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); }
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="flex-1 bg-transparent min-w-0 text-inherit outline-none"
+            style={{ color: 'inherit' }}
+          />
+        ) : (
+          <span
+            className={cn(
+              'flex-1 truncate',
+              task.completed && 'line-through opacity-60'
+            )}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setNotesOpen(true);
+            }}
+          >
+            {task.name}
+          </span>
+        )}
+
+        {/* Pencil edit icon */}
+        {!isEditing && (hovered || window.matchMedia('(pointer: coarse)').matches) && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               setIsEditing(true);
               setEditName(task.name);
-            }
-          }}
-        >
-          {task.name}
-        </span>
-      )}
-      <button
-        onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
-        onPointerDown={(e) => e.stopPropagation()}
-        className={cn(
-          'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity',
-          textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Rename task"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </button>
         )}
-      >
-        <X className="w-3 h-3" />
-      </button>
-    </div>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          className={cn(
+            'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity flex-shrink-0',
+            textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+          )}
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+
+      {notesOpen && (
+        <TaskNotesModal
+          taskId={noteId}
+          taskName={task.name}
+          taskColor={bgColor}
+          onClose={() => setNotesOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -156,6 +197,7 @@ function TimeSlotRow({
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
+  timeColumnWidth,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -165,6 +207,7 @@ function TimeSlotRow({
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  timeColumnWidth: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
@@ -173,20 +216,24 @@ function TimeSlotRow({
 
   return (
     <div className="flex items-center gap-1 group">
-      <div className="flex items-center gap-0.5 flex-shrink-0">
-        <input
-          type="text"
-          value={slot.startTime}
-          onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
-          className="w-[72px] text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring"
-        />
-        <span className="text-[10px] text-muted-foreground">–</span>
-        <input
-          type="text"
-          value={slot.endTime}
-          onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
-          className="w-[72px] text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+      <div
+        className="flex items-center gap-0.5 flex-shrink-0 overflow-hidden"
+        style={{ width: timeColumnWidth }}
+      >
+        <div className="flex flex-col min-w-0">
+          <input
+            type="text"
+            value={slot.startTime}
+            onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
+            className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <input
+            type="text"
+            value={slot.endTime}
+            onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
+            className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
       </div>
 
       <div
@@ -284,6 +331,10 @@ function UnassignedZone({
   );
 }
 
+const MIN_TIME_COL = 80;
+const MAX_TIME_COL = 200;
+const DEFAULT_TIME_COL = 148;
+
 export function TimelineView({
   timeSlots,
   unassignedTasks,
@@ -299,6 +350,27 @@ export function TimelineView({
   onUpdateUnassignedName,
   onUpdateSlotTaskName,
 }: TimelineViewProps) {
+  const [timeColWidth, setTimeColWidth] = useState(DEFAULT_TIME_COL);
+  const resizingRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = { startX: e.clientX, startW: timeColWidth };
+
+    const move = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = e.clientX - resizingRef.current.startX;
+      setTimeColWidth(Math.max(MIN_TIME_COL, Math.min(MAX_TIME_COL, resizingRef.current.startW + delta)));
+    };
+    const up = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }, [timeColWidth]);
+
   return (
     <div className="flex flex-col gap-1.5 h-full">
       <div className="flex flex-col gap-1 flex-1 overflow-auto scrollbar-thin min-h-0">
@@ -313,8 +385,19 @@ export function TimelineView({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
+            timeColumnWidth={timeColWidth}
           />
         ))}
+      </div>
+
+      {/* Resizable divider hint */}
+      <div className="flex items-center gap-1 text-[10px] text-muted-foreground/40 select-none">
+        <div
+          className="w-1 h-4 rounded cursor-col-resize bg-border/60 hover:bg-primary/40 transition-colors"
+          onMouseDown={handleDividerMouseDown}
+          title="Drag to resize time column"
+        />
+        <span>drag to resize time labels</span>
       </div>
 
       <button
