@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Calendar, Layers, List } from 'lucide-react';
+import { Calendar, Layers, List, BarChart2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
 import { RoutinesPanel } from '@/components/RoutinesPanel';
 import { SettingsModal } from '@/components/SettingsModal';
+import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAppState } from '@/hooks/useAppState';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { TaskColor, getColorValue, getContrastColor } from '@/types';
+import { cn } from '@/lib/utils';
+
+type MobileTab = 'calendar' | 'routines' | 'tasks';
+type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
 
 export default function Index() {
   const {
@@ -26,6 +32,8 @@ export default function Index() {
     updateWindowPosition, updateWindowTitle,
   } = useAppState();
 
+  const isMobile = useIsMobile();
+  const [mobileTab, setMobileTab] = useState<MobileTab>('calendar');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeDragData, setActiveDragData] = useState<{
@@ -34,6 +42,18 @@ export default function Index() {
     color?: TaskColor;
     routine?: typeof state.routines[0];
   } | null>(null);
+
+  // Minimized state for each window
+  const [minimized, setMinimized] = useState<Record<WindowKey, boolean>>({
+    calendar: false,
+    routines: false,
+    quickTasks: false,
+    stats: true, // Stats starts minimized
+  });
+
+  const toggleMinimize = (key: WindowKey) => {
+    setMinimized(prev => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -73,7 +93,6 @@ export default function Index() {
     if (activeData?.type === 'task' && activeData?.source === 'timeslot' && overData?.type === 'timeslot') {
       const { sourcePrefix, sourceSlotId } = activeData;
       const { prefix: targetPrefix, slotId: targetSlotId } = overData;
-      // Don't move to same slot
       if (sourcePrefix === targetPrefix && sourceSlotId === targetSlotId) return;
       moveSlotToSlot(sourcePrefix, sourceSlotId, targetPrefix, targetSlotId);
       return;
@@ -113,10 +132,8 @@ export default function Index() {
         return;
       }
 
-      // If source is a timeslot, move it to unassigned (clear slot)
       if (activeData.source === 'timeslot') {
         if (prefix === activeData.sourcePrefix) {
-          // Same context: move slot to unassigned
           if (prefix.startsWith('day-')) {
             moveDaySlotToUnassigned(prefix.substring(4), activeData.sourceSlotId);
           } else if (prefix.startsWith('routine-')) {
@@ -162,17 +179,6 @@ export default function Index() {
           removeTaskFromRoutine(activeData.sourcePrefix.substring(8), activeData.unassignedTaskId);
         }
       }
-      // If from a timeslot, clear the source slot
-      if (activeData.source === 'timeslot' && activeData.sourcePrefix && activeData.sourceSlotId) {
-        if (activeData.sourcePrefix.startsWith('day-')) {
-          const srcDate = activeData.sourcePrefix.substring(4);
-          // We need to clear the slot and add to the new day
-          // The task was already added above via addTaskToDay
-          // Clear source slot
-          assignTaskToDaySlot(srcDate, activeData.sourceSlotId, { name: '', color: '' }); // Hmm, need a clear function
-          // Actually let's use moveDaySlotToUnassigned then move
-        }
-      }
       setSelectedDate(date);
       return;
     }
@@ -185,6 +191,90 @@ export default function Index() {
     }
   };
 
+  // ── Mobile Layout ──────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="flex flex-col h-screen bg-background">
+          {/* Mobile header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
+            <div>
+              <h1 className="text-base font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
+            </div>
+            <SettingsModal />
+          </div>
+
+          {/* Mobile content */}
+          <div className="flex-1 overflow-auto p-4">
+            {mobileTab === 'calendar' && (
+              <HeatmapCalendar
+                calendar={state.calendar}
+                onDayClick={setSelectedDate}
+                selectedDate={selectedDate}
+                onCloseDay={() => setSelectedDate(null)}
+                onToggleDayTask={toggleDayTask}
+                onUpdateDayTask={(date, taskId, name) => updateDayTask(date, taskId, { name })}
+                onRemoveDayTask={removeDayTask}
+                onAddDayTimeSlot={addDayTimeSlot}
+                onDeleteDayTimeSlot={deleteDayTimeSlot}
+                onUpdateDaySlotTime={updateDaySlotTime}
+                onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
+                onToggleDaySlotTask={toggleDaySlotTask}
+                onUpdateDaySlotTaskName={updateDaySlotTaskName}
+              />
+            )}
+            {mobileTab === 'routines' && (
+              <RoutinesPanel
+                routines={state.routines}
+                onAddRoutine={addRoutine}
+                onUpdateRoutine={updateRoutine}
+                onDeleteRoutine={deleteRoutine}
+                onRemoveTaskFromRoutine={removeTaskFromRoutine}
+                onAddRoutineTimeSlot={addRoutineTimeSlot}
+                onDeleteRoutineTimeSlot={deleteRoutineTimeSlot}
+                onUpdateRoutineSlotTime={updateRoutineSlotTime}
+                onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
+                onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
+              />
+            )}
+            {mobileTab === 'tasks' && (
+              <QuickTasksPanel
+                tasks={state.quickTasks}
+                onAddTask={addQuickTask}
+                onUpdateTask={updateQuickTask}
+                onDeleteTask={deleteQuickTask}
+              />
+            )}
+          </div>
+
+          {/* Mobile bottom nav */}
+          <div className="flex border-t border-border bg-card">
+            {([
+              { key: 'calendar', icon: <Calendar className="w-5 h-5" />, label: 'Calendar' },
+              { key: 'routines', icon: <Layers className="w-5 h-5" />, label: 'Routines' },
+              { key: 'tasks', icon: <List className="w-5 h-5" />, label: 'Tasks' },
+            ] as { key: MobileTab; icon: React.ReactNode; label: string }[]).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setMobileTab(tab.key)}
+                className={cn(
+                  'flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors',
+                  mobileTab === tab.key
+                    ? 'text-primary border-t-2 border-primary -mt-px'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </DndContext>
+    );
+  }
+
+  // ── Desktop Layout ─────────────────────────────────────────────
   return (
     <DndContext
       collisionDetection={pointerWithin}
@@ -211,6 +301,8 @@ export default function Index() {
           onPositionChange={(pos) => updateWindowPosition('routines', pos)}
           onSizeChange={(size) => updateWindowPosition('routines', size)}
           onTitleChange={(title) => updateWindowTitle('routines', title)}
+          minimized={minimized.routines}
+          onMinimizeChange={() => toggleMinimize('routines')}
         >
           <RoutinesPanel
             routines={state.routines}
@@ -237,6 +329,8 @@ export default function Index() {
           onPositionChange={(pos) => updateWindowPosition('quickTasks', pos)}
           onSizeChange={(size) => updateWindowPosition('quickTasks', size)}
           onTitleChange={(title) => updateWindowTitle('quickTasks', title)}
+          minimized={minimized.quickTasks}
+          onMinimizeChange={() => toggleMinimize('quickTasks')}
         >
           <QuickTasksPanel
             tasks={state.quickTasks}
@@ -257,6 +351,8 @@ export default function Index() {
           onPositionChange={(pos) => updateWindowPosition('calendar', pos)}
           onSizeChange={(size) => updateWindowPosition('calendar', size)}
           onTitleChange={(title) => updateWindowTitle('calendar', title)}
+          minimized={minimized.calendar}
+          onMinimizeChange={() => toggleMinimize('calendar')}
         >
           <HeatmapCalendar
             calendar={state.calendar}
@@ -273,6 +369,20 @@ export default function Index() {
             onToggleDaySlotTask={toggleDaySlotTask}
             onUpdateDaySlotTaskName={updateDaySlotTaskName}
           />
+        </FloatingWindow>
+
+        {/* Stats Window */}
+        <FloatingWindow
+          title="Stats"
+          icon={<BarChart2 className="w-4 h-4 text-muted-foreground" />}
+          defaultPosition={{ x: state.windowPositions.routines.x, y: state.windowPositions.routines.y + state.windowPositions.routines.height + 20 }}
+          defaultSize={{ width: 300, height: 380 }}
+          minWidth={260}
+          minHeight={200}
+          minimized={minimized.stats}
+          onMinimizeChange={() => toggleMinimize('stats')}
+        >
+          <WeeklyStatsPanel calendar={state.calendar} />
         </FloatingWindow>
 
         {/* Drag Overlay */}
