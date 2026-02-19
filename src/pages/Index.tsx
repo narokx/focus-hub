@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Calendar, Layers, List, BarChart2 } from 'lucide-react';
+import { Calendar, Layers, List, Wrench, Undo2, Redo2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
@@ -10,6 +10,8 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAppState } from '@/hooks/useAppState';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTheme } from '@/hooks/useTheme';
+import { useHistory } from '@/hooks/useHistory';
 import { TaskColor, getColorValue, getContrastColor } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -30,7 +32,11 @@ export default function Index() {
     moveSlotToSlot,
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
+    restoreState,
   } = useAppState();
+
+  // Initialize theme on mount (reads persisted preference)
+  useTheme();
 
   const isMobile = useIsMobile();
   const [mobileTab, setMobileTab] = useState<MobileTab>('calendar');
@@ -42,6 +48,37 @@ export default function Index() {
     color?: TaskColor;
     routine?: typeof state.routines[0];
   } | null>(null);
+
+  // History for undo/redo
+  const history = useHistory(state);
+
+  // Push state to history whenever state changes
+  const prevStateRef = React.useRef(state);
+  useEffect(() => {
+    if (prevStateRef.current !== state) {
+      history.push(state);
+      prevStateRef.current = state;
+    }
+  }, [state]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          const prev = history.undo();
+          if (prev) restoreState(prev);
+        } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+          e.preventDefault();
+          const next = history.redo();
+          if (next) restoreState(next);
+        }
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [history, restoreState]);
 
   // Minimized state for each window
   const [minimized, setMinimized] = useState<Record<WindowKey, boolean>>({
@@ -191,6 +228,16 @@ export default function Index() {
     }
   };
 
+  const handleUndo = () => {
+    const prev = history.undo();
+    if (prev) restoreState(prev);
+  };
+
+  const handleRedo = () => {
+    const next = history.redo();
+    if (next) restoreState(next);
+  };
+
   // ── Mobile Layout ──────────────────────────────────────────────
   if (isMobile) {
     return (
@@ -201,7 +248,25 @@ export default function Index() {
             <div>
               <h1 className="text-base font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
             </div>
-            <SettingsModal />
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleUndo}
+                disabled={!history.canUndo}
+                className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="w-4 h-4" />
+              </button>
+              <button
+                onClick={handleRedo}
+                disabled={!history.canRedo}
+                className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                <Redo2 className="w-4 h-4" />
+              </button>
+              <SettingsModal />
+            </div>
           </div>
 
           {/* Mobile content */}
@@ -287,6 +352,25 @@ export default function Index() {
             <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Track your daily habits</p>
           </div>
+          {/* Undo/Redo */}
+          <div className="flex items-center gap-1 ml-2">
+            <button
+              onClick={handleUndo}
+              disabled={!history.canUndo}
+              className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={!history.canRedo}
+              className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
           <SettingsModal />
         </div>
 
@@ -371,12 +455,12 @@ export default function Index() {
           />
         </FloatingWindow>
 
-        {/* Stats Window */}
+        {/* Tools Window (formerly Stats) */}
         <FloatingWindow
-          title="Stats"
-          icon={<BarChart2 className="w-4 h-4 text-muted-foreground" />}
+          title="Tools"
+          icon={<Wrench className="w-4 h-4 text-muted-foreground" />}
           defaultPosition={{ x: state.windowPositions.routines.x, y: state.windowPositions.routines.y + state.windowPositions.routines.height + 20 }}
-          defaultSize={{ width: 300, height: 380 }}
+          defaultSize={{ width: 320, height: 420 }}
           minWidth={260}
           minHeight={200}
           minimized={minimized.stats}

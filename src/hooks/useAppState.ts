@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { AppState, QuickTask, Routine, DayData, DayTask, TimeSlot, TASK_COLORS, generateDefaultTimeSlots } from '@/types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, QuickTask, Routine, DayData, DayTask, TimeSlot, generateDefaultTimeSlots } from '@/types';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -221,7 +221,7 @@ export function useAppState() {
       ...prev,
       routines: prev.routines.map(r =>
         r.id === routineId
-          ? { ...r, timeSlots: [...r.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00 PM', endTime: '01:00 PM', task: null }] }
+          ? { ...r, timeSlots: [...r.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', task: null }] }
           : r
       ),
     }));
@@ -399,7 +399,7 @@ export function useAppState() {
           ...prev.calendar,
           [date]: {
             ...dayData,
-            timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00 PM', endTime: '01:00 PM', task: null }],
+            timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', task: null }],
           },
         },
       };
@@ -577,6 +577,10 @@ export function useAppState() {
     }));
   }, []);
 
+  const restoreState = useCallback((s: AppState) => {
+    setState(s);
+  }, []);
+
   return {
     state,
     addQuickTask, updateQuickTask, deleteQuickTask, reorderQuickTasks,
@@ -590,5 +594,6 @@ export function useAppState() {
     moveSlotToSlot,
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
+    restoreState,
   };
 }

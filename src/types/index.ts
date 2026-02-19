@@ -152,9 +152,21 @@ export function getContrastColor(color: TaskColor): 'white' | 'black' {
 
 function formatHour(hour: number): string {
   const h24 = hour % 24;
-  const h12 = h24 % 12 || 12;
-  const ampm = h24 < 12 ? 'AM' : 'PM';
-  return `${h12.toString().padStart(2, '0')}:00 ${ampm}`;
+  return `${h24.toString().padStart(2, '0')}:00`;
+}
+
+export function parseTimeTo24h(time: string): string {
+  // Already 24h (e.g. "07:00")
+  if (/^\d{2}:\d{2}$/.test(time)) return time;
+  // 12h format (e.g. "07:00 AM")
+  const match = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return time;
+  let h = parseInt(match[1]);
+  const m = parseInt(match[2]);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && h !== 12) h += 12;
+  if (ampm === 'AM' && h === 12) h = 0;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
 export function generateDefaultTimeSlots(): TimeSlot[] {

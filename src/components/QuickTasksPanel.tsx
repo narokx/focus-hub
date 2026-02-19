@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, Trash2, List } from 'lucide-react';
+import { Plus, Trash2, List, Pencil } from 'lucide-react';
 import { QuickTask, TaskColor, getColorValue, getContrastColor } from '@/types';
 import { AutocompleteInput } from './AutocompleteInput';
+import { TaskNotesModal } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
 
 interface QuickTasksPanelProps {
@@ -21,7 +22,10 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(task.name);
+  const [hovered, setHovered] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
   const {
     attributes,
@@ -59,44 +63,79 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
   };
 
   return (
-    <div className="group relative">
-      <div
-        ref={setNodeRef}
-        style={{ ...style, backgroundColor: bgColor, color: textColor }}
-        className={cn(
-          'task-chip relative inline-flex items-center gap-2 no-drag cursor-grab active:cursor-grabbing',
-          isDragging && 'opacity-50 scale-95 z-50'
-        )}
-        {...attributes}
-        {...listeners}
-        onDoubleClick={() => { setIsEditing(true); setEditName(task.name); }}
-      >
-        {isEditing ? (
-          <input
-            ref={inputRef}
-            type="text"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleBlur();
-              if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); }
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="editable-text bg-transparent min-w-[60px] text-inherit"
-            style={{ color: 'inherit' }}
-          />
-        ) : (
-          <span>{task.name}</span>
-        )}
+    <>
+      <div className="group relative">
+        <div
+          ref={setNodeRef}
+          style={{ ...style, backgroundColor: bgColor, color: textColor }}
+          className={cn(
+            'task-chip relative inline-flex items-center gap-1.5 no-drag cursor-grab active:cursor-grabbing',
+            isDragging && 'opacity-50 scale-95 z-50'
+          )}
+          {...attributes}
+          {...listeners}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setNotesOpen(true);
+          }}
+        >
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={handleBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleBlur();
+                if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); }
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="editable-text bg-transparent min-w-[60px] text-inherit"
+              style={{ color: 'inherit' }}
+            />
+          ) : (
+            <span>{task.name}</span>
+          )}
+
+          {/* Pencil icon — hover on desktop, always on mobile */}
+          {!isEditing && (hovered || isTouchDevice) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                setEditName(task.name);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'w-3.5 h-3.5 flex items-center justify-center rounded-full transition-opacity flex-shrink-0',
+                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+              )}
+              title="Rename"
+            >
+              <Pencil className="w-2.5 h-2.5" />
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => onDeleteTask(task.id)}
+          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
       </div>
-      <button
-        onClick={() => onDeleteTask(task.id)}
-        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-      >
-        <Trash2 className="w-3 h-3" />
-      </button>
-    </div>
+
+      {notesOpen && (
+        <TaskNotesModal
+          taskId={`quick-${task.id}`}
+          taskName={task.name}
+          taskColor={bgColor}
+          onClose={() => setNotesOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
