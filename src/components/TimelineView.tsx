@@ -322,6 +322,7 @@ function UnassignedZone({
                 onToggleComplete={showCompleted && onToggle ? () => onToggle(task.id) : undefined}
                 onDelete={() => onRemove(task.id)}
                 showDelete
+                noteId={`unassigned-${task.id}`}
               />
             </div>
           ))

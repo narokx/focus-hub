@@ -1,32 +1,35 @@
 import React, { useMemo, useState } from 'react';
-import { format, startOfWeek, endOfWeek, subWeeks, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, eachDayOfInterval, parseISO } from 'date-fns';
 import { DayData } from '@/types';
 import { getColorValue } from '@/types';
-import { BarChart2 } from 'lucide-react';
+import { BarChart2, Calendar } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-type Range = 'this-week' | 'last-week' | 'all-time';
+type Range = 'this-week' | 'last-week' | 'this-month' | 'last-30' | 'all-time' | 'custom';
 
 interface WeeklyStatsPanelProps {
   calendar: Record<string, DayData>;
 }
 
-function parseTimeToHours(time: string): number {
-  // e.g. "07:00 AM", "01:00 PM"
-  const match = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!match) return 0;
-  let h = parseInt(match[1]);
-  const m = parseInt(match[2]);
-  const ampm = match[3].toUpperCase();
+function parseTimeTo24hNum(time: string): number {
+  // 24h format: "07:00"
+  const match24 = time.match(/^(\d+):(\d+)$/);
+  if (match24) return parseInt(match24[1]) + parseInt(match24[2]) / 60;
+  // 12h format: "07:00 AM"
+  const match12 = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match12) return 0;
+  let h = parseInt(match12[1]);
+  const m = parseInt(match12[2]);
+  const ampm = match12[3].toUpperCase();
   if (ampm === 'PM' && h !== 12) h += 12;
   if (ampm === 'AM' && h === 12) h = 0;
   return h + m / 60;
 }
 
 function slotDuration(slot: { startTime: string; endTime: string }): number {
-  const start = parseTimeToHours(slot.startTime);
-  const end = parseTimeToHours(slot.endTime);
+  const start = parseTimeTo24hNum(slot.startTime);
+  const end = parseTimeTo24hNum(slot.endTime);
   const diff = end - start;
-  // handle overnight wrap
   return diff < 0 ? diff + 24 : diff;
 }
 
@@ -34,6 +37,7 @@ interface TaskStat {
   name: string;
   color: string;
   hours: number;
+  doneHours: number;
   count: number;
 }
 
@@ -44,28 +48,28 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
     const day = calendar[date];
     if (!day) continue;
 
-    // Slot tasks
     for (const slot of day.timeSlots || []) {
       if (!slot.task) continue;
       const key = slot.task.name;
       const dur = slotDuration(slot);
+      const doneDur = slot.task.completed ? dur : 0;
       const existing = map.get(key);
       if (existing) {
         existing.hours += dur;
+        existing.doneHours += doneDur;
         existing.count += 1;
       } else {
-        map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: dur, count: 1 });
+        map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: dur, doneHours: doneDur, count: 1 });
       }
     }
 
-    // Unassigned tasks (count as 0 hours but show in stats)
     for (const task of day.tasks || []) {
       const key = task.name;
       const existing = map.get(key);
       if (existing) {
         existing.count += 1;
       } else {
-        map.set(key, { name: task.name, color: getColorValue(task.color), hours: 0, count: 1 });
+        map.set(key, { name: task.name, color: getColorValue(task.color), hours: 0, doneHours: 0, count: 1 });
       }
     }
   }
@@ -75,32 +79,52 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
 
 export function WeeklyStatsPanel({ calendar }: WeeklyStatsPanelProps) {
   const [range, setRange] = useState<Range>('this-week');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   const dateRange = useMemo(() => {
     const now = new Date();
+    const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
     if (range === 'this-week') {
-      const start = startOfWeek(now);
-      const end = endOfWeek(now);
-      return eachDayOfInterval({ start, end }).map(d => format(d, 'yyyy-MM-dd'));
+      return eachDayOfInterval({ start: startOfWeek(now), end: endOfWeek(now) }).map(fmt);
     } else if (range === 'last-week') {
-      const start = startOfWeek(subWeeks(now, 1));
-      const end = endOfWeek(subWeeks(now, 1));
-      return eachDayOfInterval({ start, end }).map(d => format(d, 'yyyy-MM-dd'));
+      const prev = subWeeks(now, 1);
+      return eachDayOfInterval({ start: startOfWeek(prev), end: endOfWeek(prev) }).map(fmt);
+    } else if (range === 'this-month') {
+      return eachDayOfInterval({ start: startOfMonth(now), end: endOfMonth(now) }).map(fmt);
+    } else if (range === 'last-30') {
+      const start = new Date(now); start.setDate(start.getDate() - 29);
+      return eachDayOfInterval({ start, end: now }).map(fmt);
+    } else if (range === 'custom' && customStart && customEnd) {
+      try {
+        const s = parseISO(customStart);
+        const e = parseISO(customEnd);
+        if (s <= e) return eachDayOfInterval({ start: s, end: e }).map(fmt);
+      } catch {}
+      return [];
     } else {
       return Object.keys(calendar).sort();
     }
-  }, [range, calendar]);
+  }, [range, calendar, customStart, customEnd]);
 
   const stats = useMemo(() => computeStats(calendar, dateRange), [calendar, dateRange]);
 
   const totalHours = stats.reduce((sum, s) => sum + s.hours, 0);
+  const totalDone = stats.reduce((sum, s) => sum + s.doneHours, 0);
   const maxHours = Math.max(...stats.map(s => s.hours), 1);
 
-  const rangeLabel = range === 'this-week'
-    ? `${format(startOfWeek(new Date()), 'MMM d')} – ${format(endOfWeek(new Date()), 'MMM d')}`
-    : range === 'last-week'
-      ? `${format(startOfWeek(subWeeks(new Date(), 1)), 'MMM d')} – ${format(endOfWeek(subWeeks(new Date(), 1)), 'MMM d')}`
-      : 'All Time';
+  const rangeLabel = useMemo(() => {
+    const now = new Date();
+    if (range === 'this-week') return `${format(startOfWeek(now), 'MMM d')} – ${format(endOfWeek(now), 'MMM d')}`;
+    if (range === 'last-week') {
+      const prev = subWeeks(now, 1);
+      return `${format(startOfWeek(prev), 'MMM d')} – ${format(endOfWeek(prev), 'MMM d')}`;
+    }
+    if (range === 'this-month') return format(now, 'MMMM yyyy');
+    if (range === 'last-30') return 'Last 30 Days';
+    if (range === 'custom') return 'Custom Range';
+    return 'All Time';
+  }, [range]);
 
   return (
     <div className="flex flex-col h-full gap-3">
@@ -117,19 +141,46 @@ export function WeeklyStatsPanel({ calendar }: WeeklyStatsPanelProps) {
         >
           <option value="this-week">This Week</option>
           <option value="last-week">Last Week</option>
+          <option value="this-month">This Month</option>
+          <option value="last-30">Last 30 Days</option>
           <option value="all-time">All Time</option>
+          <option value="custom">Custom Range</option>
         </select>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="bg-secondary/40 rounded-lg p-3 text-center">
-          <div className="text-lg font-bold text-foreground">{totalHours.toFixed(1)}h</div>
-          <div className="text-xs text-muted-foreground">Total Scheduled</div>
+      {/* Custom range pickers */}
+      {range === 'custom' && (
+        <div className="flex items-center gap-2 p-2 bg-secondary/40 rounded-lg">
+          <Calendar className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+          <input
+            type="date"
+            value={customStart}
+            onChange={(e) => setCustomStart(e.target.value)}
+            className="flex-1 text-xs bg-transparent border border-input rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <span className="text-xs text-muted-foreground">–</span>
+          <input
+            type="date"
+            value={customEnd}
+            onChange={(e) => setCustomEnd(e.target.value)}
+            className="flex-1 text-xs bg-transparent border border-input rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-ring"
+          />
         </div>
-        <div className="bg-secondary/40 rounded-lg p-3 text-center">
-          <div className="text-lg font-bold text-foreground">{stats.length}</div>
-          <div className="text-xs text-muted-foreground">Unique Tasks</div>
+      )}
+
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="bg-secondary/40 rounded-lg p-2 text-center">
+          <div className="text-base font-bold text-foreground">{totalHours.toFixed(1)}h</div>
+          <div className="text-[10px] text-muted-foreground">Scheduled</div>
+        </div>
+        <div className="bg-secondary/40 rounded-lg p-2 text-center">
+          <div className="text-base font-bold" style={{ color: 'hsl(142 71% 45%)' }}>{totalDone.toFixed(1)}h</div>
+          <div className="text-[10px] text-muted-foreground">Completed</div>
+        </div>
+        <div className="bg-secondary/40 rounded-lg p-2 text-center">
+          <div className="text-base font-bold text-foreground">{stats.length}</div>
+          <div className="text-[10px] text-muted-foreground">Tasks</div>
         </div>
       </div>
 
@@ -141,33 +192,56 @@ export function WeeklyStatsPanel({ calendar }: WeeklyStatsPanelProps) {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {stats.map((stat, i) => (
-              <div key={i} className="flex items-center gap-2 group">
-                <div
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: stat.color }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs font-medium truncate">{stat.name}</span>
-                    <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                      {stat.hours > 0 ? `${stat.hours.toFixed(1)}h` : `${stat.count}×`}
-                    </span>
-                  </div>
-                  {stat.hours > 0 && (
-                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(stat.hours / maxHours) * 100}%`,
-                          backgroundColor: stat.color,
-                        }}
-                      />
+            {stats.map((stat, i) => {
+              const successPct = stat.hours > 0 ? (stat.doneHours / stat.hours) * 100 : 0;
+              const failedHours = stat.hours - stat.doneHours;
+              const failedPct = stat.hours > 0 ? (failedHours / stat.hours) * 100 : 0;
+              return (
+                <div key={i} className="flex items-center gap-2 group">
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: stat.color }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-medium truncate">{stat.name}</span>
+                      <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                        {stat.hours > 0 ? `${stat.doneHours.toFixed(1)}/${stat.hours.toFixed(1)}h` : `${stat.count}×`}
+                      </span>
                     </div>
-                  )}
+                    {stat.hours > 0 && (
+                      <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
+                        {/* Success bar */}
+                        <div
+                          className="h-full transition-all duration-500"
+                          style={{
+                            width: `${(successPct / 100) * (stat.hours / maxHours) * 100}%`,
+                            backgroundColor: stat.color,
+                          }}
+                        />
+                        {/* Failure bar */}
+                        {failedPct > 0 && (
+                          <div
+                            className="h-full bg-destructive transition-all duration-500 opacity-70"
+                            style={{
+                              width: `${(failedPct / 100) * (stat.hours / maxHours) * 100}%`,
+                            }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    {stat.hours > 0 && (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] text-muted-foreground">✓ {stat.doneHours.toFixed(1)}h done</span>
+                        {failedHours > 0.01 && (
+                          <span className="text-[9px] text-destructive">✗ {failedHours.toFixed(1)}h missed</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

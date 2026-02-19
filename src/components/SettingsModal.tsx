@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Settings, Download, Upload } from 'lucide-react';
+import { Settings, Download, Upload, Moon, Sun } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -8,11 +8,13 @@ import {
   DialogTrigger,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { useTheme } from '@/hooks/useTheme';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
 export function SettingsModal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { theme, toggleTheme } = useTheme();
 
   const handleExport = () => {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -53,9 +55,33 @@ export function SettingsModal() {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Manage your data backups</DialogDescription>
+          <DialogDescription>Manage your preferences and data</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4 py-4">
+          {/* Theme Toggle */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-secondary/30">
+            <div className="flex items-center gap-3">
+              {theme === 'dark' ? <Moon className="w-5 h-5 text-primary" /> : <Sun className="w-5 h-5 text-primary" />}
+              <div>
+                <div className="text-sm font-medium">Theme</div>
+                <div className="text-xs text-muted-foreground">{theme === 'dark' ? 'Dark mode active' : 'Light mode active'}</div>
+              </div>
+            </div>
+            <button
+              onClick={toggleTheme}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                theme === 'dark' ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                  theme === 'dark' ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Export */}
           <button
             onClick={handleExport}
             className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors text-left"
@@ -66,6 +92,8 @@ export function SettingsModal() {
               <div className="text-xs text-muted-foreground">Download all data as a .json file</div>
             </div>
           </button>
+
+          {/* Import */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors text-left"
@@ -76,6 +104,7 @@ export function SettingsModal() {
               <div className="text-xs text-muted-foreground">Restore from a .json backup (overwrites current data)</div>
             </div>
           </button>
+
           <input
             ref={fileInputRef}
             type="file"
