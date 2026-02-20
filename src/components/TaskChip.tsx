@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Pencil } from 'lucide-react';
+import { Pencil, FileText, Star } from 'lucide-react';
 import { TaskColor, getColorValue, getContrastColor } from '@/types';
 import { cn } from '@/lib/utils';
-import { TaskNotesModal } from './TaskNotesModal';
+import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 
 interface TaskChipProps {
   id: string;
@@ -19,7 +19,7 @@ interface TaskChipProps {
   onToggleComplete?: () => void;
   className?: string;
   showDelete?: boolean;
-  noteId?: string; // unique id for notes storage
+  noteId?: string;
 }
 
 export function TaskChip({
@@ -43,6 +43,9 @@ export function TaskChip({
   const [notesOpen, setNotesOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
+  const { note } = useTaskNote(noteId || null);
+  const hasNotes = !!note?.trim();
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,
@@ -79,7 +82,7 @@ export function TaskChip({
 
   const textColor = getContrastColor(color);
   const bgColor = getColorValue(color);
-  const showPencil = editable && !isEditing && (hovered || isTouchDevice);
+  const showActions = !isEditing && (hovered || isTouchDevice);
 
   return (
     <>
@@ -99,11 +102,12 @@ export function TaskChip({
         {...(draggable && !isEditing ? { ...attributes, ...listeners } : {})}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          if (noteId) setNotesOpen(true);
-        }}
       >
+        {/* Star indicator for notes */}
+        {hasNotes && (
+          <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
+        )}
+
         {onToggleComplete && (
           <button
             onClick={(e) => {
@@ -148,8 +152,8 @@ export function TaskChip({
           <span className={cn(completed && 'line-through')}>{name}</span>
         )}
 
-        {/* Pencil rename icon — hover on desktop, always on mobile */}
-        {showPencil && (
+        {/* Action icons: Pencil, Notes, Delete */}
+        {showActions && editable && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -164,6 +168,23 @@ export function TaskChip({
             title="Rename"
           >
             <Pencil className="w-2.5 h-2.5" />
+          </button>
+        )}
+
+        {showActions && noteId && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setNotesOpen(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Notes"
+          >
+            <FileText className="w-2.5 h-2.5" />
           </button>
         )}
         

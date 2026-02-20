@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, FileText, Star } from 'lucide-react';
 import { TimeSlot, TaskColor, getColorValue, getContrastColor } from '@/types';
 import { TaskChip } from './TaskChip';
-import { TaskNotesModal } from './TaskNotesModal';
+import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
 
 interface TimelineViewProps {
@@ -45,6 +45,11 @@ function DraggableSlotTask({
   const [notesOpen, setNotesOpen] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+
+  const noteId = `${slot.id}-${task.taskId || task.id}`;
+  const { note } = useTaskNote(noteId);
+  const hasNotes = !!note?.trim();
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${droppablePrefix}-slottask-${slot.id}`,
@@ -66,6 +71,7 @@ function DraggableSlotTask({
 
   const textColor = getContrastColor(task.color);
   const bgColor = getColorValue(task.color);
+  const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -81,9 +87,6 @@ function DraggableSlotTask({
     }
   };
 
-  // Unique id for notes: use slot id + task id combo
-  const noteId = `${slot.id}-${task.taskId || task.id}`;
-
   return (
     <>
       <div
@@ -98,6 +101,11 @@ function DraggableSlotTask({
         {...attributes}
         {...listeners}
       >
+        {/* Star indicator */}
+        {hasNotes && (
+          <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
+        )}
+
         {showCompleted && onToggleSlotTask && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSlotTask(slot.id); }}
@@ -136,17 +144,13 @@ function DraggableSlotTask({
               'flex-1 truncate',
               task.completed && 'line-through opacity-60'
             )}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setNotesOpen(true);
-            }}
           >
             {task.name}
           </span>
         )}
 
         {/* Pencil edit icon */}
-        {!isEditing && (hovered || window.matchMedia('(pointer: coarse)').matches) && (
+        {showActions && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -161,6 +165,24 @@ function DraggableSlotTask({
             title="Rename task"
           >
             <Pencil className="w-2.5 h-2.5" />
+          </button>
+        )}
+
+        {/* Notes icon */}
+        {showActions && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setNotesOpen(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Notes"
+          >
+            <FileText className="w-2.5 h-2.5" />
           </button>
         )}
 
@@ -391,23 +413,21 @@ export function TimelineView({
         ))}
       </div>
 
-      {/* Resizable divider hint */}
-      <div className="flex items-center gap-1 text-[10px] text-muted-foreground/40 select-none">
+      {/* Vertical divider for resizing time column */}
+      <div className="flex items-center gap-2 mt-1">
         <div
-          className="w-1 h-4 rounded cursor-col-resize bg-border/60 hover:bg-primary/40 transition-colors"
+          className="w-1.5 h-6 rounded-full cursor-col-resize bg-border hover:bg-primary/60 transition-colors flex-shrink-0"
           onMouseDown={handleDividerMouseDown}
           title="Drag to resize time column"
         />
-        <span>drag to resize time labels</span>
+        <button
+          onClick={onAddTimeSlot}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+          <span>Add time slot</span>
+        </button>
       </div>
-
-      <button
-        onClick={onAddTimeSlot}
-        className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors w-fit"
-      >
-        <Plus className="w-3 h-3" />
-        <span>Add time slot</span>
-      </button>
 
       <UnassignedZone
         tasks={unassignedTasks}
