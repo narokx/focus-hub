@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, Trash2, List, Pencil } from 'lucide-react';
+import { Plus, Trash2, List, Pencil, FileText, Star } from 'lucide-react';
 import { QuickTask, TaskColor, getColorValue, getContrastColor } from '@/types';
 import { AutocompleteInput } from './AutocompleteInput';
-import { TaskNotesModal } from './TaskNotesModal';
+import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
 
 interface QuickTasksPanelProps {
@@ -27,6 +27,10 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
+  const noteId = `quick-${task.id}`;
+  const { note } = useTaskNote(noteId);
+  const hasNotes = !!note?.trim();
+
   const {
     attributes,
     listeners,
@@ -47,6 +51,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
 
   const textColor = getContrastColor(task.color);
   const bgColor = getColorValue(task.color);
+  const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -76,11 +81,12 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
           {...listeners}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            setNotesOpen(true);
-          }}
         >
+          {/* Star indicator */}
+          {hasNotes && (
+            <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
+          )}
+
           {isEditing ? (
             <input
               ref={inputRef}
@@ -100,8 +106,8 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             <span>{task.name}</span>
           )}
 
-          {/* Pencil icon — hover on desktop, always on mobile */}
-          {!isEditing && (hovered || isTouchDevice) && (
+          {/* Pencil icon */}
+          {showActions && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -118,6 +124,24 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
               <Pencil className="w-2.5 h-2.5" />
             </button>
           )}
+
+          {/* Notes icon */}
+          {showActions && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotesOpen(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'w-3.5 h-3.5 flex items-center justify-center rounded-full transition-opacity flex-shrink-0',
+                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+              )}
+              title="Notes"
+            >
+              <FileText className="w-2.5 h-2.5" />
+            </button>
+          )}
         </div>
         <button
           onClick={() => onDeleteTask(task.id)}
@@ -129,7 +153,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
 
       {notesOpen && (
         <TaskNotesModal
-          taskId={`quick-${task.id}`}
+          taskId={noteId}
           taskName={task.name}
           taskColor={bgColor}
           onClose={() => setNotesOpen(false)}

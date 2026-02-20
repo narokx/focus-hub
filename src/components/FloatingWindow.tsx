@@ -51,7 +51,6 @@ export function FloatingWindow({
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('.no-drag')) return;
-    if (minimized) return;
 
     setIsDragging(true);
     setZIndex(100);
@@ -87,7 +86,7 @@ export function FloatingWindow({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [position, onPositionChange, minimized]);
+  }, [position, onPositionChange]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
