@@ -230,6 +230,7 @@ function TimeSlotRow({
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
   timeColumnWidth: number;
+  onResizeDivider: (e: React.MouseEvent) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
@@ -257,6 +258,13 @@ function TimeSlotRow({
           />
         </div>
       </div>
+
+      {/* Vertical resize divider between time column and task area */}
+      <div
+        className="w-1 self-stretch cursor-col-resize rounded-full bg-transparent hover:bg-primary/40 transition-colors flex-shrink-0"
+        onMouseDown={onResizeDivider}
+        title="Drag to resize time column"
+      />
 
       <div
         ref={setNodeRef}
@@ -409,17 +417,12 @@ export function TimelineView({
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
             timeColumnWidth={timeColWidth}
+            onResizeDivider={handleDividerMouseDown}
           />
         ))}
       </div>
 
-      {/* Vertical divider for resizing time column */}
       <div className="flex items-center gap-2 mt-1">
-        <div
-          className="w-1.5 h-6 rounded-full cursor-col-resize bg-border hover:bg-primary/60 transition-colors flex-shrink-0"
-          onMouseDown={handleDividerMouseDown}
-          title="Drag to resize time column"
-        />
         <button
           onClick={onAddTimeSlot}
           className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors"

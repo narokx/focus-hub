@@ -42,6 +42,7 @@ export function FloatingWindow({
   onMinimizeChange,
 }: FloatingWindowProps) {
   const [position, setPosition] = useState(defaultPosition);
+  const positionRef = useRef(defaultPosition);
   const [size, setSize] = useState(defaultSize);
   const [isDragging, setIsDragging] = useState(false);
   const [zIndex, setZIndex] = useState(10);
@@ -57,8 +58,8 @@ export function FloatingWindow({
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      initialX: position.x,
-      initialY: position.y,
+      initialX: positionRef.current.x,
+      initialY: positionRef.current.y,
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -67,16 +68,19 @@ export function FloatingWindow({
       const dy = e.clientY - dragRef.current.startY;
       const newX = Math.max(0, dragRef.current.initialX + dx);
       const newY = Math.max(0, dragRef.current.initialY + dy);
-      setPosition({ x: newX, y: newY });
+      const newPos = { x: newX, y: newY };
+      positionRef.current = newPos;
+      setPosition(newPos);
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       setZIndex(10);
       if (dragRef.current) {
-        const moved = position.x !== dragRef.current.initialX || position.y !== dragRef.current.initialY;
+        const cur = positionRef.current;
+        const moved = cur.x !== dragRef.current.initialX || cur.y !== dragRef.current.initialY;
         if (moved && onPositionChange) {
-          onPositionChange(position);
+          onPositionChange(cur);
         }
       }
       dragRef.current = null;
@@ -86,7 +90,7 @@ export function FloatingWindow({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [position, onPositionChange]);
+  }, [onPositionChange]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };

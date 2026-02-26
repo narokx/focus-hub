@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin, TouchSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Calendar, Layers, List, Wrench, Undo2, Redo2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
@@ -15,7 +15,7 @@ import { useHistory } from '@/hooks/useHistory';
 import { TaskColor, getColorValue, getContrastColor } from '@/types';
 import { cn } from '@/lib/utils';
 
-type MobileTab = 'calendar' | 'routines' | 'tasks';
+type MobileTab = 'calendar' | 'routines' | 'tools';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
 
 export default function Index() {
@@ -39,6 +39,15 @@ export default function Index() {
   useTheme();
 
   const isMobile = useIsMobile();
+
+  // Configure DnD sensors for both touch and pointer
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 250, tolerance: 5 },
+  });
+  const sensors = useSensors(pointerSensor, touchSensor);
   const [mobileTab, setMobileTab] = useState<MobileTab>('calendar');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -241,7 +250,7 @@ export default function Index() {
   // ── Mobile Layout ──────────────────────────────────────────────
   if (isMobile) {
     return (
-      <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div className="flex flex-col h-screen bg-background">
           {/* Mobile header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
@@ -302,13 +311,16 @@ export default function Index() {
                 onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
               />
             )}
-            {mobileTab === 'tasks' && (
-              <QuickTasksPanel
-                tasks={state.quickTasks}
-                onAddTask={addQuickTask}
-                onUpdateTask={updateQuickTask}
-                onDeleteTask={deleteQuickTask}
-              />
+            {mobileTab === 'tools' && (
+              <div className="flex flex-col gap-6">
+                <QuickTasksPanel
+                  tasks={state.quickTasks}
+                  onAddTask={addQuickTask}
+                  onUpdateTask={updateQuickTask}
+                  onDeleteTask={deleteQuickTask}
+                />
+                <WeeklyStatsPanel calendar={state.calendar} />
+              </div>
             )}
           </div>
 
@@ -317,7 +329,7 @@ export default function Index() {
             {([
               { key: 'calendar', icon: <Calendar className="w-5 h-5" />, label: 'Calendar' },
               { key: 'routines', icon: <Layers className="w-5 h-5" />, label: 'Routines' },
-              { key: 'tasks', icon: <List className="w-5 h-5" />, label: 'Tasks' },
+              { key: 'tools', icon: <Wrench className="w-5 h-5" />, label: 'Tools' },
             ] as { key: MobileTab; icon: React.ReactNode; label: string }[]).map(tab => (
               <button
                 key={tab.key}
@@ -342,6 +354,7 @@ export default function Index() {
   // ── Desktop Layout ─────────────────────────────────────────────
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
