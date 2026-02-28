@@ -93,6 +93,8 @@ export function HeatmapCalendar({
   onUpdateDaySlotTaskName,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [timeListWidth, setTimeListWidth] = useState(280);
+  const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -103,45 +105,75 @@ export function HeatmapCalendar({
 
   const selectedDayData = selectedDate ? calendar[selectedDate] : null;
 
+  const handleDividerMouseDown = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = { startX: e.clientX, startW: timeListWidth };
+
+    const move = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = e.clientX - resizingRef.current.startX;
+      setTimeListWidth(Math.max(200, Math.min(500, resizingRef.current.startW + delta)));
+    };
+    const up = () => {
+      resizingRef.current = null;
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }, [timeListWidth]);
+
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-full">
       {/* Selected day timeline panel - LEFT SIDE */}
       {selectedDate && (
-        <div className="w-[280px] flex-shrink-0 border-r border-border/50 pr-4 animate-fade-in flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-              <h3 className="font-semibold text-sm">
-                {format(new Date(selectedDate), 'EEEE, MMMM d')}
-              </h3>
+        <>
+          <div
+            className="flex-shrink-0 pr-4 animate-fade-in flex flex-col overflow-hidden"
+            style={{ width: timeListWidth }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+                <h3 className="font-semibold text-sm">
+                  {format(new Date(selectedDate), 'EEEE, MMMM d')}
+                </h3>
+              </div>
+              <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
-              <X className="w-4 h-4" />
-            </button>
+
+            <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
+              <TimelineView
+                timeSlots={selectedDayData?.timeSlots || generateDefaultTimeSlots()}
+                unassignedTasks={selectedDayData?.tasks || []}
+                droppablePrefix={`day-${selectedDate}`}
+                showCompleted={true}
+                onAddTimeSlot={() => onAddDayTimeSlot(selectedDate)}
+                onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate, slotId)}
+                onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate, slotId, field, value)}
+                onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate, slotId)}
+                onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate, slotId)}
+                onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
+                onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
+                onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
+                onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate, slotId, name) : undefined}
+              />
+            </div>
           </div>
 
-          <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
-            <TimelineView
-              timeSlots={selectedDayData?.timeSlots || generateDefaultTimeSlots()}
-              unassignedTasks={selectedDayData?.tasks || []}
-              droppablePrefix={`day-${selectedDate}`}
-              showCompleted={true}
-              onAddTimeSlot={() => onAddDayTimeSlot(selectedDate)}
-              onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate, slotId)}
-              onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate, slotId, field, value)}
-              onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate, slotId)}
-              onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate, slotId)}
-              onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
-              onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
-              onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
-              onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate, slotId, name) : undefined}
-            />
-          </div>
-        </div>
+          {/* Vertical divider for resizing time list */}
+          <div
+            className="w-1 flex-shrink-0 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
+            onMouseDown={handleDividerMouseDown}
+            title="Drag to resize timeline panel"
+          />
+        </>
       )}
 
       {/* Calendar grid - RIGHT SIDE */}
-      <div className="flex-1 flex flex-col gap-4 min-w-0">
+      <div className="flex-1 flex flex-col gap-4 min-w-0 pl-4">
         <div className="flex items-center justify-between">
           <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
             <ChevronLeft className="w-5 h-5" />

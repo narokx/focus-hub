@@ -109,7 +109,7 @@ export function FloatingWindow({
   };
 
   const enableResize: Enable = minimized ? {
-    top: false, right: false, bottom: false, left: false,
+    top: false, right: true, bottom: false, left: true,
     topRight: false, bottomRight: false, bottomLeft: false, topLeft: false,
   } : {
     top: true, right: true, bottom: true, left: true,
@@ -124,7 +124,7 @@ export function FloatingWindow({
     >
       <Resizable
         size={minimized ? { width: size.width, height: 44 } : size}
-        minWidth={minWidth}
+        minWidth={minimized ? 200 : minWidth}
         minHeight={minimized ? 44 : minHeight}
         maxWidth={maxWidth}
         maxHeight={minimized ? 44 : maxHeight}
@@ -147,7 +147,7 @@ export function FloatingWindow({
           bottomLeft: 'resize-handle rounded-bl-lg', bottomRight: 'resize-handle rounded-br-lg',
         }}
       >
-        <div className={cn('window-panel flex flex-col', minimized ? 'h-11 overflow-hidden' : 'h-full', className)}>
+        <div className={cn('window-panel flex flex-col h-full', className)}>
           <div className="window-header flex-shrink-0" onMouseDown={handleMouseDown}>
             <div className="flex items-center gap-2">
               {icon}
@@ -188,11 +188,9 @@ export function FloatingWindow({
               <GripHorizontal className="w-4 h-4 text-muted-foreground opacity-50" />
             </div>
           </div>
-          {!minimized && (
-            <div className="window-content flex-1 overflow-auto scrollbar-thin">
-              {children}
-            </div>
-          )}
+          <div className="window-content flex-1 overflow-auto scrollbar-thin" style={{ display: minimized ? 'none' : 'block' }}>
+            {children}
+          </div>
         </div>
       </Resizable>
     </div>

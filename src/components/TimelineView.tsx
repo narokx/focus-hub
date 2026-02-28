@@ -354,8 +354,6 @@ function UnassignedZone({
   );
 }
 
-const MIN_TIME_COL = 80;
-const MAX_TIME_COL = 200;
 const DEFAULT_TIME_COL = 148;
 
 export function TimelineView({
@@ -373,26 +371,7 @@ export function TimelineView({
   onUpdateUnassignedName,
   onUpdateSlotTaskName,
 }: TimelineViewProps) {
-  const [timeColWidth, setTimeColWidth] = useState(DEFAULT_TIME_COL);
-  const resizingRef = useRef<{ startX: number; startW: number } | null>(null);
-
-  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    resizingRef.current = { startX: e.clientX, startW: timeColWidth };
-
-    const move = (e: MouseEvent) => {
-      if (!resizingRef.current) return;
-      const delta = e.clientX - resizingRef.current.startX;
-      setTimeColWidth(Math.max(MIN_TIME_COL, Math.min(MAX_TIME_COL, resizingRef.current.startW + delta)));
-    };
-    const up = () => {
-      resizingRef.current = null;
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-  }, [timeColWidth]);
+  const timeColWidth = DEFAULT_TIME_COL;
 
   return (
     <div className="flex flex-col gap-1.5 h-full">
@@ -413,21 +392,13 @@ export function TimelineView({
         ))}
       </div>
 
-      {/* Vertical divider for resizing time column */}
-      <div className="flex items-center gap-2 mt-1">
-        <div
-          className="w-1.5 h-6 rounded-full cursor-col-resize bg-border hover:bg-primary/60 transition-colors flex-shrink-0"
-          onMouseDown={handleDividerMouseDown}
-          title="Drag to resize time column"
-        />
-        <button
-          onClick={onAddTimeSlot}
-          className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors"
-        >
-          <Plus className="w-3 h-3" />
-          <span>Add time slot</span>
-        </button>
-      </div>
+      <button
+        onClick={onAddTimeSlot}
+        className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded transition-colors mt-1"
+      >
+        <Plus className="w-3 h-3" />
+        <span>Add time slot</span>
+      </button>
 
       <UnassignedZone
         tasks={unassignedTasks}
