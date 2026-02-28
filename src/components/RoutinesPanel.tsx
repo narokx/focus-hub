@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight, Pencil } from 'lucide-react';
+import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { Routine, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { cn } from '@/lib/utils';
@@ -75,7 +75,7 @@ function RoutineItem({
       )}
     >
       {/* Routine header */}
-      <div className="flex items-center gap-2 p-2 bg-secondary/30 group">
+      <div className="flex items-center gap-2 p-2 bg-secondary/30">
         {/* Drag handle - ONLY this triggers routine drag */}
         <div
           ref={setDragRef}
@@ -104,18 +104,13 @@ function RoutineItem({
             autoFocus
           />
         ) : (
-          <span className="flex-1 text-sm font-medium truncate">
+          <span
+            className="flex-1 text-sm font-medium cursor-pointer hover:text-primary transition-colors"
+            onDoubleClick={() => setIsEditing(true)}
+          >
             {routine.name}
           </span>
         )}
-
-        <button
-          onClick={() => { setIsEditing(true); setEditName(routine.name); }}
-          className="p-1 rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all md:opacity-0 max-md:opacity-100"
-          title="Rename routine"
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
 
         <span className="text-xs text-muted-foreground">{totalTasks} tasks</span>
         <button onClick={() => onDeleteRoutine(routine.id)} className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors">

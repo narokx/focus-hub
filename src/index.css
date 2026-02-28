@@ -245,10 +245,3 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 }
-
-/* Mobile: always show action icons (no hover on touch) */
-@media (max-width: 767px) {
-  .group-hover\:opacity-100 {
-    opacity: 1 !important;
-  }
-}
