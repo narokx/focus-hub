@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft } from 'lucide-react';
 import { DayData, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HeatmapCalendarProps {
   calendar: Record<string, DayData>;
@@ -95,6 +96,7 @@ export function HeatmapCalendar({
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
+  const isMobile = useIsMobile();
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -123,25 +125,42 @@ export function HeatmapCalendar({
     document.addEventListener('mouseup', up);
   }, [timeListWidth]);
 
+  const showCalendarGrid = !isMobile || !selectedDate;
+  const showTimeline = !!selectedDate;
+
   return (
     <div className="flex h-full">
-      {/* Selected day timeline panel - LEFT SIDE */}
-      {selectedDate && (
+      {showTimeline && (
         <>
           <div
-            className="flex-shrink-0 pr-4 animate-fade-in flex flex-col overflow-hidden"
-            style={{ width: timeListWidth }}
+            className={cn(
+              "flex-shrink-0 animate-fade-in flex flex-col overflow-hidden",
+              isMobile ? "w-full" : "pr-4"
+            )}
+            style={isMobile ? undefined : { width: timeListWidth }}
           >
+            {isMobile && (
+              <button
+                onClick={onCloseDay}
+                className="sticky top-0 z-10 flex items-center gap-2 px-3 py-2.5 mb-2 rounded-lg bg-secondary text-sm font-medium text-foreground hover:bg-secondary/80 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Calendar
+              </button>
+            )}
+
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4 text-muted-foreground" />
                 <h3 className="font-semibold text-sm">
-                  {format(new Date(selectedDate), 'EEEE, MMMM d')}
+                  {format(new Date(selectedDate!), 'EEEE, MMMM d')}
                 </h3>
               </div>
-              <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
-                <X className="w-4 h-4" />
-              </button>
+              {!isMobile && (
+                <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
@@ -150,82 +169,84 @@ export function HeatmapCalendar({
                 unassignedTasks={selectedDayData?.tasks || []}
                 droppablePrefix={`day-${selectedDate}`}
                 showCompleted={true}
-                onAddTimeSlot={() => onAddDayTimeSlot(selectedDate)}
-                onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate, slotId)}
-                onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate, slotId, field, value)}
-                onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate, slotId)}
-                onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate, slotId)}
-                onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate, taskId)}
-                onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate, taskId)}
-                onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate, taskId, name)}
-                onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate, slotId, name) : undefined}
+                onAddTimeSlot={() => onAddDayTimeSlot(selectedDate!)}
+                onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate!, slotId)}
+                onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate!, slotId, field, value)}
+                onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate!, slotId)}
+                onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate!, slotId)}
+                onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate!, taskId)}
+                onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate!, taskId)}
+                onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate!, taskId, name)}
+                onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate!, slotId, name) : undefined}
               />
             </div>
           </div>
 
-          {/* Vertical divider for resizing time list */}
-          <div
-            className="w-1 flex-shrink-0 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
-            onMouseDown={handleDividerMouseDown}
-            title="Drag to resize timeline panel"
-          />
+          {!isMobile && (
+            <div
+              className="w-1 flex-shrink-0 cursor-col-resize bg-border hover:bg-primary/60 transition-colors"
+              onMouseDown={handleDividerMouseDown}
+              title="Drag to resize timeline panel"
+            />
+          )}
         </>
       )}
 
-      {/* Calendar grid - RIGHT SIDE */}
-      <div className="flex-1 flex flex-col gap-4 min-w-0 pl-4">
-        <div className="flex items-center justify-between">
-          <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h2 className="text-lg font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
-          <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-shrink-0">
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {weekDays.map(day => (
-              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">{day}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-1">
-            {days.map(date => {
-              const dateStr = format(date, 'yyyy-MM-dd');
-              return (
-                <DayCell
-                  key={dateStr}
-                  date={date}
-                  dayData={calendar[dateStr]}
-                  currentMonth={currentMonth}
-                  onClick={() => onDayClick(dateStr)}
-                  isSelected={selectedDate === dateStr}
-                />
-              );
-            })}
+      {showCalendarGrid && (
+        <div className={cn("flex-1 flex flex-col gap-4 min-w-0", !isMobile && "pl-4")}>
+          <div className="flex items-center justify-between">
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-lg font-semibold">{format(currentMonth, 'MMMM yyyy')}</h2>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />
-              <span>None</span>
+          <div className="flex-shrink-0">
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {weekDays.map(day => (
+                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">{day}</div>
+              ))}
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-heatmap-low" />
-              <span>&lt;30%</span>
+            <div className="grid grid-cols-7 gap-1">
+              {days.map(date => {
+                const dateStr = format(date, 'yyyy-MM-dd');
+                return (
+                  <DayCell
+                    key={dateStr}
+                    date={date}
+                    dayData={calendar[dateStr]}
+                    currentMonth={currentMonth}
+                    onClick={() => onDayClick(dateStr)}
+                    isSelected={selectedDate === dateStr}
+                  />
+                );
+              })}
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-heatmap-mid" />
-              <span>30-69%</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm bg-heatmap-high" />
-              <span>≥70%</span>
+
+            <div className="flex items-center justify-center gap-4 mt-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-heatmap-empty border border-border" />
+                <span>None</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-heatmap-low" />
+                <span>&lt;30%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-heatmap-mid" />
+                <span>30-69%</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm bg-heatmap-high" />
+                <span>≥70%</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

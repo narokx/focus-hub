@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const NOTES_KEY = 'task-notes';
 
@@ -46,6 +47,7 @@ interface TaskNotesModalProps {
 export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNotesModalProps) {
   const { note, save } = useTaskNote(taskId);
   const [draft, setDraft] = useState(note);
+  const isMobile = useIsMobile();
   const [size, setSize] = useState(() => {
     try {
       const s = localStorage.getItem('task-notes-modal-size');
@@ -115,6 +117,50 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
     onClose();
   };
 
+  // Mobile: fullscreen modal
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-[999] bg-card flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/30">
+          <FileText className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: taskColor }} />
+            <span className="text-sm font-semibold truncate">{taskName}</span>
+            <span className="text-xs text-muted-foreground">— Notes</span>
+          </div>
+        </div>
+
+        {/* Content - scrollable */}
+        <div className="flex-1 p-4 overflow-y-auto min-h-0">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Add notes, links, ideas... (supports plain text)"
+            className="w-full h-full min-h-[200px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none leading-relaxed"
+          />
+        </div>
+
+        {/* Fixed bottom buttons */}
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-t border-border bg-card">
+          <button
+            onClick={handleSave}
+            className="flex-1 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+          >
+            Save
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 text-sm font-medium bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: floating draggable/resizable window
   return (
     <div className="fixed inset-0 z-[999] pointer-events-none">
       <div
@@ -131,10 +177,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
         >
           <FileText className="w-4 h-4 text-muted-foreground" />
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div
-              className="w-3 h-3 rounded-full flex-shrink-0"
-              style={{ backgroundColor: taskColor }}
-            />
+            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: taskColor }} />
             <span className="text-sm font-semibold truncate">{taskName}</span>
             <span className="text-xs text-muted-foreground">— Notes</span>
           </div>
