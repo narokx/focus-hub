@@ -169,7 +169,7 @@ export function HeatmapCalendar({
                 </h3>
               </div>
               <div className="flex items-center gap-1">
-                {!isMobile && routines && routines.length > 0 && (
+                {routines && routines.length > 0 && (
                   <button
                     onClick={() => setShowRoutinePicker(true)}
                     className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
