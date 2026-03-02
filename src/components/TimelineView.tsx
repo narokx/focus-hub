@@ -22,6 +22,7 @@ interface TimelineViewProps {
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
   timeColumnWidth?: number;
   onTimeColumnWidthChange?: (width: number) => void;
+  onEmptySlotClick?: (slotId: string) => void;
 }
 
 function DraggableSlotTask({
@@ -220,6 +221,7 @@ function TimeSlotRow({
   onToggleSlotTask,
   onUpdateSlotTaskName,
   timeColumnWidth,
+  onEmptySlotClick,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -230,6 +232,7 @@ function TimeSlotRow({
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
   timeColumnWidth: number;
+  onEmptySlotClick?: (slotId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
@@ -276,7 +279,12 @@ function TimeSlotRow({
             onUpdateSlotTaskName={onUpdateSlotTaskName}
           />
         ) : (
-          <span className="text-[10px] text-muted-foreground/50 italic">Drop task here</span>
+          <span
+            className="text-[10px] text-muted-foreground/50 italic cursor-pointer w-full"
+            onClick={() => onEmptySlotClick?.(slot.id)}
+          >
+            {onEmptySlotClick ? 'Tap to assign or drop task' : 'Drop task here'}
+          </span>
         )}
       </div>
 
@@ -370,6 +378,7 @@ export function TimelineView({
   onRemoveUnassigned,
   onUpdateUnassignedName,
   onUpdateSlotTaskName,
+  onEmptySlotClick,
 }: TimelineViewProps) {
   const timeColWidth = DEFAULT_TIME_COL;
 
@@ -388,6 +397,7 @@ export function TimelineView({
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
             timeColumnWidth={timeColWidth}
+            onEmptySlotClick={onEmptySlotClick}
           />
         ))}
       </div>

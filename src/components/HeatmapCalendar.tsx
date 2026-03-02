@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft } from 'lucide-react';
-import { DayData, generateDefaultTimeSlots } from '@/types';
+import { DayData, QuickTask, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
+import { TaskPickerModal } from './TaskPickerModal';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -21,6 +22,8 @@ interface HeatmapCalendarProps {
   onMoveDaySlotToUnassigned: (date: string, slotId: string) => void;
   onToggleDaySlotTask: (date: string, slotId: string) => void;
   onUpdateDaySlotTaskName?: (date: string, slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -92,11 +95,14 @@ export function HeatmapCalendar({
   onMoveDaySlotToUnassigned,
   onToggleDaySlotTask,
   onUpdateDaySlotTaskName,
+  availableTasks,
+  onAssignTaskToSlot,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const isMobile = useIsMobile();
+  const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -178,8 +184,20 @@ export function HeatmapCalendar({
                 onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate!, taskId)}
                 onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate!, taskId, name)}
                 onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate!, slotId, name) : undefined}
+                onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
               />
             </div>
+
+            {pickerSlotId && availableTasks && onAssignTaskToSlot && (
+              <TaskPickerModal
+                tasks={availableTasks}
+                onSelect={(task) => {
+                  onAssignTaskToSlot(selectedDate!, pickerSlotId, { name: task.name, color: task.color, taskId: task.id });
+                  setPickerSlotId(null);
+                }}
+                onClose={() => setPickerSlotId(null)}
+              />
+            )}
           </div>
 
           {!isMobile && (

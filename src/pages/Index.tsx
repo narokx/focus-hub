@@ -286,6 +286,8 @@ export default function Index() {
                 onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
                 onToggleDaySlotTask={toggleDaySlotTask}
                 onUpdateDaySlotTaskName={updateDaySlotTaskName}
+                availableTasks={state.quickTasks}
+                onAssignTaskToSlot={assignTaskToDaySlot}
               />
             )}
             {mobileTab === 'routines' && (
@@ -300,6 +302,8 @@ export default function Index() {
                 onUpdateRoutineSlotTime={updateRoutineSlotTime}
                 onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
                 onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
+                availableTasks={state.quickTasks}
+                onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
               />
             )}
             {mobileTab === 'tasks' && (
@@ -399,6 +403,8 @@ export default function Index() {
             onUpdateRoutineSlotTime={updateRoutineSlotTime}
             onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
             onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
+            availableTasks={state.quickTasks}
+            onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
           />
         </FloatingWindow>
 
@@ -452,6 +458,8 @@ export default function Index() {
             onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
             onToggleDaySlotTask={toggleDaySlotTask}
             onUpdateDaySlotTaskName={updateDaySlotTaskName}
+            availableTasks={state.quickTasks}
+            onAssignTaskToSlot={assignTaskToDaySlot}
           />
         </FloatingWindow>
 
