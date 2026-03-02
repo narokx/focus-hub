@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft } from 'lucide-react';
-import { DayData, QuickTask, generateDefaultTimeSlots } from '@/types';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap } from 'lucide-react';
+import { DayData, QuickTask, Routine, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
+import { RoutinePickerModal } from './RoutinePickerModal';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HeatmapCalendarProps {
   calendar: Record<string, DayData>;
+  routines?: Routine[];
   onDayClick: (date: string) => void;
   selectedDate: string | null;
   onCloseDay: () => void;
@@ -24,6 +26,7 @@ interface HeatmapCalendarProps {
   onUpdateDaySlotTaskName?: (date: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onApplyRoutine?: (date: string, routine: Routine) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -83,6 +86,7 @@ function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
 
 export function HeatmapCalendar({
   calendar,
+  routines,
   onDayClick,
   selectedDate,
   onCloseDay,
@@ -97,9 +101,11 @@ export function HeatmapCalendar({
   onUpdateDaySlotTaskName,
   availableTasks,
   onAssignTaskToSlot,
+  onApplyRoutine,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
+  const [showRoutinePicker, setShowRoutinePicker] = useState(false);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const isMobile = useIsMobile();
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
@@ -162,11 +168,22 @@ export function HeatmapCalendar({
                   {format(new Date(selectedDate!), 'EEEE, MMMM d')}
                 </h3>
               </div>
-              {!isMobile && (
-                <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+              <div className="flex items-center gap-1">
+                {!isMobile && routines && routines.length > 0 && (
+                  <button
+                    onClick={() => setShowRoutinePicker(true)}
+                    className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+                    title="Add routine"
+                  >
+                    <Zap className="w-4 h-4" />
+                  </button>
+                )}
+                {!isMobile && (
+                  <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
@@ -264,6 +281,18 @@ export function HeatmapCalendar({
             </div>
           </div>
         </div>
+      )}
+
+      {showRoutinePicker && routines && selectedDate && (
+        <RoutinePickerModal
+          routines={routines}
+          onSelect={(routine) => {
+            if (onApplyRoutine) {
+              onApplyRoutine(selectedDate, routine);
+            }
+          }}
+          onClose={() => setShowRoutinePicker(false)}
+        />
       )}
     </div>
   );

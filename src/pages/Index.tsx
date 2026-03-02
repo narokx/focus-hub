@@ -274,6 +274,7 @@ export default function Index() {
             {mobileTab === 'calendar' && (
               <HeatmapCalendar
                 calendar={state.calendar}
+                routines={state.routines}
                 onDayClick={setSelectedDate}
                 selectedDate={selectedDate}
                 onCloseDay={() => setSelectedDate(null)}
@@ -288,6 +289,7 @@ export default function Index() {
                 onUpdateDaySlotTaskName={updateDaySlotTaskName}
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
+                onApplyRoutine={applyRoutineToDay}
               />
             )}
             {mobileTab === 'routines' && (
@@ -446,6 +448,7 @@ export default function Index() {
         >
           <HeatmapCalendar
             calendar={state.calendar}
+            routines={state.routines}
             onDayClick={setSelectedDate}
             selectedDate={selectedDate}
             onCloseDay={() => setSelectedDate(null)}
@@ -460,6 +463,7 @@ export default function Index() {
             onUpdateDaySlotTaskName={updateDaySlotTaskName}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
+            onApplyRoutine={applyRoutineToDay}
           />
         </FloatingWindow>
 
