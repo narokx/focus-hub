@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
-import { Routine, generateDefaultTimeSlots } from '@/types';
+import { Routine, QuickTask, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
+import { TaskPickerModal } from './TaskPickerModal';
 import { cn } from '@/lib/utils';
 
 interface RoutinesPanelProps {
@@ -16,6 +17,8 @@ interface RoutinesPanelProps {
   onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
   onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
 }
 
 function RoutineItem({
@@ -28,6 +31,8 @@ function RoutineItem({
   onUpdateRoutineSlotTime,
   onMoveRoutineSlotToUnassigned,
   onUpdateRoutineSlotTaskName,
+  availableTasks,
+  onAssignTaskToRoutineSlot,
 }: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
@@ -38,7 +43,10 @@ function RoutineItem({
   onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
   onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
 }) {
+  const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(routine.name);
@@ -132,7 +140,18 @@ function RoutineItem({
             onRemoveTaskFromSlot={(slotId) => onMoveRoutineSlotToUnassigned(routine.id, slotId)}
             onRemoveUnassigned={(taskId) => onRemoveTaskFromRoutine(routine.id, taskId)}
             onUpdateSlotTaskName={onUpdateRoutineSlotTaskName ? (slotId, name) => onUpdateRoutineSlotTaskName(routine.id, slotId, name) : undefined}
+            onEmptySlotClick={availableTasks && onAssignTaskToRoutineSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
           />
+          {pickerSlotId && availableTasks && onAssignTaskToRoutineSlot && (
+            <TaskPickerModal
+              tasks={availableTasks}
+              onSelect={(task) => {
+                onAssignTaskToRoutineSlot(routine.id, pickerSlotId, { name: task.name, color: task.color, taskId: task.id });
+                setPickerSlotId(null);
+              }}
+              onClose={() => setPickerSlotId(null)}
+            />
+          )}
         </div>
       )}
     </div>
@@ -150,6 +169,8 @@ export function RoutinesPanel({
   onUpdateRoutineSlotTime,
   onMoveRoutineSlotToUnassigned,
   onUpdateRoutineSlotTaskName,
+  availableTasks,
+  onAssignTaskToRoutineSlot,
 }: RoutinesPanelProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState('');
@@ -215,6 +236,8 @@ export function RoutinesPanel({
               onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
               onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
               onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
+              availableTasks={availableTasks}
+              onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
             />
           ))
         )}
