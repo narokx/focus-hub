@@ -1,5 +1,4 @@
 import React, { useRef } from 'react';
-import { Settings, Download, Upload, Moon, Sun } from 'lucide-react';
 import { Settings, Download, Upload, Moon, Sun, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -38,7 +37,7 @@ export function SettingsModal() {
     reader.onload = (event) => {
       try {
         const data = event.target?.result as string;
-        JSON.parse(data); // validate
+        JSON.parse(data);
         localStorage.setItem(STORAGE_KEY, data);
         window.location.reload();
       } catch {
