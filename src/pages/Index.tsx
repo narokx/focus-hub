@@ -9,6 +9,7 @@ import { RoutinesPanel } from '@/components/RoutinesPanel';
 import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAppState } from '@/hooks/useAppState';
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
@@ -20,8 +21,16 @@ type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
 
 export default function Index() {
   const {
+    tasks: supabaseTasks,
+    loading: tasksLoading,
+    addTask: addQuickTask,
+    updateTask: updateQuickTask,
+    deleteTask: deleteQuickTask,
+    reorderTasks: reorderQuickTasks,
+  } = useSupabaseTasks();
+
+  const {
     state,
-    addQuickTask, updateQuickTask, deleteQuickTask, reorderQuickTasks,
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, moveRoutineSlotToUnassigned,
@@ -33,7 +42,7 @@ export default function Index() {
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
     restoreState,
-  } = useAppState();
+  } = useAppState(supabaseTasks);
 
   // Initialize theme on mount (reads persisted preference)
   useTheme();
