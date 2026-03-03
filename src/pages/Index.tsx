@@ -27,6 +27,7 @@ export default function Index() {
     updateTask: updateQuickTask,
     deleteTask: deleteQuickTask,
     reorderTasks: reorderQuickTasks,
+    fetchTasks,
   } = useSupabaseTasks();
 
   const {
@@ -274,7 +275,7 @@ export default function Index() {
               >
                 <Redo2 className="w-4 h-4" />
               </button>
-              <SettingsModal />
+              <SettingsModal onImportComplete={fetchTasks} />
             </div>
           </div>
 

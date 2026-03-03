@@ -163,5 +163,6 @@ export function useSupabaseTasks() {
     deleteTask,
     reorderTasks,
     setTasks,
+    fetchTasks,
   };
 }
