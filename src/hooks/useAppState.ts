@@ -55,7 +55,7 @@ function ensureRoutine(r: any): Routine {
   return { ...r, timeSlots: r.timeSlots || generateDefaultTimeSlots() };
 }
 
-export function useAppState() {
+export function useAppState(externalQuickTasks?: QuickTask[]) {
   const [state, setState] = useState<AppState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -83,6 +83,16 @@ export function useAppState() {
     return getDefaultState();
   });
 
+  // Sync external quickTasks into state
+  useEffect(() => {
+    if (externalQuickTasks !== undefined) {
+      setState(prev => {
+        if (prev.quickTasks === externalQuickTasks) return prev;
+        return { ...prev, quickTasks: externalQuickTasks };
+      });
+    }
+  }, [externalQuickTasks]);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -90,37 +100,6 @@ export function useAppState() {
       console.error('Failed to save state:', e);
     }
   }, [state]);
-
-  // Quick Tasks
-  const addQuickTask = useCallback((name: string, color: string) => {
-    setState(prev => ({
-      ...prev,
-      quickTasks: [...prev.quickTasks, { id: `qt-${Date.now()}`, name, color }],
-    }));
-  }, []);
-
-  const updateQuickTask = useCallback((id: string, updates: Partial<QuickTask>) => {
-    setState(prev => ({
-      ...prev,
-      quickTasks: prev.quickTasks.map(t => t.id === id ? { ...t, ...updates } : t),
-    }));
-  }, []);
-
-  const deleteQuickTask = useCallback((id: string) => {
-    setState(prev => ({
-      ...prev,
-      quickTasks: prev.quickTasks.filter(t => t.id !== id),
-    }));
-  }, []);
-
-  const reorderQuickTasks = useCallback((fromIndex: number, toIndex: number) => {
-    setState(prev => {
-      const tasks = [...prev.quickTasks];
-      const [moved] = tasks.splice(fromIndex, 1);
-      tasks.splice(toIndex, 0, moved);
-      return { ...prev, quickTasks: tasks };
-    });
-  }, []);
 
   // Routines
   const addRoutine = useCallback((name: string) => {
@@ -583,7 +562,6 @@ export function useAppState() {
 
   return {
     state,
-    addQuickTask, updateQuickTask, deleteQuickTask, reorderQuickTasks,
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
