@@ -27,11 +27,11 @@ export default function Index() {
     updateTask: updateQuickTask,
     deleteTask: deleteQuickTask,
     reorderTasks: reorderQuickTasks,
-    fetchTasks,
   } = useSupabaseTasks();
 
   const {
     state,
+    addQuickTask, updateQuickTask, deleteQuickTask, reorderQuickTasks,
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, moveRoutineSlotToUnassigned,
@@ -43,6 +43,7 @@ export default function Index() {
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
     restoreState,
+  } = useAppState();
   } = useAppState(supabaseTasks);
 
   // Initialize theme on mount (reads persisted preference)
@@ -275,7 +276,7 @@ export default function Index() {
               >
                 <Redo2 className="w-4 h-4" />
               </button>
-              <SettingsModal onImportComplete={fetchTasks} />
+              <SettingsModal />
             </div>
           </div>
 

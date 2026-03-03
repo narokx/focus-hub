@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
+import { Settings, Download, Upload, Moon, Sun } from 'lucide-react';
 import { Settings, Download, Upload, Moon, Sun, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -14,9 +14,8 @@ import { useTheme } from '@/hooks/useTheme';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
-export function SettingsModal({ onImportComplete }: { onImportComplete?: () => void }) {
+export function SettingsModal() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isImporting, setIsImporting] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { signOut, user } = useAuth();
 
@@ -36,54 +35,12 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       try {
         const data = event.target?.result as string;
-        const parsed = JSON.parse(data);
-
-        // Validate structure
-        if (!Array.isArray(parsed.quickTasks)) {
-          alert('Invalid backup file structure.');
-          return;
-        }
-
-        // Save to localStorage for backward compatibility
+        JSON.parse(data); // validate
         localStorage.setItem(STORAGE_KEY, data);
-
-        // If user is authenticated, sync tasks to Supabase
-        if (user) {
-          setIsImporting(true);
-          const quickTasks = parsed.quickTasks;
-
-          // Prepare rows for upsert with user_id
-          const rows = quickTasks.map((task: any) => ({
-            id: task.id,
-            name: task.name,
-            color: task.color || '#3B82F6',
-            user_id: user.id,
-          }));
-
-          // Use upsert to handle duplicates (conflict on id)
-          const { error } = await supabase
-            .from('tasks')
-            .upsert(rows, { onConflict: 'id' });
-
-          if (error) {
-            console.error('Failed to import tasks:', error);
-            alert('Failed to import tasks to cloud. Data saved locally.');
-            setIsImporting(false);
-            return;
-          }
-
-          // Trigger UI refresh by calling the callback
-          if (onImportComplete) {
-            onImportComplete();
-          }
-          setIsImporting(false);
-          alert('Tasks imported successfully!');
-        } else {
-          alert('Data imported locally. Sign in to sync to cloud.');
-        }
+        window.location.reload();
       } catch {
         alert('Invalid backup file.');
       }
@@ -142,13 +99,12 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
           {/* Import */}
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors text-left"
           >
-            <Upload className={`w-5 h-5 text-primary ${isImporting ? 'animate-pulse' : ''}`} />
+            <Upload className="w-5 h-5 text-primary" />
             <div>
-              <div className="text-sm font-medium">{isImporting ? 'Importing...' : 'Import Data'}</div>
-              <div className="text-xs text-muted-foreground">{isImporting ? 'Syncing with Supabase...' : 'Restore from a .json backup'}</div>
+              <div className="text-sm font-medium">Import Data</div>
+              <div className="text-xs text-muted-foreground">Restore from a .json backup (overwrites current data)</div>
             </div>
           </button>
 
