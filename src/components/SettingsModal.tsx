@@ -32,6 +32,9 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
     URL.revokeObjectURL(url);
   };
 
+  const isValidUUID = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -41,7 +44,6 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
         const data = event.target?.result as string;
         const parsed = JSON.parse(data);
 
-        // Validate structure
         if (!Array.isArray(parsed.quickTasks)) {
           alert('Invalid backup file structure.');
           return;
@@ -50,32 +52,60 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
         // Save to localStorage for backward compatibility
         localStorage.setItem(STORAGE_KEY, data);
 
-        // If user is authenticated, sync tasks to Supabase
         if (user) {
           setIsImporting(true);
-          const quickTasks = parsed.quickTasks;
+          const quickTasks: any[] = parsed.quickTasks;
 
-          // Prepare rows for upsert with user_id
-          const rows = quickTasks.map((task: any) => ({
-            id: task.id,
-            name: task.name,
-            color: task.color || '#3B82F6',
-            user_id: user.id,
-          }));
+          // Separate tasks with valid UUIDs from those without
+          const withValidId = quickTasks.filter(t => t.id && isValidUUID(t.id));
+          const withoutValidId = quickTasks.filter(t => !t.id || !isValidUUID(t.id));
 
-          // Use upsert to handle duplicates (conflict on id)
-          const { error } = await supabase
-            .from('tasks')
-            .upsert(rows, { onConflict: 'id' });
-
-          if (error) {
-            console.error('Failed to import tasks:', error);
-            alert('Failed to import tasks to cloud. Data saved locally.');
-            setIsImporting(false);
-            return;
+          // Upsert tasks with valid UUIDs (conflict on id)
+          if (withValidId.length > 0) {
+            const rows = withValidId.map(t => ({
+              id: t.id,
+              name: t.name,
+              color: t.color || '#3B82F6',
+              user_id: user.id,
+            }));
+            const { error } = await supabase.from('tasks').upsert(rows, { onConflict: 'id' });
+            if (error) {
+              console.error('Failed to upsert tasks with valid IDs:', error);
+              alert('Failed to import some tasks to cloud.');
+              setIsImporting(false);
+              return;
+            }
           }
 
-          // Trigger UI refresh by calling the callback
+          // For tasks without valid UUIDs, deduplicate by name
+          if (withoutValidId.length > 0) {
+            // Fetch existing task names for this user
+            const { data: existing } = await supabase
+              .from('tasks')
+              .select('name')
+              .eq('user_id', user.id);
+            const existingNames = new Set((existing || []).map(t => t.name.toLowerCase()));
+
+            const newTasks = withoutValidId
+              .filter(t => !existingNames.has(t.name.toLowerCase()))
+              .map(t => ({
+                name: t.name,
+                color: t.color || '#3B82F6',
+                user_id: user.id,
+              }));
+
+            if (newTasks.length > 0) {
+              const { error } = await supabase.from('tasks').insert(newTasks);
+              if (error) {
+                console.error('Failed to insert new tasks:', error);
+                alert('Failed to import some tasks to cloud.');
+                setIsImporting(false);
+                return;
+              }
+            }
+          }
+
+          // Refresh UI state
           if (onImportComplete) {
             onImportComplete();
           }
