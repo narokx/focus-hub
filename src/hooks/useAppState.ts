@@ -55,7 +55,7 @@ function ensureRoutine(r: any): Routine {
   return { ...r, timeSlots: r.timeSlots || generateDefaultTimeSlots() };
 }
 
-export function useAppState(externalQuickTasks?: QuickTask[]) {
+export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?: Routine[]) {
   const [state, setState] = useState<AppState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -92,6 +92,16 @@ export function useAppState(externalQuickTasks?: QuickTask[]) {
       });
     }
   }, [externalQuickTasks]);
+
+  // Sync external routines into state
+  useEffect(() => {
+    if (externalRoutines !== undefined) {
+      setState(prev => {
+        if (prev.routines === externalRoutines) return prev;
+        return { ...prev, routines: externalRoutines };
+      });
+    }
+  }, [externalRoutines]);
 
   useEffect(() => {
     try {

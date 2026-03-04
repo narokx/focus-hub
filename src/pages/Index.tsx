@@ -10,6 +10,7 @@ import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAppState } from '@/hooks/useAppState';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useSupabaseRoutines } from '@/hooks/useSupabaseRoutines';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
@@ -31,11 +32,25 @@ export default function Index() {
   } = useSupabaseTasks();
 
   const {
+    routines: supabaseRoutines,
+    loading: routinesLoading,
+    addRoutine,
+    updateRoutine,
+    deleteRoutine,
+    addTaskToRoutine,
+    removeTaskFromRoutine,
+    assignTaskToRoutineSlot,
+    removeTaskFromRoutineSlot,
+    moveRoutineSlotToUnassigned,
+    addRoutineTimeSlot,
+    deleteRoutineTimeSlot,
+    updateRoutineSlotTime,
+    updateRoutineSlotTaskName,
+    fetchRoutines,
+  } = useSupabaseRoutines();
+
+  const {
     state,
-    addRoutine, updateRoutine, deleteRoutine,
-    addTaskToRoutine, removeTaskFromRoutine,
-    assignTaskToRoutineSlot, moveRoutineSlotToUnassigned,
-    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, updateRoutineSlotTaskName,
     addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
     assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
     addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, updateDaySlotTaskName,
@@ -43,7 +58,7 @@ export default function Index() {
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
     restoreState,
-  } = useAppState(supabaseTasks);
+  } = useAppState(supabaseTasks, supabaseRoutines);
 
   // Initialize theme on mount (reads persisted preference)
   useTheme();
@@ -275,7 +290,7 @@ export default function Index() {
               >
                 <Redo2 className="w-4 h-4" />
               </button>
-              <SettingsModal onImportComplete={fetchTasks} />
+              <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); }} />
             </div>
           </div>
 
@@ -387,7 +402,7 @@ export default function Index() {
               <Redo2 className="w-4 h-4" />
             </button>
           </div>
-          <SettingsModal />
+          <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); }} />
         </div>
 
         {/* Routines Window */}
