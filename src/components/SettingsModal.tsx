@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useTheme } from '@/hooks/useTheme';
+import { Routine } from '@/types';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -34,6 +35,124 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
 
   const isValidUUID = (id: string) =>
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  // Reconcile a task name to a UUID, creating if needed
+  async function reconcileTaskId(
+    name: string,
+    color: string,
+    userId: string,
+    taskNameMap: Map<string, string>
+  ): Promise<string | null> {
+    const key = name.toLowerCase();
+    const existing = taskNameMap.get(key);
+    if (existing) return existing;
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({ name, color: color || '#3B82F6', user_id: userId })
+      .select('id')
+      .maybeSingle();
+
+    if (error || !data) {
+      console.error('Failed to create task during reconciliation:', error);
+      return null;
+    }
+
+    taskNameMap.set(key, data.id);
+    return data.id;
+  }
+
+  async function importRoutines(routines: any[], userId: string, taskNameMap: Map<string, string>) {
+    // Fetch existing routine names to deduplicate
+    const { data: existingRoutines } = await supabase
+      .from('routines')
+      .select('id, name')
+      .eq('user_id', userId);
+    const existingRoutineNames = new Set((existingRoutines || []).map(r => r.name.toLowerCase()));
+
+    for (const routine of routines) {
+      if (!routine.name) continue;
+
+      // Determine routine ID: use existing if valid UUID, else create new
+      let routineId: string;
+
+      if (routine.id && isValidUUID(routine.id) && !existingRoutineNames.has(routine.name.toLowerCase())) {
+        // Upsert with existing UUID
+        const { data, error } = await supabase
+          .from('routines')
+          .upsert({ id: routine.id, name: routine.name, user_id: userId }, { onConflict: 'id' })
+          .select('id')
+          .maybeSingle();
+
+        if (error || !data) {
+          console.error('Failed to upsert routine:', error);
+          continue;
+        }
+        routineId = data.id;
+      } else if (existingRoutineNames.has(routine.name.toLowerCase())) {
+        // Skip duplicate routine by name
+        continue;
+      } else {
+        // Insert new routine (no valid UUID or regenerating)
+        const { data, error } = await supabase
+          .from('routines')
+          .insert({ name: routine.name, user_id: userId })
+          .select('id')
+          .maybeSingle();
+
+        if (error || !data) {
+          console.error('Failed to insert routine:', error);
+          continue;
+        }
+        routineId = data.id;
+      }
+
+      // Clear existing children for this routine (in case of upsert)
+      await supabase.from('routine_tasks').delete().eq('routine_id', routineId);
+      await supabase.from('routine_time_slots').delete().eq('routine_id', routineId);
+
+      // Import buffer tasks with reconciliation - preserve duplicates and sequence
+      const bufferTasks: any[] = routine.tasks || [];
+      const bufferRows = [];
+      for (let i = 0; i < bufferTasks.length; i++) {
+        const t = bufferTasks[i];
+        const resolvedTaskId = await reconcileTaskId(t.name, t.color, userId, taskNameMap);
+        if (resolvedTaskId) {
+          bufferRows.push({
+            routine_id: routineId,
+            task_id: resolvedTaskId,
+            order_index: i,
+          });
+        }
+      }
+
+      if (bufferRows.length > 0) {
+        const { error } = await supabase.from('routine_tasks').insert(bufferRows);
+        if (error) console.error('Failed to insert routine_tasks:', error);
+      }
+
+      // Import time slots with task reconciliation
+      const timeSlots: any[] = routine.timeSlots || [];
+      const slotRows = [];
+      for (const slot of timeSlots) {
+        let taskId: string | null = null;
+        if (slot.task && slot.task.name) {
+          taskId = await reconcileTaskId(slot.task.name, slot.task.color, userId, taskNameMap);
+        }
+        slotRows.push({
+          routine_id: routineId,
+          start_time: slot.startTime,
+          end_time: slot.endTime,
+          task_id: taskId,
+        });
+      }
+
+      if (slotRows.length > 0) {
+        const { error } = await supabase.from('routine_time_slots').insert(slotRows);
+        if (error) console.error('Failed to insert routine_time_slots:', error);
+      }
+    }
+  }
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,7 +198,6 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
 
           // For tasks without valid UUIDs, deduplicate by name
           if (withoutValidId.length > 0) {
-            // Fetch existing task names for this user
             const { data: existing } = await supabase
               .from('tasks')
               .select('name')
@@ -105,12 +223,25 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
             }
           }
 
+          // Import routines if present
+          if (Array.isArray(parsed.routines) && parsed.routines.length > 0) {
+            // Build task name map for reconciliation
+            const { data: allTasks } = await supabase
+              .from('tasks')
+              .select('id, name')
+              .eq('user_id', user.id);
+            const taskNameMap = new Map<string, string>();
+            (allTasks || []).forEach(t => taskNameMap.set(t.name.toLowerCase(), t.id));
+
+            await importRoutines(parsed.routines, user.id, taskNameMap);
+          }
+
           // Refresh UI state
           if (onImportComplete) {
             onImportComplete();
           }
           setIsImporting(false);
-          alert('Tasks imported successfully!');
+          alert('Data imported successfully!');
         } else {
           alert('Data imported locally. Sign in to sync to cloud.');
         }
