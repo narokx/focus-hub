@@ -55,7 +55,11 @@ function ensureRoutine(r: any): Routine {
   return { ...r, timeSlots: r.timeSlots || generateDefaultTimeSlots() };
 }
 
-export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?: Routine[]) {
+export function useAppState(
+  externalQuickTasks?: QuickTask[],
+  externalRoutines?: Routine[],
+  externalCalendar?: Record<string, DayData>
+) {
   const [state, setState] = useState<AppState>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -103,6 +107,16 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
     }
   }, [externalRoutines]);
 
+  // Sync external calendar into state
+  useEffect(() => {
+    if (externalCalendar !== undefined) {
+      setState(prev => {
+        if (prev.calendar === externalCalendar) return prev;
+        return { ...prev, calendar: externalCalendar };
+      });
+    }
+  }, [externalCalendar]);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -111,7 +125,7 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
     }
   }, [state]);
 
-  // Routines
+  // Routines (kept for backward compat / non-supabase fallback)
   const addRoutine = useCallback((name: string) => {
     setState(prev => ({
       ...prev,
@@ -249,7 +263,7 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
     }));
   }, []);
 
-  // Calendar
+  // Calendar - these are kept as local fallbacks but primary calendar ops go through useSupabaseCalendar
   const getDayData = useCallback((date: string): DayData => {
     return state.calendar[date] || ensureDayData(date);
   }, [state.calendar]);
@@ -443,7 +457,6 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
     targetPrefix: string, targetSlotId: string
   ) => {
     setState(prev => {
-      // Helper to get/set data
       const getContext = (prefix: string) => {
         if (prefix.startsWith('day-')) {
           const date = prefix.substring(4);
@@ -460,7 +473,6 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
       const tgt = getContext(targetPrefix);
       if (!src?.data || !tgt?.data) return prev;
 
-      // Get source task
       const srcSlots = 'timeSlots' in src.data ? src.data.timeSlots : [];
       const srcSlot = srcSlots.find(s => s.id === sourceSlotId);
       if (!srcSlot?.task) return prev;
@@ -468,7 +480,6 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
 
       let newState = { ...prev };
 
-      // Clear source slot
       if (src.type === 'day') {
         const dayData = ensureDayData(src.date!, prev.calendar[src.date!]);
         newState = {
@@ -487,7 +498,6 @@ export function useAppState(externalQuickTasks?: QuickTask[], externalRoutines?:
         };
       }
 
-      // Set target slot
       const newTask = { ...task, id: `st-${Date.now()}` };
       if (tgt.type === 'day') {
         const dayData = ensureDayData(tgt.date!, newState.calendar[tgt.date!]);

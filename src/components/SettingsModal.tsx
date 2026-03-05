@@ -11,19 +11,174 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useTheme } from '@/hooks/useTheme';
-import { Routine } from '@/types';
+import { Routine, generateDefaultTimeSlots } from '@/types';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
 export function SettingsModal({ onImportComplete }: { onImportComplete?: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { signOut, user } = useAuth();
 
-  const handleExport = () => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) return;
+  const isValidUUID = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
+  // ── Export: pull all data from Supabase ──
+  const handleExport = async () => {
+    if (!user) {
+      // Fallback to localStorage for non-authenticated users
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) return;
+      downloadJson(data);
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      // Fetch all data from Supabase in parallel
+      const [tasksRes, routinesRes, routineTasksRes, routineSlotsRes, bufferRes, eventsRes] = await Promise.all([
+        supabase.from('tasks').select('id, name, color').eq('user_id', user.id).order('created_at', { ascending: true }),
+        supabase.from('routines').select('id, name').eq('user_id', user.id).order('created_at', { ascending: true }),
+        supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
+        supabase.from('routine_time_slots').select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)').order('start_time', { ascending: true }),
+        supabase.from('daily_task_buffer').select('id, date, task_id, completed, order_index, tasks(id, name, color)').eq('user_id', user.id).order('order_index', { ascending: true }),
+        supabase.from('calendar_events').select('id, date, start_time, end_time, task_id, completed, tasks(id, name, color)').eq('user_id', user.id).order('start_time', { ascending: true }),
+      ]);
+
+      // Build quickTasks array
+      const quickTasks = (tasksRes.data || []).map(t => ({
+        id: t.id,
+        name: t.name,
+        color: t.color || '#3B82F6',
+      }));
+
+      // Build routines with nested structure
+      const rtData = routineTasksRes.data || [];
+      const rsData = routineSlotsRes.data || [];
+      const routines = (routinesRes.data || []).map(r => {
+        const tasks = rtData
+          .filter(rt => rt.routine_id === r.id)
+          .map(rt => {
+            const task = rt.tasks as any;
+            return {
+              id: rt.id,
+              taskId: task?.id || rt.task_id || '',
+              name: task?.name || '',
+              color: task?.color || '#3B82F6',
+            };
+          });
+
+        const dbSlots = rsData.filter(s => s.routine_id === r.id);
+        let timeSlots;
+        if (dbSlots.length > 0) {
+          timeSlots = dbSlots.map(s => {
+            const task = s.tasks as any;
+            return {
+              id: s.id,
+              startTime: s.start_time,
+              endTime: s.end_time,
+              task: s.task_id && task ? {
+                id: `rst-${s.id}`,
+                taskId: task.id,
+                name: task.name,
+                color: task.color || '#3B82F6',
+              } : null,
+            };
+          });
+        } else {
+          timeSlots = generateDefaultTimeSlots();
+        }
+
+        return { id: r.id, name: r.name, tasks, timeSlots };
+      });
+
+      // Build calendar with nested structure
+      const bufferData = bufferRes.data || [];
+      const eventsData = eventsRes.data || [];
+      const allDates = new Set<string>();
+      bufferData.forEach(b => allDates.add(b.date));
+      eventsData.forEach(e => allDates.add(e.date));
+
+      const calendar: Record<string, any> = {};
+      for (const date of allDates) {
+        const dayBuffer = bufferData.filter(b => b.date === date);
+        const dayEvents = eventsData.filter(e => e.date === date);
+
+        const tasks = dayBuffer.map(b => {
+          const task = b.tasks as any;
+          return {
+            id: b.id,
+            taskId: task?.id || b.task_id || '',
+            name: task?.name || '',
+            color: task?.color || '#3B82F6',
+            completed: b.completed || false,
+          };
+        });
+
+        const defaultSlots = generateDefaultTimeSlots();
+        let timeSlots;
+        if (dayEvents.length > 0) {
+          const eventSlots = dayEvents.map(e => {
+            const task = e.tasks as any;
+            return {
+              id: e.id,
+              startTime: e.start_time,
+              endTime: e.end_time,
+              task: task ? {
+                id: `dst-${e.id}`,
+                taskId: task.id,
+                name: task.name,
+                color: task.color || '#3B82F6',
+                completed: e.completed || false,
+              } : null,
+            };
+          });
+
+          timeSlots = defaultSlots.map(ds => {
+            const match = eventSlots.find(es => es.startTime === ds.startTime && es.endTime === ds.endTime);
+            return match || ds;
+          });
+          const defaultTimeKeys = new Set(defaultSlots.map(s => `${s.startTime}-${s.endTime}`));
+          const extraSlots = eventSlots.filter(es => !defaultTimeKeys.has(`${es.startTime}-${es.endTime}`));
+          timeSlots = [...timeSlots, ...extraSlots];
+        } else {
+          timeSlots = defaultSlots;
+        }
+
+        calendar[date] = { date, tasks, timeSlots };
+      }
+
+      // Also include localStorage window settings for backward compat
+      let windowPositions, windowTitles;
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          windowPositions = parsed.windowPositions;
+          windowTitles = parsed.windowTitles;
+        }
+      } catch {}
+
+      const exportData = {
+        quickTasks,
+        routines,
+        calendar,
+        ...(windowPositions && { windowPositions }),
+        ...(windowTitles && { windowTitles }),
+      };
+
+      downloadJson(JSON.stringify(exportData));
+    } catch (e) {
+      console.error('Export failed:', e);
+      alert('Export failed.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  function downloadJson(data: string) {
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -31,10 +186,7 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
     a.download = `productivity-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  };
-
-  const isValidUUID = (id: string) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  }
 
   // Reconcile a task name to a UUID, creating if needed
   async function reconcileTaskId(
@@ -63,7 +215,6 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
   }
 
   async function importRoutines(routines: any[], userId: string, taskNameMap: Map<string, string>) {
-    // Fetch existing routine names to deduplicate
     const { data: existingRoutines } = await supabase
       .from('routines')
       .select('id, name')
@@ -73,11 +224,9 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
     for (const routine of routines) {
       if (!routine.name) continue;
 
-      // Determine routine ID: use existing if valid UUID, else create new
       let routineId: string;
 
       if (routine.id && isValidUUID(routine.id) && !existingRoutineNames.has(routine.name.toLowerCase())) {
-        // Upsert with existing UUID
         const { data, error } = await supabase
           .from('routines')
           .upsert({ id: routine.id, name: routine.name, user_id: userId }, { onConflict: 'id' })
@@ -90,10 +239,8 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
         }
         routineId = data.id;
       } else if (existingRoutineNames.has(routine.name.toLowerCase())) {
-        // Skip duplicate routine by name
         continue;
       } else {
-        // Insert new routine (no valid UUID or regenerating)
         const { data, error } = await supabase
           .from('routines')
           .insert({ name: routine.name, user_id: userId })
@@ -107,11 +254,9 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
         routineId = data.id;
       }
 
-      // Clear existing children for this routine (in case of upsert)
       await supabase.from('routine_tasks').delete().eq('routine_id', routineId);
       await supabase.from('routine_time_slots').delete().eq('routine_id', routineId);
 
-      // Import buffer tasks with reconciliation - preserve duplicates and sequence
       const bufferTasks: any[] = routine.tasks || [];
       const bufferRows = [];
       for (let i = 0; i < bufferTasks.length; i++) {
@@ -131,25 +276,85 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
         if (error) console.error('Failed to insert routine_tasks:', error);
       }
 
-      // Import time slots with task reconciliation
       const timeSlots: any[] = routine.timeSlots || [];
       const slotRows = [];
       for (const slot of timeSlots) {
+        // Skip empty time slots (no task assigned)
+        if (!slot.task) continue;
         let taskId: string | null = null;
-        if (slot.task && slot.task.name) {
+        if (slot.task.name) {
           taskId = await reconcileTaskId(slot.task.name, slot.task.color, userId, taskNameMap);
         }
-        slotRows.push({
-          routine_id: routineId,
-          start_time: slot.startTime,
-          end_time: slot.endTime,
-          task_id: taskId,
-        });
+        if (taskId) {
+          slotRows.push({
+            routine_id: routineId,
+            start_time: slot.startTime,
+            end_time: slot.endTime,
+            task_id: taskId,
+          });
+        }
       }
 
       if (slotRows.length > 0) {
         const { error } = await supabase.from('routine_time_slots').insert(slotRows);
         if (error) console.error('Failed to insert routine_time_slots:', error);
+      }
+    }
+  }
+
+  async function importCalendar(calendar: Record<string, any>, userId: string, taskNameMap: Map<string, string>) {
+    for (const [date, dayData] of Object.entries(calendar)) {
+      if (!dayData) continue;
+
+      // Import buffer tasks
+      const tasks: any[] = dayData.tasks || [];
+      const bufferRows = [];
+      for (let i = 0; i < tasks.length; i++) {
+        const t = tasks[i];
+        if (!t.name) continue;
+        const resolvedTaskId = await reconcileTaskId(t.name, t.color, userId, taskNameMap);
+        if (resolvedTaskId) {
+          bufferRows.push({
+            user_id: userId,
+            date,
+            task_id: resolvedTaskId,
+            completed: t.completed || false,
+            order_index: i,
+          });
+        }
+      }
+
+      if (bufferRows.length > 0) {
+        // Deduplicate: delete existing buffer for this date first
+        await supabase.from('daily_task_buffer').delete().eq('user_id', userId).eq('date', date);
+        const { error } = await supabase.from('daily_task_buffer').insert(bufferRows);
+        if (error) console.error('Failed to insert daily_task_buffer:', error);
+      }
+
+      // Import time slots (only those with tasks assigned)
+      const timeSlots: any[] = dayData.timeSlots || [];
+      const eventRows = [];
+      for (const slot of timeSlots) {
+        if (!slot.task) continue;
+        if (!slot.task.name) continue;
+        const resolvedTaskId = await reconcileTaskId(slot.task.name, slot.task.color, userId, taskNameMap);
+        if (resolvedTaskId) {
+          eventRows.push({
+            user_id: userId,
+            date,
+            task_id: resolvedTaskId,
+            start_time: slot.startTime,
+            end_time: slot.endTime,
+            completed: slot.task.completed || false,
+          });
+        }
+      }
+
+      if (eventRows.length > 0) {
+        // Deduplicate: delete existing events for this date first
+        await supabase.from('calendar_events').delete().eq('user_id', userId).eq('date', date);
+        const { error } = await supabase.from('calendar_events').insert(eventRows);
+        if (error) console.error('Failed to insert calendar_events:', error);
       }
     }
   }
@@ -173,13 +378,12 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
 
         if (user) {
           setIsImporting(true);
-          const quickTasks: any[] = parsed.quickTasks;
 
-          // Separate tasks with valid UUIDs from those without
+          // ── Import quickTasks ──
+          const quickTasks: any[] = parsed.quickTasks;
           const withValidId = quickTasks.filter(t => t.id && isValidUUID(t.id));
           const withoutValidId = quickTasks.filter(t => !t.id || !isValidUUID(t.id));
 
-          // Upsert tasks with valid UUIDs (conflict on id)
           if (withValidId.length > 0) {
             const rows = withValidId.map(t => ({
               id: t.id,
@@ -196,7 +400,6 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
             }
           }
 
-          // For tasks without valid UUIDs, deduplicate by name
           if (withoutValidId.length > 0) {
             const { data: existing } = await supabase
               .from('tasks')
@@ -223,17 +426,22 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
             }
           }
 
-          // Import routines if present
-          if (Array.isArray(parsed.routines) && parsed.routines.length > 0) {
-            // Build task name map for reconciliation
-            const { data: allTasks } = await supabase
-              .from('tasks')
-              .select('id, name')
-              .eq('user_id', user.id);
-            const taskNameMap = new Map<string, string>();
-            (allTasks || []).forEach(t => taskNameMap.set(t.name.toLowerCase(), t.id));
+          // Build task name map for reconciliation
+          const { data: allTasks } = await supabase
+            .from('tasks')
+            .select('id, name')
+            .eq('user_id', user.id);
+          const taskNameMap = new Map<string, string>();
+          (allTasks || []).forEach(t => taskNameMap.set(t.name.toLowerCase(), t.id));
 
+          // ── Import routines ──
+          if (Array.isArray(parsed.routines) && parsed.routines.length > 0) {
             await importRoutines(parsed.routines, user.id, taskNameMap);
+          }
+
+          // ── Import calendar ──
+          if (parsed.calendar && typeof parsed.calendar === 'object') {
+            await importCalendar(parsed.calendar, user.id, taskNameMap);
           }
 
           // Refresh UI state
@@ -291,12 +499,13 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
           {/* Export */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors text-left"
+            disabled={isExporting}
+            className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border hover:bg-secondary transition-colors text-left disabled:opacity-50"
           >
-            <Download className="w-5 h-5 text-primary" />
+            <Download className={`w-5 h-5 text-primary ${isExporting ? 'animate-pulse' : ''}`} />
             <div>
-              <div className="text-sm font-medium">Export Data</div>
-              <div className="text-xs text-muted-foreground">Download all data as a .json file</div>
+              <div className="text-sm font-medium">{isExporting ? 'Exporting...' : 'Export Data'}</div>
+              <div className="text-xs text-muted-foreground">{isExporting ? 'Fetching from cloud...' : 'Download all data as a .json file'}</div>
             </div>
           </button>
 
