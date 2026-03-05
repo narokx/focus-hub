@@ -11,6 +11,7 @@ import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAppState } from '@/hooks/useAppState';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSupabaseRoutines } from '@/hooks/useSupabaseRoutines';
+import { useSupabaseCalendar } from '@/hooks/useSupabaseCalendar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
@@ -50,15 +51,31 @@ export default function Index() {
   } = useSupabaseRoutines();
 
   const {
+    calendar: supabaseCalendar,
+    loading: calendarLoading,
+    addTaskToDay,
+    toggleDayTask,
+    updateDayTask,
+    removeDayTask,
+    assignTaskToDaySlot,
+    toggleDaySlotTask,
+    moveDaySlotToUnassigned,
+    addDayTimeSlot,
+    deleteDayTimeSlot,
+    updateDaySlotTime,
+    updateDaySlotTaskName,
+    moveSlotToSlot: moveCalendarSlotToSlot,
+    applyRoutineToDay: applyRoutineToDayCloud,
+    fetchCalendar,
+  } = useSupabaseCalendar();
+
+  const {
     state,
-    addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
-    assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
-    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,
     restoreState,
-  } = useAppState(supabaseTasks, supabaseRoutines);
+  } = useAppState(supabaseTasks, supabaseRoutines, supabaseCalendar);
 
   // Initialize theme on mount (reads persisted preference)
   useTheme();
@@ -146,7 +163,7 @@ export default function Index() {
 
     // Handle routine drag to calendar cell
     if (activeData?.type === 'routine' && overData?.type === 'day') {
-      applyRoutineToDay(overData.date, activeData.routine);
+      applyRoutineToDayCloud(overData.date, activeData.routine);
       setSelectedDate(overData.date);
       return;
     }
@@ -156,7 +173,13 @@ export default function Index() {
       const { sourcePrefix, sourceSlotId } = activeData;
       const { prefix: targetPrefix, slotId: targetSlotId } = overData;
       if (sourcePrefix === targetPrefix && sourceSlotId === targetSlotId) return;
-      moveSlotToSlot(sourcePrefix, sourceSlotId, targetPrefix, targetSlotId);
+
+      // Use cloud handler for day-to-day moves, local for routine-involved moves
+      if (sourcePrefix.startsWith('day-') && targetPrefix.startsWith('day-')) {
+        moveCalendarSlotToSlot(sourcePrefix, sourceSlotId, targetPrefix, targetSlotId);
+      } else {
+        moveSlotToSlot(sourcePrefix, sourceSlotId, targetPrefix, targetSlotId);
+      }
       return;
     }
 
@@ -290,7 +313,7 @@ export default function Index() {
               >
                 <Redo2 className="w-4 h-4" />
               </button>
-              <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); }} />
+              <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); fetchCalendar(); }} />
             </div>
           </div>
 
@@ -402,7 +425,7 @@ export default function Index() {
               <Redo2 className="w-4 h-4" />
             </button>
           </div>
-          <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); }} />
+          <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); fetchCalendar(); }} />
         </div>
 
         {/* Routines Window */}
