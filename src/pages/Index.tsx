@@ -48,6 +48,7 @@ export default function Index() {
     updateRoutineSlotTime,
     updateRoutineSlotTaskName,
     fetchRoutines,
+    reorderRoutines,
   } = useSupabaseRoutines();
 
   const {
@@ -157,6 +158,18 @@ export default function Index() {
       const toIndex = state.quickTasks.findIndex(t => t.id === overTaskId);
       if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
         reorderQuickTasks(fromIndex, toIndex);
+      }
+      return;
+    }
+
+    // Handle sortable reorder within Routines (desktop only)
+    if (activeData?.type === 'routine' && activeData?.source === 'routine-list' && overData?.type === 'routine' && overData?.source === 'routine-list') {
+      const activeRoutineId = (active.id as string).replace('sortable-routine-', '');
+      const overRoutineId = (over.id as string).replace('sortable-routine-', '');
+      const fromIndex = state.routines.findIndex(r => r.id === activeRoutineId);
+      const toIndex = state.routines.findIndex(r => r.id === overRoutineId);
+      if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+        reorderRoutines(fromIndex, toIndex);
       }
       return;
     }
@@ -455,6 +468,7 @@ export default function Index() {
             onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
             availableTasks={state.quickTasks}
             onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
+            onReorderRoutines={reorderRoutines}
           />
         </FloatingWindow>
 

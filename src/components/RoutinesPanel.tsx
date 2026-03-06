@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
 import { Routine, QuickTask, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
 interface RoutinesPanelProps {
@@ -19,9 +22,11 @@ interface RoutinesPanelProps {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onReorderRoutines?: (fromIndex: number, toIndex: number) => void;
 }
 
-function RoutineItem({
+// Shared inner content for a routine item
+function RoutineItemContent({
   routine,
   onUpdateRoutine,
   onDeleteRoutine,
@@ -33,6 +38,12 @@ function RoutineItem({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  isOver,
+  isDragging,
+  dragHandleRef,
+  dragHandleProps,
+  dropRef,
+  style,
 }: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
@@ -45,24 +56,17 @@ function RoutineItem({
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  isOver: boolean;
+  isDragging: boolean;
+  dragHandleRef: (node: HTMLElement | null) => void;
+  dragHandleProps: Record<string, any>;
+  dropRef: (node: HTMLElement | null) => void;
+  style?: React.CSSProperties;
 }) {
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(routine.name);
-
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `routine-drop-${routine.id}`,
-    data: { type: 'routine-drop', routineId: routine.id },
-  });
-
-  // Drag handle for entire routine
-  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
-    id: `routine-${routine.id}`,
-    data: { type: 'routine', routine },
-  });
-
-  const dragStyle = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
 
   const handleNameSubmit = () => {
     setIsEditing(false);
@@ -75,21 +79,18 @@ function RoutineItem({
 
   return (
     <div
-      style={dragStyle}
+      style={style}
       className={cn(
         'border border-border/50 rounded-lg overflow-hidden transition-colors',
         isOver && 'border-primary bg-accent/30',
         isDragging && 'opacity-50'
       )}
     >
-      {/* Routine header */}
       <div className="flex items-center gap-2 p-2 bg-secondary/30">
-        {/* Drag handle - ONLY this triggers routine drag */}
         <div
-          ref={setDragRef}
+          ref={dragHandleRef}
           className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-secondary rounded transition-colors"
-          {...attributes}
-          {...listeners}
+          {...dragHandleProps}
         >
           <GripVertical className="w-4 h-4 text-muted-foreground" />
         </div>
@@ -126,9 +127,8 @@ function RoutineItem({
         </button>
       </div>
 
-      {/* Routine timeline */}
       {isExpanded && (
-        <div ref={setDropRef} className={cn('p-2 transition-colors overflow-auto scrollbar-thin max-h-[400px]', isOver && 'bg-accent/20')}>
+        <div ref={dropRef} className={cn('p-2 transition-colors overflow-auto scrollbar-thin max-h-[400px]', isOver && 'bg-accent/20')}>
           <TimelineView
             timeSlots={routine.timeSlots || generateDefaultTimeSlots()}
             unassignedTasks={routine.tasks}
@@ -158,6 +158,95 @@ function RoutineItem({
   );
 }
 
+// Mobile: uses useDraggable (drag routine to calendar)
+function DraggableRoutineItem(props: {
+  routine: Routine;
+  onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
+  onDeleteRoutine: (id: string) => void;
+  onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
+  onAddRoutineTimeSlot: (routineId: string) => void;
+  onDeleteRoutineTimeSlot: (routineId: string, slotId: string) => void;
+  onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
+  onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+}) {
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `routine-drop-${props.routine.id}`,
+    data: { type: 'routine-drop', routineId: props.routine.id },
+  });
+
+  const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
+    id: `routine-${props.routine.id}`,
+    data: { type: 'routine', routine: props.routine },
+  });
+
+  const dragStyle = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+
+  return (
+    <RoutineItemContent
+      {...props}
+      isOver={isOver}
+      isDragging={isDragging}
+      dragHandleRef={setDragRef}
+      dragHandleProps={{ ...attributes, ...listeners }}
+      dropRef={setDropRef}
+      style={dragStyle}
+    />
+  );
+}
+
+// Desktop: uses useSortable (reorder) + also acts as draggable for calendar drops
+function SortableRoutineItem(props: {
+  routine: Routine;
+  onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
+  onDeleteRoutine: (id: string) => void;
+  onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
+  onAddRoutineTimeSlot: (routineId: string) => void;
+  onDeleteRoutineTimeSlot: (routineId: string, slotId: string) => void;
+  onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
+  onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+}) {
+  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
+    id: `routine-drop-${props.routine.id}`,
+    data: { type: 'routine-drop', routineId: props.routine.id },
+  });
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: `sortable-routine-${props.routine.id}`,
+    data: { type: 'routine', routine: props.routine, source: 'routine-list' },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <RoutineItemContent
+        {...props}
+        isOver={isDropOver}
+        isDragging={isDragging}
+        dragHandleRef={() => {}}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        dropRef={setDropRef}
+      />
+    </div>
+  );
+}
+
 export function RoutinesPanel({
   routines,
   onAddRoutine,
@@ -171,7 +260,9 @@ export function RoutinesPanel({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  onReorderRoutines,
 }: RoutinesPanelProps) {
+  const isMobile = useIsMobile();
   const [isAdding, setIsAdding] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState('');
 
@@ -223,9 +314,9 @@ export function RoutinesPanel({
       <div className="flex-1 flex flex-col gap-3 overflow-auto scrollbar-thin">
         {routines.length === 0 ? (
           <p className="text-sm text-muted-foreground italic text-center py-4">No routines yet. Create a day template!</p>
-        ) : (
+        ) : isMobile ? (
           routines.map(routine => (
-            <RoutineItem
+            <DraggableRoutineItem
               key={routine.id}
               routine={routine}
               onUpdateRoutine={onUpdateRoutine}
@@ -240,6 +331,25 @@ export function RoutinesPanel({
               onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
             />
           ))
+        ) : (
+          <SortableContext items={routines.map(r => `sortable-routine-${r.id}`)} strategy={verticalListSortingStrategy}>
+            {routines.map(routine => (
+              <SortableRoutineItem
+                key={routine.id}
+                routine={routine}
+                onUpdateRoutine={onUpdateRoutine}
+                onDeleteRoutine={onDeleteRoutine}
+                onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
+                onAddRoutineTimeSlot={onAddRoutineTimeSlot}
+                onDeleteRoutineTimeSlot={onDeleteRoutineTimeSlot}
+                onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
+                onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
+                onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
+                availableTasks={availableTasks}
+                onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+              />
+            ))}
+          </SortableContext>
         )}
       </div>
 

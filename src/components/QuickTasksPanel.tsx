@@ -3,7 +3,7 @@ import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, Trash2, List, Pencil, FileText, Star } from 'lucide-react';
-import { QuickTask, TaskColor, getColorValue, getContrastColor } from '@/types';
+import { QuickTask, TaskColor, getColorValue, getContrastColor, PRESET_COLORS } from '@/types';
 import { AutocompleteInput } from './AutocompleteInput';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(task.name);
+  const [editColor, setEditColor] = useState(task.color);
   const [hovered, setHovered] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -49,8 +50,9 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
     transition,
   };
 
-  const textColor = getContrastColor(task.color);
-  const bgColor = getColorValue(task.color);
+  const displayColor = isEditing ? editColor : task.color;
+  const textColor = getContrastColor(displayColor);
+  const bgColor = isEditing ? editColor : getColorValue(task.color);
   const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
@@ -60,11 +62,12 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
     }
   }, [isEditing]);
 
-  const handleBlur = () => {
+  const handleSaveEdit = () => {
     setIsEditing(false);
-    if (editName.trim() && editName !== task.name) {
-      onUpdateTask(task.id, { name: editName.trim() });
-    }
+    const updates: Partial<QuickTask> = {};
+    if (editName.trim() && editName !== task.name) updates.name = editName.trim();
+    if (editColor !== task.color) updates.color = editColor;
+    if (Object.keys(updates).length > 0) onUpdateTask(task.id, updates);
   };
 
   return (
@@ -88,20 +91,43 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
           )}
 
           {isEditing ? (
-            <input
-              ref={inputRef}
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onBlur={handleBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleBlur();
-                if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); }
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="editable-text bg-transparent min-w-[60px] text-inherit"
-              style={{ color: 'inherit' }}
-            />
+            <div className="flex flex-col gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveEdit();
+                  if (e.key === 'Escape') { setIsEditing(false); setEditName(task.name); setEditColor(task.color); }
+                }}
+                className="editable-text bg-transparent min-w-[60px] text-inherit"
+                style={{ color: 'inherit' }}
+              />
+              <div className="flex flex-wrap gap-1">
+                {PRESET_COLORS.map(c => (
+                  <button
+                    key={c.value}
+                    onClick={() => setEditColor(c.value)}
+                    className={cn(
+                      'w-4 h-4 rounded-full border-2 transition-transform',
+                      editColor === c.value ? 'border-white scale-125' : 'border-transparent hover:scale-110'
+                    )}
+                    style={{ backgroundColor: c.value }}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={handleSaveEdit}
+                className={cn(
+                  'text-xs px-2 py-0.5 rounded',
+                  textColor === 'white' ? 'bg-white/20 hover:bg-white/30' : 'bg-black/10 hover:bg-black/20'
+                )}
+              >
+                Done
+              </button>
+            </div>
           ) : (
             <span>{task.name}</span>
           )}
@@ -111,8 +137,9 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                setIsEditing(true);
+              setIsEditing(true);
                 setEditName(task.name);
+                setEditColor(task.color);
               }}
               onPointerDown={(e) => e.stopPropagation()}
               className={cn(
