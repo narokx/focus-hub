@@ -50,8 +50,9 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
     transition,
   };
 
-  const textColor = getContrastColor(task.color);
-  const bgColor = getColorValue(task.color);
+  const displayColor = isEditing ? editColor : task.color;
+  const textColor = getContrastColor(displayColor);
+  const bgColor = isEditing ? editColor : getColorValue(task.color);
   const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
