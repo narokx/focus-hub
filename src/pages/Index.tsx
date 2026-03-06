@@ -468,6 +468,7 @@ export default function Index() {
             onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
             availableTasks={state.quickTasks}
             onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
+            onReorderRoutines={reorderRoutines}
           />
         </FloatingWindow>
 
