@@ -8,6 +8,7 @@ import { TaskPickerModal } from './TaskPickerModal';
 import { RoutinePickerModal } from './RoutinePickerModal';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { parseLocalDate } from '@/lib/dateUtils';
 
 interface HeatmapCalendarProps {
   calendar: Record<string, DayData>;
@@ -165,7 +166,7 @@ export function HeatmapCalendar({
               <div className="flex items-center gap-2">
                 <CalendarIcon className="w-4 h-4 text-muted-foreground" />
                 <h3 className="font-semibold text-sm">
-                  {format(new Date(selectedDate!), 'EEEE, MMMM d')}
+                  {format(parseLocalDate(selectedDate!), 'EEEE, MMMM d')}
                 </h3>
               </div>
               <div className="flex items-center gap-1">
