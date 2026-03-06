@@ -260,7 +260,9 @@ export function RoutinesPanel({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  onReorderRoutines,
 }: RoutinesPanelProps) {
+  const isMobile = useIsMobile();
   const [isAdding, setIsAdding] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState('');
 
@@ -312,9 +314,9 @@ export function RoutinesPanel({
       <div className="flex-1 flex flex-col gap-3 overflow-auto scrollbar-thin">
         {routines.length === 0 ? (
           <p className="text-sm text-muted-foreground italic text-center py-4">No routines yet. Create a day template!</p>
-        ) : (
+        ) : isMobile ? (
           routines.map(routine => (
-            <RoutineItem
+            <DraggableRoutineItem
               key={routine.id}
               routine={routine}
               onUpdateRoutine={onUpdateRoutine}
@@ -329,6 +331,25 @@ export function RoutinesPanel({
               onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
             />
           ))
+        ) : (
+          <SortableContext items={routines.map(r => `sortable-routine-${r.id}`)} strategy={verticalListSortingStrategy}>
+            {routines.map(routine => (
+              <SortableRoutineItem
+                key={routine.id}
+                routine={routine}
+                onUpdateRoutine={onUpdateRoutine}
+                onDeleteRoutine={onDeleteRoutine}
+                onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
+                onAddRoutineTimeSlot={onAddRoutineTimeSlot}
+                onDeleteRoutineTimeSlot={onDeleteRoutineTimeSlot}
+                onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
+                onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
+                onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
+                availableTasks={availableTasks}
+                onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+              />
+            ))}
+          </SortableContext>
         )}
       </div>
 
