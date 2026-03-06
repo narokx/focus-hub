@@ -17,7 +17,7 @@ export function useSupabaseRoutines() {
 
     // Fetch all three tables in parallel
     const [routinesRes, tasksRes, slotsRes] = await Promise.all([
-      supabase.from('routines').select('id, name').eq('user_id', user.id).order('created_at', { ascending: true }),
+      supabase.from('routines').select('id, name, order_index').eq('user_id', user.id).order('order_index', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true }),
       supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
       supabase.from('routine_time_slots').select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)').order('start_time', { ascending: true }),
     ]);
@@ -445,6 +445,28 @@ export function useSupabaseRoutines() {
     }
   }, [routines]);
 
+  const reorderRoutines = useCallback(async (fromIndex: number, toIndex: number) => {
+    setRoutines(prev => {
+      const arr = [...prev];
+      const [moved] = arr.splice(fromIndex, 1);
+      arr.splice(toIndex, 0, moved);
+      return arr;
+    });
+
+    // Bulk update order_index in Supabase
+    const reordered = (() => {
+      const arr = [...routines];
+      const [moved] = arr.splice(fromIndex, 1);
+      arr.splice(toIndex, 0, moved);
+      return arr;
+    })();
+
+    const updates = reordered.map((r, i) =>
+      supabase.from('routines').update({ order_index: i }).eq('id', r.id)
+    );
+    await Promise.all(updates);
+  }, [routines]);
+
   return {
     routines,
     loading,
@@ -461,6 +483,7 @@ export function useSupabaseRoutines() {
     updateRoutineSlotTime,
     updateRoutineSlotTaskName,
     fetchRoutines,
+    reorderRoutines,
     // Exposed for import
     importSingleRoutine: async (routine: Routine, taskNameMap: Map<string, string>) => {
       if (!user) return;
