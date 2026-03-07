@@ -298,7 +298,7 @@ function TimeSlotRow({
         ref={setNodeRef}
         style={{ minHeight: `${scaledHeight}px` }}
         className={cn(
-          'flex-1 rounded-md border border-dashed border-border/50 flex items-center px-2 transition-all',
+          'flex-1 rounded-md border border-dashed border-border/50 flex items-stretch px-2 transition-all',
           isOver && 'border-primary bg-accent/40 scale-[1.02]',
           slot.task && 'border-transparent p-0'
         )}
