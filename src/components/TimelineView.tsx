@@ -1,10 +1,38 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star } from 'lucide-react';
-import { TimeSlot, TaskColor, getColorValue, getContrastColor } from '@/types';
+import { TimeSlot, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
+
+function formatTimeDisplay(time24: string): string {
+  const normalized = parseTimeTo24h(time24);
+  const [hStr, mStr] = normalized.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
+}
+
+function getSlotDurationMinutes(startTime: string, endTime: string): number {
+  const s = parseTimeTo24h(startTime);
+  const e = parseTimeTo24h(endTime);
+  const [sh, sm] = s.split(':').map(Number);
+  const [eh, em] = e.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) diff += 24 * 60; // handle overnight
+  return diff;
+}
+
+function getDurationScale(minutes: number): number {
+  if (minutes <= 30) return 1;
+  if (minutes <= 60) return 1.25;
+  if (minutes <= 120) return 1.4;
+  return 1.6;
+}
 
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
