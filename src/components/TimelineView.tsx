@@ -298,7 +298,7 @@ function TimeSlotRow({
         ref={setNodeRef}
         style={{ minHeight: `${scaledHeight}px` }}
         className={cn(
-          'flex-1 rounded-md border border-dashed border-border/50 flex items-center px-2 transition-all',
+          'flex-1 rounded-md border border-dashed border-border/50 flex items-stretch px-2 transition-all',
           isOver && 'border-primary bg-accent/40 scale-[1.02]',
           slot.task && 'border-transparent p-0'
         )}
@@ -314,7 +314,7 @@ function TimeSlotRow({
           />
         ) : (
           <span
-            className="text-[10px] text-muted-foreground/50 italic cursor-pointer w-full"
+            className="text-[10px] text-muted-foreground/50 italic cursor-pointer w-full flex items-center"
             onClick={() => onEmptySlotClick?.(slot.id)}
           >
             {onEmptySlotClick ? 'Tap to assign or drop task' : 'Drop task here'}
