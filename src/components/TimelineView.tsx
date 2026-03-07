@@ -1,10 +1,38 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star } from 'lucide-react';
-import { TimeSlot, TaskColor, getColorValue, getContrastColor } from '@/types';
+import { TimeSlot, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
+
+function formatTimeDisplay(time24: string): string {
+  const normalized = parseTimeTo24h(time24);
+  const [hStr, mStr] = normalized.split(':');
+  let h = parseInt(hStr, 10);
+  const m = mStr || '00';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  if (h === 0) h = 12;
+  else if (h > 12) h -= 12;
+  return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
+}
+
+function getSlotDurationMinutes(startTime: string, endTime: string): number {
+  const s = parseTimeTo24h(startTime);
+  const e = parseTimeTo24h(endTime);
+  const [sh, sm] = s.split(':').map(Number);
+  const [eh, em] = e.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) diff += 24 * 60; // handle overnight
+  return diff;
+}
+
+function getDurationScale(minutes: number): number {
+  if (minutes <= 30) return 1;
+  if (minutes <= 60) return 1.25;
+  if (minutes <= 120) return 1.4;
+  return 1.6;
+}
 
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
@@ -239,8 +267,13 @@ function TimeSlotRow({
     data: { type: 'timeslot', prefix: droppablePrefix, slotId: slot.id },
   });
 
+  const durationMin = getSlotDurationMinutes(slot.startTime, slot.endTime);
+  const scale = slot.task ? getDurationScale(durationMin) : 1;
+  const baseHeight = 32; // px, standard min-height
+  const scaledHeight = Math.round(baseHeight * scale);
+
   return (
-    <div className="flex items-center gap-1 group">
+    <div className="flex items-stretch gap-1 group">
       <div
         className="flex items-center gap-0.5 flex-shrink-0 overflow-hidden"
         style={{ width: timeColumnWidth }}
@@ -248,13 +281,13 @@ function TimeSlotRow({
         <div className="flex flex-col min-w-0">
           <input
             type="text"
-            value={slot.startTime}
+            value={formatTimeDisplay(slot.startTime)}
             onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <input
             type="text"
-            value={slot.endTime}
+            value={formatTimeDisplay(slot.endTime)}
             onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />
@@ -263,8 +296,9 @@ function TimeSlotRow({
 
       <div
         ref={setNodeRef}
+        style={{ minHeight: `${scaledHeight}px` }}
         className={cn(
-          'flex-1 min-h-[32px] rounded-md border border-dashed border-border/50 flex items-center px-2 transition-all',
+          'flex-1 rounded-md border border-dashed border-border/50 flex items-center px-2 transition-all',
           isOver && 'border-primary bg-accent/40 scale-[1.02]',
           slot.task && 'border-transparent p-0'
         )}
