@@ -314,7 +314,7 @@ function TimeSlotRow({
           />
         ) : (
           <span
-            className="text-[10px] text-muted-foreground/50 italic cursor-pointer w-full"
+            className="text-[10px] text-muted-foreground/50 italic cursor-pointer w-full flex items-center"
             onClick={() => onEmptySlotClick?.(slot.id)}
           >
             {onEmptySlotClick ? 'Tap to assign or drop task' : 'Drop task here'}
