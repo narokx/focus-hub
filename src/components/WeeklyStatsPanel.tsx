@@ -79,7 +79,7 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
   return Array.from(map.values()).sort((a, b) => b.hours - a.hours);
 }
 
-export function WeeklyStatsPanel({ calendar }: WeeklyStatsPanelProps) {
+export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelProps) {
   const [range, setRange] = useState<Range>('this-week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
