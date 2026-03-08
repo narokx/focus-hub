@@ -247,6 +247,13 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
           </div>
         )}
       </div>
+      {/* Routine Analytics Section */}
+      {routines.length > 0 && (
+        <>
+          <div className="border-t border-border my-2" />
+          <RoutineAnalyticsPanel routines={routines} />
+        </>
+      )}
     </div>
   );
 }
