@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, eachDayOfInterval, parseISO } from 'date-fns';
 import { DayData } from '@/types';
-import { getColorValue } from '@/types';
+import { getColorValue, Routine } from '@/types';
 import { BarChart2, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RoutineAnalyticsPanel } from '@/components/RoutineAnalyticsPanel';
 
 type Range = 'this-week' | 'last-week' | 'this-month' | 'last-30' | 'all-time' | 'custom';
 
 interface WeeklyStatsPanelProps {
   calendar: Record<string, DayData>;
+  routines?: Routine[];
 }
 
 function parseTimeTo24hNum(time: string): number {
@@ -77,7 +79,7 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
   return Array.from(map.values()).sort((a, b) => b.hours - a.hours);
 }
 
-export function WeeklyStatsPanel({ calendar }: WeeklyStatsPanelProps) {
+export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelProps) {
   const [range, setRange] = useState<Range>('this-week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -245,6 +247,13 @@ export function WeeklyStatsPanel({ calendar }: WeeklyStatsPanelProps) {
           </div>
         )}
       </div>
+      {/* Routine Analytics Section */}
+      {routines.length > 0 && (
+        <>
+          <div className="border-t border-border my-2" />
+          <RoutineAnalyticsPanel routines={routines} />
+        </>
+      )}
     </div>
   );
 }
