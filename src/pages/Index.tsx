@@ -540,7 +540,7 @@ export default function Index() {
           minimized={minimized.stats}
           onMinimizeChange={() => toggleMinimize('stats')}
         >
-          <WeeklyStatsPanel calendar={state.calendar} />
+          <WeeklyStatsPanel calendar={state.calendar} routines={state.routines} />
         </FloatingWindow>
 
         {/* Drag Overlay */}
