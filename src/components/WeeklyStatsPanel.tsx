@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, eachDayOfInterval, parseISO } from 'date-fns';
 import { DayData } from '@/types';
-import { getColorValue } from '@/types';
+import { getColorValue, Routine } from '@/types';
 import { BarChart2, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RoutineAnalyticsPanel } from '@/components/RoutineAnalyticsPanel';
 
 type Range = 'this-week' | 'last-week' | 'this-month' | 'last-30' | 'all-time' | 'custom';
 
