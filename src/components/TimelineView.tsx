@@ -28,10 +28,8 @@ function getSlotDurationMinutes(startTime: string, endTime: string): number {
 }
 
 function getDurationScale(minutes: number): number {
-  if (minutes <= 30) return 1;
-  if (minutes <= 60) return 1.25;
-  if (minutes <= 120) return 1.4;
-  return 1.6;
+  const heightPercent = Math.max(100, Math.min(250, 100 + ((minutes - 30) / 150) * 150));
+  return heightPercent / 100;
 }
 
 interface TimelineViewProps {
