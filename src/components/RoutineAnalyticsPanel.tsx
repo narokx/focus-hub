@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Routine } from '@/types';
+import { Routine, parseTimeTo24h } from '@/types';
 import { getColorValue } from '@/types';
 import { Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,15 +9,8 @@ interface RoutineAnalyticsPanelProps {
 }
 
 function parseTimeTo24hNum(time: string): number {
-  const match24 = time.match(/^(\d+):(\d+)$/);
-  if (match24) return parseInt(match24[1]) + parseInt(match24[2]) / 60;
-  const match12 = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!match12) return 0;
-  let h = parseInt(match12[1]);
-  const m = parseInt(match12[2]);
-  const ampm = match12[3].toUpperCase();
-  if (ampm === 'PM' && h !== 12) h += 12;
-  if (ampm === 'AM' && h === 12) h = 0;
+  const normalized = parseTimeTo24h(time); // "HH:MM"
+  const [h, m] = normalized.split(':').map(Number);
   return h + m / 60;
 }
 
