@@ -10,6 +10,7 @@ type Range = 'this-week' | 'last-week' | 'this-month' | 'last-30' | 'all-time' |
 
 interface WeeklyStatsPanelProps {
   calendar: Record<string, DayData>;
+  routines?: Routine[];
 }
 
 function parseTimeTo24hNum(time: string): number {
