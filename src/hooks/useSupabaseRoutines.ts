@@ -481,16 +481,13 @@ export function useSupabaseRoutines() {
       return;
     }
 
-    // Update local state: clear all tasks from time slots
+    // Update local state: empty timeline for this routine
     setRoutines(prev => prev.map(r =>
       r.id === routineId
-        ? { ...r, timeSlots: generateDefaultTimeSlots() }
+        ? { ...r, timeSlots: [] }
         : r
     ));
-
-    // Refetch to ensure sync
-    fetchRoutines();
-  }, [user, fetchRoutines]);
+  }, [user]);
 
   return {
     routines,
