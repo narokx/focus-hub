@@ -24,6 +24,7 @@ interface RoutinesPanelProps {
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onReorderRoutines?: (fromIndex: number, toIndex: number) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
 }
 
 // Shared inner content for a routine item
