@@ -73,6 +73,7 @@ export default function Index() {
     updateDaySlotTaskName,
     moveSlotToSlot: moveCalendarSlotToSlot,
     applyRoutineToDay: applyRoutineToDayCloud,
+    batchApplyRoutine,
     clearDayTimeline,
     fetchCalendar,
   } = useSupabaseCalendar();

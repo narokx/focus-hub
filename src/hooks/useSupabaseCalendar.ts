@@ -827,6 +827,7 @@ export function useSupabaseCalendar() {
     updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
+    batchApplyRoutine,
     clearDayTimeline,
     fetchCalendar,
   };
