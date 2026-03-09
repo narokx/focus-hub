@@ -402,7 +402,7 @@ export default function Index() {
                 onUpdateDaySlotTime={updateDaySlotTime}
                 onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
                 onToggleDaySlotTask={toggleDaySlotTask}
-                onUpdateDaySlotTaskName={updateDaySlotTaskName}
+                onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
                 onApplyRoutine={(date, routine) => {
