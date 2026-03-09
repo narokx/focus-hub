@@ -338,15 +338,6 @@ export default function Index() {
     }
   };
 
-  const handleUndo = () => {
-    const prev = history.undo();
-    if (prev) restoreState(prev);
-  };
-
-  const handleRedo = () => {
-    const next = history.redo();
-    if (next) restoreState(next);
-  };
 
   // ── Mobile Layout ──────────────────────────────────────────────
   if (isMobile) {
