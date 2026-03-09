@@ -605,40 +605,62 @@ export function useSupabaseCalendar() {
   const applyRoutineToDay = useCallback(async (date: string, routine: { tasks: any[]; timeSlots: TimeSlot[] }) => {
     if (!user) return;
 
-    // Optimistic update
+    // Step 1: Atomic DELETE - Clear all existing records for this date
+    const [bufferDeleteResult, eventsDeleteResult] = await Promise.all([
+      supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', date),
+      supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', date),
+    ]);
+
+    // Step 2: Failure Guard - Abort if DELETE failed
+    if (bufferDeleteResult.error) {
+      console.error('Failed to clear daily_task_buffer for date:', date, bufferDeleteResult.error);
+      return;
+    }
+    if (eventsDeleteResult.error) {
+      console.error('Failed to clear calendar_events for date:', date, eventsDeleteResult.error);
+      return;
+    }
+
+    // Step 3: Clear local state for this specific date (clean slate)
     setCalendar(prev => {
-      const dayData = prev[date] || { date, tasks: [], timeSlots: generateDefaultTimeSlots() };
-      const newUnassigned: DayTask[] = routine.tasks.map(t => ({
-        id: `temp-dt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        taskId: t.taskId,
-        name: t.name,
-        color: t.color,
-        completed: false,
-      }));
-
-      const newTimeSlots = [...dayData.timeSlots];
-      routine.timeSlots.forEach((rSlot, i) => {
-        if (rSlot.task && i < newTimeSlots.length && !newTimeSlots[i].task) {
-          newTimeSlots[i] = {
-            ...newTimeSlots[i],
-            task: {
-              id: `dst-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              taskId: rSlot.task.taskId,
-              name: rSlot.task.name,
-              color: rSlot.task.color,
-              completed: false,
-            },
-          };
-        }
-      });
-
-      return {
-        ...prev,
-        [date]: { ...dayData, tasks: [...dayData.tasks, ...newUnassigned], timeSlots: newTimeSlots },
-      };
+      const newCalendar = { ...prev };
+      delete newCalendar[date];
+      return newCalendar;
     });
 
-    // DB: Insert buffer tasks
+    // Step 4: Build new data for INSERT
+    const newUnassigned: DayTask[] = routine.tasks.map(t => ({
+      id: `temp-dt-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      taskId: t.taskId,
+      name: t.name,
+      color: t.color,
+      completed: false,
+    }));
+
+    const defaultSlots = generateDefaultTimeSlots();
+    const newTimeSlots = [...defaultSlots];
+    routine.timeSlots.forEach((rSlot, i) => {
+      if (rSlot.task && i < newTimeSlots.length) {
+        newTimeSlots[i] = {
+          ...newTimeSlots[i],
+          task: {
+            id: `dst-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            taskId: rSlot.task.taskId,
+            name: rSlot.task.name,
+            color: rSlot.task.color,
+            completed: false,
+          },
+        };
+      }
+    });
+
+    // Optimistic UI update with new data
+    setCalendar(prev => ({
+      ...prev,
+      [date]: { date, tasks: newUnassigned, timeSlots: newTimeSlots },
+    }));
+
+    // Step 5: INSERT new buffer tasks
     const bufferRows = routine.tasks
       .filter(t => t.taskId)
       .map((t, i) => ({
@@ -646,18 +668,22 @@ export function useSupabaseCalendar() {
         date,
         task_id: t.taskId,
         completed: false,
-        order_index: (calendar[date]?.tasks || []).length + i,
+        order_index: i,
       }));
 
     if (bufferRows.length > 0) {
-      await supabase.from('daily_task_buffer').insert(bufferRows);
+      const bufferInsert = await supabase.from('daily_task_buffer').insert(bufferRows);
+      if (bufferInsert.error) {
+        console.error('Failed to insert buffer tasks:', bufferInsert.error);
+        fetchCalendar(); // Resync on error
+        return;
+      }
     }
 
-    // DB: Insert time slot events (only with tasks)
-    const dayData = calendar[date] || { date, tasks: [], timeSlots: generateDefaultTimeSlots() };
+    // Step 6: INSERT new time slot events (only with tasks)
     const eventRows: any[] = [];
-    routine.timeSlots.forEach((rSlot, i) => {
-      if (rSlot.task?.taskId && i < dayData.timeSlots.length && !dayData.timeSlots[i].task) {
+    routine.timeSlots.forEach(rSlot => {
+      if (rSlot.task?.taskId) {
         eventRows.push({
           user_id: user.id,
           date,
@@ -670,11 +696,17 @@ export function useSupabaseCalendar() {
     });
 
     if (eventRows.length > 0) {
-      await supabase.from('calendar_events').insert(eventRows);
+      const eventsInsert = await supabase.from('calendar_events').insert(eventRows);
+      if (eventsInsert.error) {
+        console.error('Failed to insert calendar events:', eventsInsert.error);
+        fetchCalendar(); // Resync on error
+        return;
+      }
     }
 
+    // Final sync to ensure UI matches DB
     fetchCalendar();
-  }, [user, calendar, fetchCalendar]);
+  }, [user, fetchCalendar]);
 
   return {
     calendar,
