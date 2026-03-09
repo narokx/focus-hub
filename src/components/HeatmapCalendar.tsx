@@ -67,6 +67,7 @@ function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
     <div
       ref={setNodeRef}
       onClick={onClick}
+      tabIndex={-1}
       className={cn(
         'calendar-cell',
         !inMonth && 'opacity-30',
@@ -74,8 +75,11 @@ function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
         level === 'low' && 'calendar-cell-low',
         level === 'mid' && 'calendar-cell-mid',
         level === 'high' && 'calendar-cell-high',
-        today && 'ring-2 ring-primary ring-offset-2',
-        isSelected && 'ring-2 ring-primary',
+        isSelected
+          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+          : today
+            ? 'ring-2 ring-primary/50 ring-offset-2 ring-offset-background'
+            : '',
         isOver && 'ring-2 ring-accent-foreground scale-110'
       )}
     >
