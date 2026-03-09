@@ -74,7 +74,7 @@ function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
         level === 'low' && 'calendar-cell-low',
         level === 'mid' && 'calendar-cell-mid',
         level === 'high' && 'calendar-cell-high',
-        today && 'ring-2 ring-primary ring-offset-2',
+        today && 'ring-2 ring-yellow-400 ring-offset-2',
         isSelected && 'ring-2 ring-primary',
         isOver && 'ring-2 ring-accent-foreground scale-110'
       )}
