@@ -371,7 +371,7 @@ function TimeSlotRow({
 
       <button
         onClick={() => onDeleteTimeSlot(slot.id)}
-        className="p-0.5 text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+        className="p-0.5 text-muted-foreground/40 hover:text-destructive transition-opacity"
       >
         <Trash2 className="w-3 h-3" />
       </button>
