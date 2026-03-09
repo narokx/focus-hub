@@ -358,7 +358,7 @@ export default function Index() {
   if (isMobile) {
     return (
       <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex flex-col h-screen bg-background">
+        <div className={cn("flex flex-col h-screen bg-background", isApplyingRoutine && "pointer-events-none")}>
           {/* Mobile header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
             <div>
