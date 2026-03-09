@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star } from 'lucide-react';
 import { TimeSlot, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
@@ -23,7 +23,7 @@ function getSlotDurationMinutes(startTime: string, endTime: string): number {
   const [sh, sm] = s.split(':').map(Number);
   const [eh, em] = e.split(':').map(Number);
   let diff = (eh * 60 + em) - (sh * 60 + sm);
-  if (diff <= 0) diff += 24 * 60; // handle overnight
+  if (diff <= 0) diff += 24 * 60;
   return diff;
 }
 
@@ -31,6 +31,8 @@ function getDurationScale(minutes: number): number {
   const heightPercent = Math.max(100, Math.min(250, 100 + ((minutes - 30) / 150) * 150));
   return heightPercent / 100;
 }
+
+const DRAG_THRESHOLD = 10;
 
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
@@ -58,6 +60,8 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
+  isExpanded,
+  onExpand,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -65,14 +69,16 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  isExpanded: boolean;
+  onExpand: () => void;
 }) {
   const task = slot.task!;
   const [isEditing, setIsEditing] = React.useState(false);
   const [editName, setEditName] = React.useState(task.name);
   const [notesOpen, setNotesOpen] = React.useState(false);
-  const [hovered, setHovered] = React.useState(false);
+  const [isPressed, setIsPressed] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  const pointerStartRef = React.useRef<{ x: number; y: number } | null>(null);
 
   const noteId = `${slot.id}-${task.taskId || task.id}`;
   const { note } = useTaskNote(noteId);
@@ -98,7 +104,7 @@ function DraggableSlotTask({
 
   const textColor = getContrastColor(task.color);
   const bgColor = getColorValue(task.color);
-  const showActions = !isEditing && (hovered || isTouchDevice);
+  const showActions = isExpanded && !isEditing;
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -114,21 +120,51 @@ function DraggableSlotTask({
     }
   };
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    setIsPressed(true);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setIsPressed(false);
+    if (!pointerStartRef.current || isDragging) {
+      pointerStartRef.current = null;
+      return;
+    }
+
+    const dx = Math.abs(e.clientX - pointerStartRef.current.x);
+    const dy = Math.abs(e.clientY - pointerStartRef.current.y);
+    pointerStartRef.current = null;
+
+    if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) return;
+
+    if (!isEditing) {
+      onExpand();
+    }
+  };
+
   return (
     <>
       <div
         ref={setNodeRef}
-        style={{ ...style, backgroundColor: bgColor, color: textColor }}
+        style={{
+          ...style,
+          backgroundColor: bgColor,
+          color: textColor,
+          willChange: isExpanded ? 'width' : 'auto',
+        }}
         className={cn(
-          'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
-          isDragging && 'opacity-50'
+          'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing overflow-hidden',
+          'transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+          isDragging && 'opacity-50',
+          isPressed && !isDragging && 'scale-[0.98]'
         )}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => { setIsPressed(false); pointerStartRef.current = null; }}
         {...attributes}
         {...listeners}
       >
-        {/* Star indicator */}
         {hasNotes && (
           <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
         )}
@@ -150,6 +186,7 @@ function DraggableSlotTask({
             )}
           </button>
         )}
+
         {isEditing ? (
           <input
             ref={inputRef}
@@ -176,8 +213,14 @@ function DraggableSlotTask({
           </span>
         )}
 
-        {/* Pencil edit icon */}
-        {showActions && (
+        {/* Action icons with animated reveal */}
+        <div
+          className={cn(
+            'flex items-center gap-0.5 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            showActions ? 'opacity-100 scale-100' : 'opacity-0 scale-75 w-0'
+          )}
+          style={{ width: showActions ? '60px' : 0 }}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -193,10 +236,7 @@ function DraggableSlotTask({
           >
             <Pencil className="w-2.5 h-2.5" />
           </button>
-        )}
 
-        {/* Notes icon */}
-        {showActions && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -211,18 +251,18 @@ function DraggableSlotTask({
           >
             <FileText className="w-2.5 h-2.5" />
           </button>
-        )}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={cn(
-            'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity flex-shrink-0',
-            textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-          )}
-        >
-          <X className="w-3 h-3" />
-        </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity flex-shrink-0',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {notesOpen && (
@@ -248,6 +288,8 @@ function TimeSlotRow({
   onUpdateSlotTaskName,
   timeColumnWidth,
   onEmptySlotClick,
+  expandedTaskId,
+  onExpandTask,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -259,6 +301,8 @@ function TimeSlotRow({
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
   timeColumnWidth: number;
   onEmptySlotClick?: (slotId: string) => void;
+  expandedTaskId: string | null;
+  onExpandTask: (taskId: string | null) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
@@ -267,8 +311,11 @@ function TimeSlotRow({
 
   const durationMin = getSlotDurationMinutes(slot.startTime, slot.endTime);
   const scale = slot.task ? getDurationScale(durationMin) : 1;
-  const baseHeight = 32; // px, standard min-height
+  const baseHeight = 32;
   const scaledHeight = Math.round(baseHeight * scale);
+
+  const slotTaskId = slot.task ? `slot-${slot.id}` : null;
+  const isExpanded = slotTaskId !== null && expandedTaskId === slotTaskId;
 
   return (
     <div className="flex items-stretch gap-1 group">
@@ -309,6 +356,8 @@ function TimeSlotRow({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
+            isExpanded={isExpanded}
+            onExpand={() => onExpandTask(isExpanded ? null : slotTaskId)}
           />
         ) : (
           <span
@@ -337,6 +386,8 @@ function UnassignedZone({
   onToggle,
   onRemove,
   onUpdateName,
+  expandedTaskId,
+  onExpandTask,
 }: {
   tasks: Array<{ id: string; taskId?: string; name: string; color: TaskColor; completed?: boolean }>;
   droppablePrefix: string;
@@ -344,6 +395,8 @@ function UnassignedZone({
   onToggle?: (taskId: string) => void;
   onRemove: (taskId: string) => void;
   onUpdateName?: (taskId: string, name: string) => void;
+  expandedTaskId: string | null;
+  onExpandTask: (taskId: string | null) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-unassigned`,
@@ -365,29 +418,35 @@ function UnassignedZone({
             Drop tasks here or drag to a time slot
           </span>
         ) : (
-          tasks.map(task => (
-            <div key={task.id} onClick={(e) => e.stopPropagation()}>
-              <TaskChip
-                id={`${droppablePrefix}-unassigned-${task.id}`}
-                name={task.name}
-                color={task.color}
-                draggable={true}
-                dragData={{
-                  taskId: task.taskId || task.id,
-                  source: 'unassigned',
-                  sourcePrefix: droppablePrefix,
-                  unassignedTaskId: task.id,
-                }}
-                editable={!!onUpdateName}
-                onNameChange={onUpdateName ? (name) => onUpdateName(task.id, name) : undefined}
-                completed={task.completed}
-                onToggleComplete={showCompleted && onToggle ? () => onToggle(task.id) : undefined}
-                onDelete={() => onRemove(task.id)}
-                showDelete
-                noteId={`unassigned-${task.id}`}
-              />
-            </div>
-          ))
+          tasks.map(task => {
+            const unassignedTaskId = `unassigned-${task.id}`;
+            const isExpanded = expandedTaskId === unassignedTaskId;
+            return (
+              <div key={task.id} onClick={(e) => e.stopPropagation()}>
+                <TaskChip
+                  id={`${droppablePrefix}-unassigned-${task.id}`}
+                  name={task.name}
+                  color={task.color}
+                  draggable={true}
+                  dragData={{
+                    taskId: task.taskId || task.id,
+                    source: 'unassigned',
+                    sourcePrefix: droppablePrefix,
+                    unassignedTaskId: task.id,
+                  }}
+                  editable={!!onUpdateName}
+                  onNameChange={onUpdateName ? (name) => onUpdateName(task.id, name) : undefined}
+                  completed={task.completed}
+                  onToggleComplete={showCompleted && onToggle ? () => onToggle(task.id) : undefined}
+                  onDelete={() => onRemove(task.id)}
+                  showDelete
+                  noteId={`unassigned-${task.id}`}
+                  isExpanded={isExpanded}
+                  onExpand={() => onExpandTask(isExpanded ? null : unassignedTaskId)}
+                />
+              </div>
+            );
+          })
         )}
       </div>
     </div>
@@ -413,9 +472,28 @@ export function TimelineView({
   onEmptySlotClick,
 }: TimelineViewProps) {
   const timeColWidth = DEFAULT_TIME_COL;
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Outside click handler to collapse expanded task
+  useEffect(() => {
+    const handlePointerDown = (e: PointerEvent) => {
+      if (!expandedTaskId) return;
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpandedTaskId(null);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [expandedTaskId]);
+
+  const handleExpandTask = useCallback((taskId: string | null) => {
+    setExpandedTaskId(taskId);
+  }, []);
 
   return (
-    <div className="flex flex-col gap-1.5 h-full">
+    <div ref={containerRef} className="flex flex-col gap-1.5 h-full">
       <div className="flex flex-col gap-1 flex-1 overflow-auto scrollbar-thin min-h-0">
         {timeSlots.map(slot => (
           <TimeSlotRow
@@ -430,6 +508,8 @@ export function TimelineView({
             onUpdateSlotTaskName={onUpdateSlotTaskName}
             timeColumnWidth={timeColWidth}
             onEmptySlotClick={onEmptySlotClick}
+            expandedTaskId={expandedTaskId}
+            onExpandTask={handleExpandTask}
           />
         ))}
       </div>
@@ -449,6 +529,8 @@ export function TimelineView({
         onToggle={onToggleUnassigned}
         onRemove={onRemoveUnassigned}
         onUpdateName={onUpdateUnassignedName}
+        expandedTaskId={expandedTaskId}
+        onExpandTask={handleExpandTask}
       />
     </div>
   );
