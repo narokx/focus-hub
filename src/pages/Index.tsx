@@ -674,10 +674,16 @@ export default function Index() {
           targetDate={pendingRoutineDrop?.targetDate || null}
           onApply={async (dates) => {
             if (!pendingRoutineDrop) return;
+            const routine = pendingRoutineDrop.routine;
+            const targetDate = pendingRoutineDrop.targetDate;
             setIsApplyingRoutine(true);
             try {
-              await batchApplyRoutine(dates, pendingRoutineDrop.routine);
-              setSelectedDate(pendingRoutineDrop.targetDate);
+              if (dates.length === 1) {
+                await applyRoutineToDayCloud(dates[0], routine);
+              } else {
+                await batchApplyRoutine(dates, routine);
+              }
+              setSelectedDate(targetDate);
             } finally {
               setIsApplyingRoutine(false);
             }
