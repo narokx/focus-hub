@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -23,10 +23,10 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(task.name);
   const [editColor, setEditColor] = useState(task.color);
-  const [hovered, setHovered] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  const chipRef = useRef<HTMLDivElement>(null);
 
   const noteId = `quick-${task.id}`;
   const { note } = useTaskNote(noteId);
@@ -53,7 +53,6 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
   const displayColor = isEditing ? editColor : task.color;
   const textColor = getContrastColor(displayColor);
   const bgColor = isEditing ? editColor : getColorValue(task.color);
-  const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -61,6 +60,17 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
       inputRef.current.select();
     }
   }, [isEditing]);
+
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handler = (e: PointerEvent) => {
+      if (chipRef.current && !chipRef.current.contains(e.target as Node)) {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [isExpanded]);
 
   const handleSaveEdit = () => {
     setIsEditing(false);
@@ -70,11 +80,22 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
     if (Object.keys(updates).length > 0) onUpdateTask(task.id, updates);
   };
 
+  const handleChipClick = (e: React.MouseEvent) => {
+    if (isEditing) return;
+    e.stopPropagation();
+    setIsExpanded(prev => !prev);
+  };
+
+  const setRefs = (node: HTMLElement | null) => {
+    setNodeRef(node);
+    (chipRef as React.MutableRefObject<HTMLDivElement | null>).current = node as HTMLDivElement | null;
+  };
+
   return (
     <>
-      <div className="group relative">
+      <div className="relative">
         <div
-          ref={setNodeRef}
+          ref={setRefs}
           style={{ ...style, backgroundColor: bgColor, color: textColor }}
           className={cn(
             'task-chip relative inline-flex items-center gap-1.5 no-drag cursor-grab active:cursor-grabbing',
@@ -82,10 +103,8 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
           )}
           {...attributes}
           {...listeners}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
+          onClick={handleChipClick}
         >
-          {/* Star indicator */}
           {hasNotes && (
             <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
           )}
@@ -132,12 +151,11 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             <span>{task.name}</span>
           )}
 
-          {/* Pencil icon */}
-          {showActions && (
+          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-              setIsEditing(true);
+                setIsEditing(true);
                 setEditName(task.name);
                 setEditColor(task.color);
               }}
@@ -152,8 +170,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             </button>
           )}
 
-          {/* Notes icon */}
-          {showActions && (
+          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -169,13 +186,24 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
               <FileText className="w-2.5 h-2.5" />
             </button>
           )}
+
+          {isExpanded && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteTask(task.id);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'w-4 h-4 flex items-center justify-center rounded-full transition-colors ml-0.5',
+                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+              )}
+              title="Delete"
+            >
+              <Trash2 className="w-2.5 h-2.5" />
+            </button>
+          )}
         </div>
-        <button
-          onClick={() => onDeleteTask(task.id)}
-          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
       </div>
 
       {notesOpen && (
@@ -257,7 +285,6 @@ export function QuickTasksPanel({
             className="mb-3"
           />
 
-          {/* Color picker */}
           <div className="flex items-center gap-3 mb-3">
             <label className="text-xs text-muted-foreground">Color:</label>
             <input

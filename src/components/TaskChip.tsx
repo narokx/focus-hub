@@ -39,10 +39,10 @@ export function TaskChip({
 }: TaskChipProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(name);
-  const [hovered, setHovered] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+  const chipRef = useRef<HTMLDivElement>(null);
 
   const { note } = useTaskNote(noteId || null);
   const hasNotes = !!note?.trim();
@@ -64,6 +64,17 @@ export function TaskChip({
     }
   }, [isEditing]);
 
+  useEffect(() => {
+    if (!isExpanded) return;
+    const handler = (e: PointerEvent) => {
+      if (chipRef.current && !chipRef.current.contains(e.target as Node)) {
+        setIsExpanded(false);
+      }
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [isExpanded]);
+
   const handleBlur = () => {
     setIsEditing(false);
     if (editName.trim() && editName !== name && onNameChange) {
@@ -80,14 +91,24 @@ export function TaskChip({
     }
   };
 
+  const handleChipClick = (e: React.MouseEvent) => {
+    if (isEditing) return;
+    e.stopPropagation();
+    setIsExpanded(prev => !prev);
+  };
+
   const textColor = getContrastColor(color);
   const bgColor = getColorValue(color);
-  const showActions = !isEditing && (hovered || isTouchDevice);
+
+  const setRefs = (node: HTMLElement | null) => {
+    setNodeRef(node);
+    (chipRef as React.MutableRefObject<HTMLDivElement | null>).current = node as HTMLDivElement | null;
+  };
 
   return (
     <>
       <div
-        ref={setNodeRef}
+        ref={setRefs}
         style={{
           ...style,
           backgroundColor: bgColor,
@@ -100,10 +121,8 @@ export function TaskChip({
           className
         )}
         {...(draggable && !isEditing ? { ...attributes, ...listeners } : {})}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onClick={handleChipClick}
       >
-        {/* Star indicator for notes */}
         {hasNotes && (
           <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
         )}
@@ -152,8 +171,7 @@ export function TaskChip({
           <span className={cn(completed && 'line-through')}>{name}</span>
         )}
 
-        {/* Action icons: Pencil, Notes, Delete */}
-        {showActions && editable && (
+        {isExpanded && editable && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -171,7 +189,7 @@ export function TaskChip({
           </button>
         )}
 
-        {showActions && noteId && (
+        {isExpanded && noteId && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -188,7 +206,7 @@ export function TaskChip({
           </button>
         )}
         
-        {showDelete && onDelete && (
+        {isExpanded && showDelete && onDelete && (
           <button
             onClick={(e) => {
               e.stopPropagation();
