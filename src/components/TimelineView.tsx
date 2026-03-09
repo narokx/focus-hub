@@ -216,7 +216,7 @@ function DraggableSlotTask({
         {/* Action icons with animated reveal */}
         <div
           className={cn(
-            'flex items-center gap-0.5 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            'flex items-center gap-0.5 overflow-hidden transition-[width,opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
             showActions ? 'opacity-100 scale-100' : 'opacity-0 scale-75 w-0'
           )}
           style={{ width: showActions ? '60px' : 0 }}
@@ -343,7 +343,7 @@ function TimeSlotRow({
         ref={setNodeRef}
         style={{ minHeight: `${scaledHeight}px` }}
         className={cn(
-          'flex-1 rounded-md border border-dashed border-border/50 flex items-stretch px-2 transition-all',
+          'flex-1 rounded-md border border-dashed border-border/50 flex items-stretch px-2 transition-[border-color,background-color,transform] duration-200',
           isOver && 'border-primary bg-accent/40 scale-[1.02]',
           slot.task && 'border-transparent p-0'
         )}
