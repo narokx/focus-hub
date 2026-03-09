@@ -304,6 +304,7 @@ export function RoutinesPanel({
   availableTasks,
   onAssignTaskToRoutineSlot,
   onReorderRoutines,
+  onClearRoutineTimeline,
 }: RoutinesPanelProps) {
   const isMobile = useIsMobile();
   const [isAdding, setIsAdding] = useState(false);
