@@ -100,6 +100,15 @@ export default function Index() {
     routine?: typeof state.routines[0];
   } | null>(null);
 
+  // State for routine application modal
+  const [routineModalOpen, setRoutineModalOpen] = useState(false);
+  const [pendingRoutineDrop, setPendingRoutineDrop] = useState<{
+    routine: Routine;
+    targetDate: string;
+  } | null>(null);
+  const [isApplyingRoutine, setIsApplyingRoutine] = useState(false);
+  } | null>(null);
+
   // History for undo/redo
   const history = useHistory(state);
 
