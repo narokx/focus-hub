@@ -161,9 +161,6 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
                       <span className="text-[9px] text-muted-foreground">
                         Avg {dailyAvg.toFixed(1)}h/day
                       </span>
-                      <span className="text-[9px] text-muted-foreground">
-                        ~{weeklyProj.toFixed(1)}h/wk
-                      </span>
                     </div>
                   </div>
                 </div>
