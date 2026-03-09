@@ -29,6 +29,7 @@ interface HeatmapCalendarProps {
   availableTasks?: QuickTask[];
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onApplyRoutine?: (date: string, routine: Routine) => void;
+  onClearDayTimeline?: (date: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
