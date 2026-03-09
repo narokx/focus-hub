@@ -467,6 +467,31 @@ export function useSupabaseRoutines() {
     await Promise.all(updates);
   }, [routines]);
 
+  const clearRoutineTimeline = useCallback(async (routineId: string) => {
+    if (!user) return;
+
+    // Delete all routine_time_slots for this specific routine ID
+    const { error } = await supabase
+      .from('routine_time_slots')
+      .delete()
+      .eq('routine_id', routineId);
+
+    if (error) {
+      console.error('Failed to clear routine_time_slots for routine:', routineId, error);
+      return;
+    }
+
+    // Update local state: clear all tasks from time slots
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? { ...r, timeSlots: generateDefaultTimeSlots() }
+        : r
+    ));
+
+    // Refetch to ensure sync
+    fetchRoutines();
+  }, [user, fetchRoutines]);
+
   return {
     routines,
     loading,
