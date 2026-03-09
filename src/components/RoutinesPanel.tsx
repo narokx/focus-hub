@@ -40,6 +40,7 @@ function RoutineItemContent({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  onClearRoutineTimeline,
   isOver,
   isDragging,
   dragHandleRef,
@@ -58,6 +59,7 @@ function RoutineItemContent({
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
   isOver: boolean;
   isDragging: boolean;
   dragHandleRef: (node: HTMLElement | null) => void;
@@ -69,6 +71,7 @@ function RoutineItemContent({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(routine.name);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleNameSubmit = () => {
     setIsEditing(false);
