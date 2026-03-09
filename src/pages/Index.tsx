@@ -624,6 +624,38 @@ export default function Index() {
             </div>
           )}
         </DragOverlay>
+
+        {/* Routine Application Modal */}
+        <RoutineApplicationModal
+          isOpen={routineModalOpen}
+          onClose={() => {
+            setRoutineModalOpen(false);
+            setPendingRoutineDrop(null);
+          }}
+          routine={pendingRoutineDrop?.routine || null}
+          targetDate={pendingRoutineDrop?.targetDate || null}
+          onApply={async (dates) => {
+            if (!pendingRoutineDrop) return;
+            setIsApplyingRoutine(true);
+            try {
+              await batchApplyRoutine(dates, pendingRoutineDrop.routine);
+              setSelectedDate(pendingRoutineDrop.targetDate);
+            } finally {
+              setIsApplyingRoutine(false);
+            }
+          }}
+        />
+
+        {/* Loading overlay during batch operations */}
+        {isApplyingRoutine && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4 p-8 bg-card rounded-lg border shadow-lg">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm font-medium text-foreground">Syncing routine data...</p>
+              <p className="text-xs text-muted-foreground">Please wait while we apply your routine</p>
+            </div>
+          </div>
+        )}
       </div>
     </DndContext>
   );
