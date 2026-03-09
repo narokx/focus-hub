@@ -235,10 +235,13 @@ export default function Index() {
       return;
     }
 
-    // Handle routine drag to calendar cell
+    // Handle routine drag to calendar cell - show modal for selection
     if (activeData?.type === 'routine' && overData?.type === 'day') {
-      applyRoutineToDayCloud(overData.date, activeData.routine);
-      setSelectedDate(overData.date);
+      setPendingRoutineDrop({
+        routine: activeData.routine,
+        targetDate: overData.date,
+      });
+      setRoutineModalOpen(true);
       return;
     }
 
