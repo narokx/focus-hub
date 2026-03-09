@@ -618,7 +618,10 @@ export default function Index() {
             onUpdateDaySlotTaskName={updateDaySlotTaskName}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
-            onApplyRoutine={applyRoutineToDay}
+            onApplyRoutine={(date, routine) => {
+              setPendingRoutineDrop({ routine, targetDate: date });
+              setRoutineModalOpen(true);
+            }}
             onClearDayTimeline={clearDayTimeline}
           />
         </FloatingWindow>
