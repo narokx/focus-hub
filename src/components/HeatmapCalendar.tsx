@@ -183,6 +183,15 @@ export function HeatmapCalendar({
                     <Zap className="w-4 h-4" />
                   </button>
                 )}
+                {onClearDayTimeline && (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-destructive"
+                    title="Clear timeline"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
                 {!isMobile && (
                   <button onClick={onCloseDay} className="p-1 rounded hover:bg-secondary transition-colors">
                     <X className="w-4 h-4" />
