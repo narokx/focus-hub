@@ -423,7 +423,7 @@ export default function Index() {
                 onDeleteRoutineTimeSlot={deleteRoutineTimeSlot}
                 onUpdateRoutineSlotTime={updateRoutineSlotTime}
                 onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
-                onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
+                onUpdateRoutineSlotTaskName={async (routineId, slotId, name) => { await updateRoutineSlotTaskName(routineId, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
                 onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
                 onClearRoutineTimeline={clearRoutineTimeline}
