@@ -431,19 +431,40 @@ export function useSupabaseRoutines() {
   }, [fetchRoutines]);
 
   const updateRoutineSlotTaskName = useCallback(async (routineId: string, slotId: string, name: string) => {
+    if (!user) return;
+
+    // Find original color
+    const routine = routines.find(r => r.id === routineId);
+    const slot = routine?.timeSlots.find(s => s.id === slotId);
+    const originalColor = slot?.task?.color || '#3B82F6';
+
+    // Optimistic UI
     setRoutines(prev => prev.map(r =>
       r.id === routineId
         ? { ...r, timeSlots: r.timeSlots.map(s => s.id === slotId && s.task ? { ...s, task: { ...s.task, name } } : s) }
         : r
     ));
-    // Task name updates go to the tasks table, not routine_time_slots
-    // Find the task_id for this slot
-    const routine = routines.find(r => r.id === routineId);
-    const slot = routine?.timeSlots.find(s => s.id === slotId);
-    if (slot?.task?.taskId) {
-      await supabase.from('tasks').update({ name }).eq('id', slot.task.taskId);
+
+    // Non-destructive: find or create task by name, then reassign pointer
+    const resolvedId = await resolveTaskId(name, originalColor, user.id);
+    if (!resolvedId) return;
+
+    // Update optimistic state with resolved taskId
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? { ...r, timeSlots: r.timeSlots.map(s => s.id === slotId && s.task ? { ...s, task: { ...s.task, taskId: resolvedId } } : s) }
+        : r
+    ));
+
+    // Reassign routine_time_slots row to point to the resolved task
+    const { error } = await supabase.from('routine_time_slots').update({ task_id: resolvedId }).eq('id', slotId);
+    if (error) {
+      console.error('Failed to reassign routine slot task:', error);
+      fetchRoutines();
     }
-  }, [routines]);
+
+    return resolvedId;
+  }, [user, routines, fetchRoutines]);
 
   const reorderRoutines = useCallback(async (fromIndex: number, toIndex: number) => {
     setRoutines(prev => {
