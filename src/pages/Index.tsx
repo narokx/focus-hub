@@ -410,6 +410,7 @@ export default function Index() {
                 onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
                 availableTasks={state.quickTasks}
                 onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
+                onClearRoutineTimeline={clearRoutineTimeline}
               />
             )}
             {mobileTab === 'tasks' && (

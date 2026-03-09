@@ -373,6 +373,7 @@ export function RoutinesPanel({
               onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
               availableTasks={availableTasks}
               onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+              onClearRoutineTimeline={onClearRoutineTimeline}
             />
           ))
         ) : (
@@ -391,6 +392,7 @@ export function RoutinesPanel({
                 onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
                 availableTasks={availableTasks}
                 onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+                onClearRoutineTimeline={onClearRoutineTimeline}
               />
             ))}
           </SortableContext>

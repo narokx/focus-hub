@@ -507,6 +507,7 @@ export function useSupabaseRoutines() {
     deleteRoutineTimeSlot,
     updateRoutineSlotTime,
     updateRoutineSlotTaskName,
+    clearRoutineTimeline,
     fetchRoutines,
     reorderRoutines,
     // Exposed for import

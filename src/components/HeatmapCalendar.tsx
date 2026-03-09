@@ -308,6 +308,33 @@ export function HeatmapCalendar({
           onClose={() => setShowRoutinePicker(false)}
         />
       )}
+
+      {showClearConfirm && selectedDate && (
+        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear Timeline</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete all tasks and time slots for {format(parseLocalDate(selectedDate), 'MMMM d, yyyy')}. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onClearDayTimeline) {
+                    onClearDayTimeline(selectedDate);
+                  }
+                  setShowClearConfirm(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Clear Timeline
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

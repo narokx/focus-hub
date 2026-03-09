@@ -708,6 +708,32 @@ export function useSupabaseCalendar() {
     fetchCalendar();
   }, [user, fetchCalendar]);
 
+  const clearDayTimeline = useCallback(async (date: string) => {
+    if (!user) return;
+
+    // Delete all calendar_events and daily_task_buffer for this specific date
+    const [bufferDeleteResult, eventsDeleteResult] = await Promise.all([
+      supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', date),
+      supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', date),
+    ]);
+
+    if (bufferDeleteResult.error) {
+      console.error('Failed to clear daily_task_buffer for date:', date, bufferDeleteResult.error);
+      return;
+    }
+    if (eventsDeleteResult.error) {
+      console.error('Failed to clear calendar_events for date:', date, eventsDeleteResult.error);
+      return;
+    }
+
+    // Clear local state for this date
+    setCalendar(prev => {
+      const newCalendar = { ...prev };
+      delete newCalendar[date];
+      return newCalendar;
+    });
+  }, [user]);
+
   return {
     calendar,
     loading,
@@ -724,6 +750,7 @@ export function useSupabaseCalendar() {
     updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
+    clearDayTimeline,
     fetchCalendar,
   };
 }
