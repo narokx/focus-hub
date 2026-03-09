@@ -193,7 +193,7 @@ export function TaskChip({
         {/* Action icons container with animated reveal */}
         <div
           className={cn(
-            'flex items-center gap-0.5 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            'flex items-center gap-0.5 overflow-hidden transition-[width,opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
             showActions ? 'opacity-100 scale-100' : 'opacity-0 scale-75 w-0'
           )}
           style={{
