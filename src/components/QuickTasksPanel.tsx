@@ -80,7 +80,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
     if (Object.keys(updates).length > 0) onUpdateTask(task.id, updates);
   };
 
-  const handleChipClick = (e: React.MouseEvent) => {
+  const handleChipPointerUp = (e: React.PointerEvent) => {
     if (isEditing) return;
     e.stopPropagation();
     setIsExpanded(prev => !prev);
@@ -103,7 +103,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
           )}
           {...attributes}
           {...listeners}
-          onClick={handleChipClick}
+          onPointerUp={handleChipPointerUp}
         >
           {hasNotes && (
             <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
@@ -151,7 +151,13 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             <span>{task.name}</span>
           )}
 
-          {isExpanded && (
+          <div
+            className={cn(
+              'absolute right-0 top-1/2 -translate-y-1/2 translate-x-full ml-1 z-50 pointer-events-auto',
+              !isExpanded && 'hidden',
+              isExpanded && 'flex items-center gap-1'
+            )}
+          >
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -168,9 +174,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             >
               <Pencil className="w-2.5 h-2.5" />
             </button>
-          )}
 
-          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -185,9 +189,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             >
               <FileText className="w-2.5 h-2.5" />
             </button>
-          )}
 
-          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -202,7 +204,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             >
               <Trash2 className="w-2.5 h-2.5" />
             </button>
-          )}
+          </div>
         </div>
       </div>
 

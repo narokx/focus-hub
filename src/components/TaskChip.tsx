@@ -91,7 +91,7 @@ export function TaskChip({
     }
   };
 
-  const handleChipClick = (e: React.MouseEvent) => {
+  const handleChipPointerUp = (e: React.PointerEvent) => {
     if (isEditing) return;
     e.stopPropagation();
     setIsExpanded(prev => !prev);
@@ -121,7 +121,7 @@ export function TaskChip({
           className
         )}
         {...(draggable && !isEditing ? { ...attributes, ...listeners } : {})}
-        onClick={handleChipClick}
+        onPointerUp={handleChipPointerUp}
       >
         {hasNotes && (
           <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
@@ -171,59 +171,67 @@ export function TaskChip({
           <span className={cn(completed && 'line-through')}>{name}</span>
         )}
 
-        {isExpanded && editable && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-              setEditName(name);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className={cn(
-              'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
-              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-            )}
-            title="Rename"
-          >
-            <Pencil className="w-2.5 h-2.5" />
-          </button>
-        )}
+        <div
+          className={cn(
+            'absolute right-0 top-1/2 -translate-y-1/2 translate-x-full ml-1 z-50 pointer-events-auto',
+            !isExpanded && 'hidden',
+            isExpanded && 'flex items-center gap-1'
+          )}
+        >
+          {editable && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditing(true);
+                setEditName(name);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
+                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+              )}
+              title="Rename"
+            >
+              <Pencil className="w-2.5 h-2.5" />
+            </button>
+          )}
 
-        {isExpanded && noteId && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setNotesOpen(true);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className={cn(
-              'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
-              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-            )}
-            title="Notes"
-          >
-            <FileText className="w-2.5 h-2.5" />
-          </button>
-        )}
-        
-        {isExpanded && showDelete && onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onDelete();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className={cn(
-              'w-4 h-4 flex items-center justify-center rounded-full transition-colors ml-0.5',
-              textColor === 'white' 
-                ? 'hover:bg-white/20' 
-                : 'hover:bg-black/10'
-            )}
-          >
-            ×
-          </button>
-        )}
+          {noteId && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setNotesOpen(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
+                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+              )}
+              title="Notes"
+            >
+              <FileText className="w-2.5 h-2.5" />
+            </button>
+          )}
+
+          {showDelete && onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onDelete();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className={cn(
+                'w-4 h-4 flex items-center justify-center rounded-full transition-colors ml-0.5',
+                textColor === 'white'
+                  ? 'hover:bg-white/20'
+                  : 'hover:bg-black/10'
+              )}
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       {notesOpen && noteId && (
