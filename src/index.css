@@ -176,7 +176,6 @@
 
   .task-chip {
     @apply px-3 py-1.5 rounded-md text-sm font-medium cursor-grab active:cursor-grabbing transition-all;
-    @apply hover:scale-105 hover:shadow-md;
   }
 
   .task-chip.dragging {
