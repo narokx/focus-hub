@@ -513,6 +513,7 @@ export default function Index() {
             availableTasks={state.quickTasks}
             onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
             onReorderRoutines={reorderRoutines}
+            onClearRoutineTimeline={clearRoutineTimeline}
           />
         </FloatingWindow>
 
