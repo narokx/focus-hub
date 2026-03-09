@@ -51,6 +51,7 @@ export default function Index() {
     deleteRoutineTimeSlot,
     updateRoutineSlotTime,
     updateRoutineSlotTaskName,
+    clearRoutineTimeline,
     fetchRoutines,
     reorderRoutines,
   } = useSupabaseRoutines();
