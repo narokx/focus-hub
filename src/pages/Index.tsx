@@ -502,7 +502,7 @@ export default function Index() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-screen bg-background p-4 overflow-hidden relative">
+      <div className={cn("min-h-screen bg-background p-4 overflow-hidden relative", isApplyingRoutine && "pointer-events-none")}>
         <div className="absolute top-4 left-4 z-0 flex items-center gap-3">
           <div>
             <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
