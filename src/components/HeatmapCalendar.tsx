@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
 import { DayData, QuickTask, Routine, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
 import { RoutinePickerModal } from './RoutinePickerModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { parseLocalDate } from '@/lib/dateUtils';
