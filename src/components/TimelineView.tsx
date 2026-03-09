@@ -318,7 +318,7 @@ function TimeSlotRow({
   const isExpanded = slotTaskId !== null && expandedTaskId === slotTaskId;
 
   return (
-    <div className="flex items-stretch gap-1 group">
+    <div className="flex items-stretch gap-1">
       <div
         className="flex items-center gap-0.5 flex-shrink-0 overflow-hidden"
         style={{ width: timeColumnWidth }}
