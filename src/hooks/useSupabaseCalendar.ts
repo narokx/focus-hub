@@ -708,6 +708,83 @@ export function useSupabaseCalendar() {
     fetchCalendar();
   }, [user, fetchCalendar]);
 
+  // Batch apply routine to multiple dates with atomic DELETE/INSERT for each
+  const batchApplyRoutine = useCallback(async (dates: string[], routine: { tasks: any[]; timeSlots: TimeSlot[] }) => {
+    if (!user || dates.length === 0) return;
+
+    // Process each date sequentially to avoid overwhelming the database
+    for (const date of dates) {
+      // Step 1: Atomic DELETE for this date
+      const [bufferDeleteResult, eventsDeleteResult] = await Promise.all([
+        supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', date),
+        supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', date),
+      ]);
+
+      if (bufferDeleteResult.error) {
+        console.error('Failed to clear daily_task_buffer for date:', date, bufferDeleteResult.error);
+        continue; // Skip this date but continue with others
+      }
+      if (eventsDeleteResult.error) {
+        console.error('Failed to clear calendar_events for date:', date, eventsDeleteResult.error);
+        continue;
+      }
+
+      // Step 2: INSERT new buffer tasks
+      const bufferRows = routine.tasks
+        .filter(t => t.taskId)
+        .map((t, i) => ({
+          user_id: user.id,
+          date,
+          task_id: t.taskId,
+          completed: false,
+          order_index: i,
+        }));
+
+      if (bufferRows.length > 0) {
+        const bufferInsert = await supabase.from('daily_task_buffer').insert(bufferRows);
+        if (bufferInsert.error) {
+          console.error('Failed to insert buffer tasks for date:', date, bufferInsert.error);
+          continue;
+        }
+      }
+
+      // Step 3: INSERT new time slot events
+      const eventRows: any[] = [];
+      routine.timeSlots.forEach(rSlot => {
+        if (rSlot.task?.taskId) {
+          eventRows.push({
+            user_id: user.id,
+            date,
+            task_id: rSlot.task.taskId,
+            start_time: rSlot.startTime,
+            end_time: rSlot.endTime,
+            completed: false,
+          });
+        }
+      });
+
+      if (eventRows.length > 0) {
+        const eventsInsert = await supabase.from('calendar_events').insert(eventRows);
+        if (eventsInsert.error) {
+          console.error('Failed to insert calendar events for date:', date, eventsInsert.error);
+          continue;
+        }
+      }
+    }
+
+    // Clear local state for all affected dates
+    setCalendar(prev => {
+      const newCalendar = { ...prev };
+      dates.forEach(date => {
+        delete newCalendar[date];
+      });
+      return newCalendar;
+    });
+
+    // Final sync to ensure UI matches DB for all dates
+    await fetchCalendar();
+  }, [user, fetchCalendar]);
+
   const clearDayTimeline = useCallback(async (date: string) => {
     if (!user) return;
 
@@ -750,6 +827,7 @@ export function useSupabaseCalendar() {
     updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
+    batchApplyRoutine,
     clearDayTimeline,
     fetchCalendar,
   };

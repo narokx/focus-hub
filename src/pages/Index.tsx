@@ -6,6 +6,7 @@ import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
 import { RoutinesPanel } from '@/components/RoutinesPanel';
+import { RoutineApplicationModal } from '@/components/RoutineApplicationModal';
 import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +18,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
-import { TaskColor, getColorValue, getContrastColor } from '@/types';
+import { TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
 
 type MobileTab = 'calendar' | 'routines' | 'tasks';
@@ -72,6 +73,7 @@ export default function Index() {
     updateDaySlotTaskName,
     moveSlotToSlot: moveCalendarSlotToSlot,
     applyRoutineToDay: applyRoutineToDayCloud,
+    batchApplyRoutine,
     clearDayTimeline,
     fetchCalendar,
   } = useSupabaseCalendar();
@@ -97,6 +99,14 @@ export default function Index() {
     color?: TaskColor;
     routine?: typeof state.routines[0];
   } | null>(null);
+
+  // State for routine application modal
+  const [routineModalOpen, setRoutineModalOpen] = useState(false);
+  const [pendingRoutineDrop, setPendingRoutineDrop] = useState<{
+    routine: Routine;
+    targetDate: string;
+  } | null>(null);
+  const [isApplyingRoutine, setIsApplyingRoutine] = useState(false);
 
   // History for undo/redo
   const history = useHistory(state);
@@ -225,10 +235,13 @@ export default function Index() {
       return;
     }
 
-    // Handle routine drag to calendar cell
+    // Handle routine drag to calendar cell - show modal for selection
     if (activeData?.type === 'routine' && overData?.type === 'day') {
-      applyRoutineToDayCloud(overData.date, activeData.routine);
-      setSelectedDate(overData.date);
+      setPendingRoutineDrop({
+        routine: activeData.routine,
+        targetDate: overData.date,
+      });
+      setRoutineModalOpen(true);
       return;
     }
 
@@ -345,7 +358,7 @@ export default function Index() {
   if (isMobile) {
     return (
       <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex flex-col h-screen bg-background">
+        <div className={cn("flex flex-col h-screen bg-background", isApplyingRoutine && "pointer-events-none")}>
           {/* Mobile header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
             <div>
@@ -392,7 +405,10 @@ export default function Index() {
                 onUpdateDaySlotTaskName={updateDaySlotTaskName}
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
-                onApplyRoutine={applyRoutineToDay}
+                onApplyRoutine={(date, routine) => {
+                  setPendingRoutineDrop({ routine, targetDate: date });
+                  setRoutineModalOpen(true);
+                }}
                 onClearDayTimeline={clearDayTimeline}
               />
             )}
@@ -445,6 +461,38 @@ export default function Index() {
               </button>
             ))}
           </div>
+
+          {/* Routine Application Modal */}
+          <RoutineApplicationModal
+            isOpen={routineModalOpen}
+            onClose={() => {
+              setRoutineModalOpen(false);
+              setPendingRoutineDrop(null);
+            }}
+            routine={pendingRoutineDrop?.routine || null}
+            targetDate={pendingRoutineDrop?.targetDate || null}
+            onApply={async (dates) => {
+              if (!pendingRoutineDrop) return;
+              setIsApplyingRoutine(true);
+              try {
+                await batchApplyRoutine(dates, pendingRoutineDrop.routine);
+                setSelectedDate(pendingRoutineDrop.targetDate);
+              } finally {
+                setIsApplyingRoutine(false);
+              }
+            }}
+          />
+
+          {/* Loading overlay during batch operations */}
+          {isApplyingRoutine && (
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+              <div className="flex flex-col items-center gap-4 p-8 bg-card rounded-lg border shadow-lg">
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm font-medium text-foreground">Syncing routine data...</p>
+                <p className="text-xs text-muted-foreground">Please wait while we apply your routine</p>
+              </div>
+            </div>
+          )}
         </div>
       </DndContext>
     );
@@ -457,7 +505,7 @@ export default function Index() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="min-h-screen bg-background p-4 overflow-hidden relative">
+      <div className={cn("min-h-screen bg-background p-4 overflow-hidden relative", isApplyingRoutine && "pointer-events-none")}>
         <div className="absolute top-4 left-4 z-0 flex items-center gap-3">
           <div>
             <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
@@ -570,7 +618,10 @@ export default function Index() {
             onUpdateDaySlotTaskName={updateDaySlotTaskName}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
-            onApplyRoutine={applyRoutineToDay}
+            onApplyRoutine={(date, routine) => {
+              setPendingRoutineDrop({ routine, targetDate: date });
+              setRoutineModalOpen(true);
+            }}
             onClearDayTimeline={clearDayTimeline}
           />
         </FloatingWindow>
@@ -611,6 +662,38 @@ export default function Index() {
             </div>
           )}
         </DragOverlay>
+
+        {/* Routine Application Modal */}
+        <RoutineApplicationModal
+          isOpen={routineModalOpen}
+          onClose={() => {
+            setRoutineModalOpen(false);
+            setPendingRoutineDrop(null);
+          }}
+          routine={pendingRoutineDrop?.routine || null}
+          targetDate={pendingRoutineDrop?.targetDate || null}
+          onApply={async (dates) => {
+            if (!pendingRoutineDrop) return;
+            setIsApplyingRoutine(true);
+            try {
+              await batchApplyRoutine(dates, pendingRoutineDrop.routine);
+              setSelectedDate(pendingRoutineDrop.targetDate);
+            } finally {
+              setIsApplyingRoutine(false);
+            }
+          }}
+        />
+
+        {/* Loading overlay during batch operations */}
+        {isApplyingRoutine && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4 p-8 bg-card rounded-lg border shadow-lg">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm font-medium text-foreground">Syncing routine data...</p>
+              <p className="text-xs text-muted-foreground">Please wait while we apply your routine</p>
+            </div>
+          </div>
+        )}
       </div>
     </DndContext>
   );
