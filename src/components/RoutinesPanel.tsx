@@ -212,6 +212,7 @@ function DraggableRoutineItem(props: {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `routine-drop-${props.routine.id}`,
