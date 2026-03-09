@@ -105,10 +105,12 @@ export function HeatmapCalendar({
   availableTasks,
   onAssignTaskToSlot,
   onApplyRoutine,
+  onClearDayTimeline,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
   const [showRoutinePicker, setShowRoutinePicker] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const isMobile = useIsMobile();
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
