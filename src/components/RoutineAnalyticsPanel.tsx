@@ -135,7 +135,6 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
           <div className="flex flex-col gap-2">
             {metrics.map((m, i) => {
               const dailyAvg = m.totalHours / selectedCount;
-              const weeklyProj = dailyAvg * 7;
               return (
                 <div key={i} className="flex items-center gap-2">
                   <div
