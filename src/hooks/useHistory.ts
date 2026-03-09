@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { AppState } from '@/types';
 
 const MAX_HISTORY = 50;
@@ -6,17 +6,23 @@ const MAX_HISTORY = 50;
 export function useHistory(initialState: AppState) {
   const [history, setHistory] = useState<AppState[]>([initialState]);
   const [index, setIndex] = useState(0);
-  // Track if we should skip pushing (during undo/redo)
-  const skipPushRef = useRef(false);
+  // How many upcoming push() calls should be ignored (used during undo/redo and any follow-up normalization updates)
+  const skipPushCountRef = useRef(0);
 
   const canUndo = index > 0;
   const canRedo = index < history.length - 1;
 
+  const skipNextPushes = useCallback((count = 1) => {
+    const n = Math.max(0, count);
+    skipPushCountRef.current += n;
+  }, []);
+
   const push = useCallback((state: AppState) => {
-    if (skipPushRef.current) {
-      skipPushRef.current = false;
+    if (skipPushCountRef.current > 0) {
+      skipPushCountRef.current -= 1;
       return;
     }
+
     setHistory(prev => {
       // Slice off any redo states
       const newHistory = [...prev.slice(0, index + 1), state];
@@ -29,7 +35,8 @@ export function useHistory(initialState: AppState) {
 
   const undo = useCallback(() => {
     if (!canUndo) return null;
-    skipPushRef.current = true;
+    // Skip the push that will happen due to restoreState(prev)
+    skipPushCountRef.current += 1;
     const newIndex = index - 1;
     setIndex(newIndex);
     return history[newIndex];
@@ -37,11 +44,12 @@ export function useHistory(initialState: AppState) {
 
   const redo = useCallback(() => {
     if (!canRedo) return null;
-    skipPushRef.current = true;
+    // Skip the push that will happen due to restoreState(next)
+    skipPushCountRef.current += 1;
     const newIndex = index + 1;
     setIndex(newIndex);
     return history[newIndex];
   }, [canRedo, index, history]);
 
-  return { push, undo, redo, canUndo, canRedo };
+  return { push, undo, redo, canUndo, canRedo, skipNextPushes };
 }

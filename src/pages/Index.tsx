@@ -8,6 +8,7 @@ import { QuickTasksPanel } from '@/components/QuickTasksPanel';
 import { RoutinesPanel } from '@/components/RoutinesPanel';
 import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
+import { useAuth } from '@/contexts/AuthContext';
 import { useAppState } from '@/hooks/useAppState';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSupabaseRoutines } from '@/hooks/useSupabaseRoutines';
@@ -15,6 +16,7 @@ import { useSupabaseCalendar } from '@/hooks/useSupabaseCalendar';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
+import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
 import { TaskColor, getColorValue, getContrastColor } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +24,8 @@ type MobileTab = 'calendar' | 'routines' | 'tasks';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
 
 export default function Index() {
+  const { user } = useAuth();
+
   const {
     tasks: supabaseTasks,
     loading: tasksLoading,
@@ -95,6 +99,9 @@ export default function Index() {
   // History for undo/redo
   const history = useHistory(state);
 
+  // Serialize undo/redo DB sync to avoid interleaving mutations
+  const undoRedoQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+
   // Push state to history whenever state changes
   const prevStateRef = React.useRef(state);
   useEffect(() => {
@@ -104,24 +111,66 @@ export default function Index() {
     }
   }, [state]);
 
+  const enqueueCalendarHistorySync = useCallback((fromState: typeof state, toState: typeof state) => {
+    if (!user) return;
+
+    undoRedoQueueRef.current = undoRedoQueueRef.current.then(async () => {
+      try {
+        await syncCalendarForHistoryTransition({
+          userId: user.id,
+          fromCalendar: fromState.calendar,
+          toCalendar: toState.calendar,
+        });
+      } catch (e) {
+        console.error('Undo/redo calendar DB sync failed:', e);
+      } finally {
+        // Ensure the supabase calendar hook is aligned after any direct DB mutations.
+        await fetchCalendar();
+      }
+    });
+  }, [user, fetchCalendar]);
+
+  const handleUndo = useCallback(() => {
+    const from = state;
+    const prev = history.undo();
+    if (!prev) return;
+
+    // We will restore state (skip is handled by history.undo()), then fetchCalendar() will normalize ids.
+    // Skip that follow-up push so we don't kill the redo stack.
+    history.skipNextPushes(1);
+
+    restoreState(prev);
+    enqueueCalendarHistorySync(from, prev);
+  }, [state, history, restoreState, enqueueCalendarHistorySync]);
+
+  const handleRedo = useCallback(() => {
+    const from = state;
+    const next = history.redo();
+    if (!next) return;
+
+    history.skipNextPushes(1);
+
+    restoreState(next);
+    enqueueCalendarHistorySync(from, next);
+  }, [state, history, restoreState, enqueueCalendarHistorySync]);
+
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
       if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z' && !e.shiftKey) {
+        if (key === 'z' && !e.shiftKey) {
           e.preventDefault();
-          const prev = history.undo();
-          if (prev) restoreState(prev);
-        } else if ((e.key === 'z' && e.shiftKey) || e.key === 'y') {
+          handleUndo();
+        } else if ((key === 'z' && e.shiftKey) || key === 'y') {
           e.preventDefault();
-          const next = history.redo();
-          if (next) restoreState(next);
+          handleRedo();
         }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [history, restoreState]);
+  }, [handleUndo, handleRedo]);
 
   // Minimized state for each window
   const [minimized, setMinimized] = useState<Record<WindowKey, boolean>>({
