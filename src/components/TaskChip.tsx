@@ -20,11 +20,7 @@ interface TaskChipProps {
   className?: string;
   showDelete?: boolean;
   noteId?: string;
-  isExpanded?: boolean;
-  onExpand?: () => void;
 }
-
-const DRAG_THRESHOLD = 10;
 
 export function TaskChip({
   id,
@@ -40,15 +36,13 @@ export function TaskChip({
   className,
   showDelete = false,
   noteId,
-  isExpanded = false,
-  onExpand,
 }: TaskChipProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(name);
+  const [hovered, setHovered] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
-  const [isPressed, setIsPressed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
   const { note } = useTaskNote(noteId || null);
   const hasNotes = !!note?.trim();
@@ -86,38 +80,9 @@ export function TaskChip({
     }
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    pointerStartRef.current = { x: e.clientX, y: e.clientY };
-    setIsPressed(true);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent) => {
-    setIsPressed(false);
-    if (!pointerStartRef.current || isDragging) {
-      pointerStartRef.current = null;
-      return;
-    }
-    
-    const dx = Math.abs(e.clientX - pointerStartRef.current.x);
-    const dy = Math.abs(e.clientY - pointerStartRef.current.y);
-    pointerStartRef.current = null;
-    
-    // If moved more than threshold, it's a drag, not a tap
-    if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) return;
-    
-    // Trigger expansion toggle
-    if (onExpand && !isEditing) {
-      onExpand();
-    }
-  };
-
   const textColor = getContrastColor(color);
   const bgColor = getColorValue(color);
-  const showActions = isExpanded && !isEditing;
-
-  // Calculate expanded width based on action count
-  const actionCount = (editable ? 1 : 0) + (noteId ? 1 : 0) + (showDelete && onDelete ? 1 : 0);
-  const expandedExtraWidth = actionCount * 20; // ~20px per action button
+  const showActions = !isEditing && (hovered || isTouchDevice);
 
   return (
     <>
@@ -127,19 +92,16 @@ export function TaskChip({
           ...style,
           backgroundColor: bgColor,
           color: textColor,
-          willChange: isExpanded ? 'width' : 'auto',
         }}
         className={cn(
-          'task-chip relative inline-flex items-center gap-1.5 no-drag overflow-hidden',
+          'task-chip relative inline-flex items-center gap-1.5 no-drag',
           isDragging && 'opacity-50 scale-95',
           completed && 'opacity-60',
-          isPressed && !isDragging && 'scale-[0.98]',
           className
         )}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={() => { setIsPressed(false); pointerStartRef.current = null; }}
         {...(draggable && !isEditing ? { ...attributes, ...listeners } : {})}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
         {/* Star indicator for notes */}
         {hasNotes && (
@@ -187,73 +149,63 @@ export function TaskChip({
             style={{ color: 'inherit' }}
           />
         ) : (
-          <span className={cn('flex-shrink-0', completed && 'line-through')}>{name}</span>
+          <span className={cn(completed && 'line-through')}>{name}</span>
         )}
 
-        {/* Action icons container with animated reveal */}
-        <div
-          className={cn(
-            'flex items-center gap-0.5 overflow-hidden transition-[width,opacity,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-            showActions ? 'opacity-100 scale-100' : 'opacity-0 scale-75 w-0'
-          )}
-          style={{
-            width: showActions ? `${expandedExtraWidth}px` : 0,
-          }}
-        >
-          {editable && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsEditing(true);
-                setEditName(name);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className={cn(
-                'w-4 h-4 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
-                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-              )}
-              title="Rename"
-            >
-              <Pencil className="w-2.5 h-2.5" />
-            </button>
-          )}
+        {/* Action icons: Pencil, Notes, Delete */}
+        {showActions && editable && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsEditing(true);
+              setEditName(name);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Rename"
+          >
+            <Pencil className="w-2.5 h-2.5" />
+          </button>
+        )}
 
-          {noteId && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setNotesOpen(true);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className={cn(
-                'w-4 h-4 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
-                textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-              )}
-              title="Notes"
-            >
-              <FileText className="w-2.5 h-2.5" />
-            </button>
-          )}
-          
-          {showDelete && onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onDelete();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className={cn(
-                'w-4 h-4 flex items-center justify-center rounded-full transition-colors',
-                textColor === 'white' 
-                  ? 'hover:bg-white/20' 
-                  : 'hover:bg-black/10'
-              )}
-            >
-              ×
-            </button>
-          )}
-        </div>
+        {showActions && noteId && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setNotesOpen(true);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-3.5 h-3.5 flex items-center justify-center rounded-full flex-shrink-0 transition-opacity',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Notes"
+          >
+            <FileText className="w-2.5 h-2.5" />
+          </button>
+        )}
+        
+        {showDelete && onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDelete();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full transition-colors ml-0.5',
+              textColor === 'white' 
+                ? 'hover:bg-white/20' 
+                : 'hover:bg-black/10'
+            )}
+          >
+            ×
+          </button>
+        )}
       </div>
 
       {notesOpen && noteId && (
