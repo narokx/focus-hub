@@ -6,6 +6,7 @@ import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
 import { RoutinesPanel } from '@/components/RoutinesPanel';
+import { RoutineApplicationModal } from '@/components/RoutineApplicationModal';
 import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +18,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
-import { TaskColor, getColorValue, getContrastColor } from '@/types';
+import { TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
 
 type MobileTab = 'calendar' | 'routines' | 'tasks';
