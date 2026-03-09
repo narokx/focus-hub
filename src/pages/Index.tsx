@@ -107,7 +107,6 @@ export default function Index() {
     targetDate: string;
   } | null>(null);
   const [isApplyingRoutine, setIsApplyingRoutine] = useState(false);
-  } | null>(null);
 
   // History for undo/redo
   const history = useHistory(state);
