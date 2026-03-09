@@ -131,7 +131,6 @@ export function TaskChip({
         }}
         className={cn(
           'task-chip relative inline-flex items-center gap-1.5 no-drag overflow-hidden',
-          'transition-[width,transform] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
           isDragging && 'opacity-50 scale-95',
           completed && 'opacity-60',
           isPressed && !isDragging && 'scale-[0.98]',
