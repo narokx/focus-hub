@@ -114,7 +114,7 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
       ) : (
         <>
           {/* Summary row */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="bg-secondary/40 rounded-lg p-2 text-center">
               <div className="text-base font-bold text-foreground">
                 {metrics.reduce((s, m) => s + m.totalHours, 0).toFixed(1)}h
@@ -129,19 +129,12 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
               </div>
               <div className="text-[10px] text-muted-foreground">Daily Avg</div>
             </div>
-            <div className="bg-secondary/40 rounded-lg p-2 text-center">
-              <div className="text-base font-bold text-foreground">
-                {(metrics.reduce((s, m) => s + m.totalHours, 0) * 7 / Math.max(selectedCount, 1)).toFixed(1)}h
-              </div>
-              <div className="text-[10px] text-muted-foreground">Weekly Proj.</div>
-            </div>
           </div>
 
           {/* Task breakdown bars */}
           <div className="flex flex-col gap-2">
             {metrics.map((m, i) => {
               const dailyAvg = m.totalHours / selectedCount;
-              const weeklyProj = dailyAvg * 7;
               return (
                 <div key={i} className="flex items-center gap-2">
                   <div
@@ -167,9 +160,6 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[9px] text-muted-foreground">
                         Avg {dailyAvg.toFixed(1)}h/day
-                      </span>
-                      <span className="text-[9px] text-muted-foreground">
-                        ~{weeklyProj.toFixed(1)}h/wk
                       </span>
                     </div>
                   </div>
