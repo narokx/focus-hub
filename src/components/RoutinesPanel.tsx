@@ -127,6 +127,15 @@ function RoutineItemContent({
         )}
 
         <span className="text-xs text-muted-foreground">{totalTasks} tasks</span>
+        {onClearRoutineTimeline && isExpanded && (
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
+            title="Clear timeline"
+          >
+            <Eraser className="w-3.5 h-3.5" />
+          </button>
+        )}
         <button onClick={() => onDeleteRoutine(routine.id)} className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -158,6 +167,33 @@ function RoutineItemContent({
             />
           )}
         </div>
+      )}
+
+      {showClearConfirm && (
+        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear Routine Timeline</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove all task assignments from time slots in "{routine.name}". Unassigned tasks will remain. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onClearRoutineTimeline) {
+                    onClearRoutineTimeline(routine.id);
+                  }
+                  setShowClearConfirm(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Clear Timeline
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
