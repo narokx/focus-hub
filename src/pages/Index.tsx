@@ -571,6 +571,7 @@ export default function Index() {
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
             onApplyRoutine={applyRoutineToDay}
+            onClearDayTimeline={clearDayTimeline}
           />
         </FloatingWindow>
 
