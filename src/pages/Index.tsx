@@ -51,6 +51,7 @@ export default function Index() {
     deleteRoutineTimeSlot,
     updateRoutineSlotTime,
     updateRoutineSlotTaskName,
+    clearRoutineTimeline,
     fetchRoutines,
     reorderRoutines,
   } = useSupabaseRoutines();
@@ -71,6 +72,7 @@ export default function Index() {
     updateDaySlotTaskName,
     moveSlotToSlot: moveCalendarSlotToSlot,
     applyRoutineToDay: applyRoutineToDayCloud,
+    clearDayTimeline,
     fetchCalendar,
   } = useSupabaseCalendar();
 
@@ -391,6 +393,7 @@ export default function Index() {
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
                 onApplyRoutine={applyRoutineToDay}
+                onClearDayTimeline={clearDayTimeline}
               />
             )}
             {mobileTab === 'routines' && (
@@ -407,6 +410,7 @@ export default function Index() {
                 onUpdateRoutineSlotTaskName={updateRoutineSlotTaskName}
                 availableTasks={state.quickTasks}
                 onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
+                onClearRoutineTimeline={clearRoutineTimeline}
               />
             )}
             {mobileTab === 'tasks' && (
@@ -509,6 +513,7 @@ export default function Index() {
             availableTasks={state.quickTasks}
             onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
             onReorderRoutines={reorderRoutines}
+            onClearRoutineTimeline={clearRoutineTimeline}
           />
         </FloatingWindow>
 
@@ -566,6 +571,7 @@ export default function Index() {
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
             onApplyRoutine={applyRoutineToDay}
+            onClearDayTimeline={clearDayTimeline}
           />
         </FloatingWindow>
 

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight, Eraser } from 'lucide-react';
 import { Routine, QuickTask, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ interface RoutinesPanelProps {
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onReorderRoutines?: (fromIndex: number, toIndex: number) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
 }
 
 // Shared inner content for a routine item
@@ -38,6 +40,7 @@ function RoutineItemContent({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  onClearRoutineTimeline,
   isOver,
   isDragging,
   dragHandleRef,
@@ -56,6 +59,7 @@ function RoutineItemContent({
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
   isOver: boolean;
   isDragging: boolean;
   dragHandleRef: (node: HTMLElement | null) => void;
@@ -67,6 +71,7 @@ function RoutineItemContent({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(routine.name);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const handleNameSubmit = () => {
     setIsEditing(false);
@@ -122,6 +127,15 @@ function RoutineItemContent({
         )}
 
         <span className="text-xs text-muted-foreground">{totalTasks} tasks</span>
+        {onClearRoutineTimeline && isExpanded && (
+          <button
+            onClick={() => setShowClearConfirm(true)}
+            className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
+            title="Clear timeline"
+          >
+            <Eraser className="w-3.5 h-3.5" />
+          </button>
+        )}
         <button onClick={() => onDeleteRoutine(routine.id)} className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -154,6 +168,33 @@ function RoutineItemContent({
           )}
         </div>
       )}
+
+      {showClearConfirm && (
+        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear Routine Timeline</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will remove all task assignments from time slots in "{routine.name}". Unassigned tasks will remain. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onClearRoutineTimeline) {
+                    onClearRoutineTimeline(routine.id);
+                  }
+                  setShowClearConfirm(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Clear Timeline
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
@@ -171,6 +212,7 @@ function DraggableRoutineItem(props: {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `routine-drop-${props.routine.id}`,
@@ -210,6 +252,7 @@ function SortableRoutineItem(props: {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
     id: `routine-drop-${props.routine.id}`,
@@ -261,6 +304,7 @@ export function RoutinesPanel({
   availableTasks,
   onAssignTaskToRoutineSlot,
   onReorderRoutines,
+  onClearRoutineTimeline,
 }: RoutinesPanelProps) {
   const isMobile = useIsMobile();
   const [isAdding, setIsAdding] = useState(false);
@@ -329,6 +373,7 @@ export function RoutinesPanel({
               onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
               availableTasks={availableTasks}
               onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+              onClearRoutineTimeline={onClearRoutineTimeline}
             />
           ))
         ) : (
@@ -347,6 +392,7 @@ export function RoutinesPanel({
                 onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
                 availableTasks={availableTasks}
                 onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+                onClearRoutineTimeline={onClearRoutineTimeline}
               />
             ))}
           </SortableContext>

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
 import { DayData, QuickTask, Routine, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
 import { RoutinePickerModal } from './RoutinePickerModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { parseLocalDate } from '@/lib/dateUtils';
@@ -28,6 +29,7 @@ interface HeatmapCalendarProps {
   availableTasks?: QuickTask[];
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onApplyRoutine?: (date: string, routine: Routine) => void;
+  onClearDayTimeline?: (date: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -103,10 +105,12 @@ export function HeatmapCalendar({
   availableTasks,
   onAssignTaskToSlot,
   onApplyRoutine,
+  onClearDayTimeline,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
   const [showRoutinePicker, setShowRoutinePicker] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const isMobile = useIsMobile();
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
@@ -177,6 +181,15 @@ export function HeatmapCalendar({
                     title="Add routine"
                   >
                     <Zap className="w-4 h-4" />
+                  </button>
+                )}
+                {onClearDayTimeline && (
+                  <button
+                    onClick={() => setShowClearConfirm(true)}
+                    className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-destructive"
+                    title="Clear timeline"
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 )}
                 {!isMobile && (
@@ -294,6 +307,33 @@ export function HeatmapCalendar({
           }}
           onClose={() => setShowRoutinePicker(false)}
         />
+      )}
+
+      {showClearConfirm && selectedDate && (
+        <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear Timeline</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete all tasks and time slots for {format(parseLocalDate(selectedDate), 'MMMM d, yyyy')}. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (onClearDayTimeline) {
+                    onClearDayTimeline(selectedDate);
+                  }
+                  setShowClearConfirm(false);
+                }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Clear Timeline
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
