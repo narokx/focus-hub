@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { DayData, DayTask, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -512,27 +513,59 @@ export function useSupabaseCalendar() {
   }, [fetchCalendar]);
 
   const updateDaySlotTaskName = useCallback(async (date: string, slotId: string, name: string) => {
+    if (!user) return;
+
+    // Find the original slot to get color for potential new task
+    const dayData = calendar[date];
+    const slot = dayData?.timeSlots.find(s => s.id === slotId);
+    const originalColor = slot?.task?.color || '#3B82F6';
+
+    // Optimistic UI update
     setCalendar(prev => {
-      const dayData = prev[date];
-      if (!dayData) return prev;
+      const dd = prev[date];
+      if (!dd) return prev;
       return {
         ...prev,
         [date]: {
-          ...dayData,
-          timeSlots: dayData.timeSlots.map(s =>
+          ...dd,
+          timeSlots: dd.timeSlots.map(s =>
             s.id === slotId && s.task ? { ...s, task: { ...s.task, name } } : s
           ),
         },
       };
     });
 
-    // Update the tasks table
-    const dayData = calendar[date];
-    const slot = dayData?.timeSlots.find(s => s.id === slotId);
-    if (slot?.task?.taskId) {
-      await supabase.from('tasks').update({ name }).eq('id', slot.task.taskId);
+    // Non-destructive: find or create task by name, then reassign pointer
+    const resolvedId = await resolveTaskId(name, originalColor, user.id);
+    if (!resolvedId) return;
+
+    // Update optimistic state with resolved taskId
+    setCalendar(prev => {
+      const dd = prev[date];
+      if (!dd) return prev;
+      return {
+        ...prev,
+        [date]: {
+          ...dd,
+          timeSlots: dd.timeSlots.map(s =>
+            s.id === slotId && s.task ? { ...s, task: { ...s.task, taskId: resolvedId } } : s
+          ),
+        },
+      };
+    });
+
+    // Reassign the calendar_events row to point to the resolved task
+    const isDbSlot = !slotId.startsWith('ts-');
+    if (isDbSlot) {
+      const { error } = await supabase.from('calendar_events').update({ task_id: resolvedId }).eq('id', slotId);
+      if (error) {
+        console.error('Failed to reassign calendar event task:', error);
+        fetchCalendar();
+      }
     }
-  }, [calendar]);
+
+    return resolvedId;
+  }, [user, calendar, fetchCalendar]);
 
   const moveSlotToSlot = useCallback(async (
     sourcePrefix: string, sourceSlotId: string,
