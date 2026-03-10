@@ -153,9 +153,9 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
 
           <div
             className={cn(
-              'absolute right-0 top-1/2 -translate-y-1/2 translate-x-full ml-1 z-50 pointer-events-auto',
+              'ml-auto pl-1',
               !isExpanded && 'hidden',
-              isExpanded && 'flex items-center gap-1'
+              isExpanded && 'flex items-center gap-1 z-50 pointer-events-auto'
             )}
           >
             <button
