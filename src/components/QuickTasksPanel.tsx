@@ -80,7 +80,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
     if (Object.keys(updates).length > 0) onUpdateTask(task.id, updates);
   };
 
-  const handleChipPointerUp = (e: React.PointerEvent) => {
+  const handleChipClick = (e: React.MouseEvent) => {
     if (isEditing) return;
     e.stopPropagation();
     setIsExpanded(prev => !prev);
@@ -103,7 +103,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
           )}
           {...attributes}
           {...listeners}
-          onPointerUp={handleChipPointerUp}
+          onClick={handleChipClick}
         >
           {hasNotes && (
             <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
@@ -151,13 +151,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             <span>{task.name}</span>
           )}
 
-          <div
-            className={cn(
-              'ml-auto pl-1',
-              !isExpanded && 'hidden',
-              isExpanded && 'flex items-center gap-1 z-50 pointer-events-auto'
-            )}
-          >
+          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -174,7 +168,9 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             >
               <Pencil className="w-2.5 h-2.5" />
             </button>
+          )}
 
+          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -189,7 +185,9 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             >
               <FileText className="w-2.5 h-2.5" />
             </button>
+          )}
 
+          {isExpanded && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -204,7 +202,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
             >
               <Trash2 className="w-2.5 h-2.5" />
             </button>
-          </div>
+          )}
         </div>
       </div>
 
