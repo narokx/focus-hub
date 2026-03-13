@@ -231,12 +231,12 @@ export function useSupabaseRoutines() {
   const addRoutine = useCallback(async (name: string) => {
     if (!user) return;
     const tempId = `temp-${Date.now()}`;
-    const optimistic: Routine = { id: tempId, name, color: '#cbd5e1', tasks: [], timeSlots: generateDefaultTimeSlots() };
+    const optimistic: Routine = { id: tempId, name, tasks: [], timeSlots: generateDefaultTimeSlots() };
     setRoutines(prev => [...prev, optimistic]);
 
     const { data, error } = await supabase
       .from('routines')
-      .insert({ name, color: '#cbd5e1', user_id: user.id })
+      .insert({ name, user_id: user.id })
       .select('id')
       .maybeSingle();
 
@@ -280,18 +280,18 @@ export function useSupabaseRoutines() {
   );
 
   const deleteRoutine = useCallback(async (id: string) => {
+    const prev = routines;
     setRoutines(r => r.filter(x => x.id !== id));
 
     // Children cascade via FK or we delete explicitly
     await supabase.from('routine_tasks').delete().eq('routine_id', id);
     await supabase.from('routine_time_slots').delete().eq('routine_id', id);
     const { error } = await supabase.from('routines').delete().eq('id', id);
-
     if (error) {
       console.error('Failed to delete routine:', error);
+      setRoutines(prev);
     }
-    fetchRoutines();
-  }, [fetchRoutines]);
+  }, [routines]);
 
   const addTaskToRoutine = useCallback(async (routineId: string, task: QuickTask) => {
     const tempId = `temp-rt-${Date.now()}`;
