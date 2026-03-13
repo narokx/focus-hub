@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DayData, DayTask, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
@@ -24,7 +24,7 @@ export function useSupabaseCalendar() {
         .order('order_index', { ascending: true }),
       supabase
         .from('calendar_events')
-        .select('id, date, start_time, end_time, task_id, completed, tasks(id, name, color)')
+        .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
         .eq('user_id', user.id)
         .order('start_time', { ascending: true }),
     ]);
@@ -87,6 +87,7 @@ export function useSupabaseCalendar() {
               name: task.name,
               color: task.color || '#3B82F6',
               completed: e.completed || false,
+              subtasks: Array.isArray((e as any).subtasks) ? ((e as any).subtasks as SubtaskData[]) : [],
             } : null,
           };
         });
@@ -328,7 +329,7 @@ export function useSupabaseCalendar() {
           ...dayData,
           timeSlots: dayData.timeSlots.map(s =>
             s.id === slotId
-              ? { ...s, task: { id: `dst-${Date.now()}`, taskId: task.taskId || '', name: task.name, color: task.color, completed: false } }
+              ? { ...s, task: { id: `dst-${Date.now()}`, taskId: task.taskId || '', name: task.name, color: task.color, completed: false, subtasks: [] } }
               : s
           ),
         },
@@ -348,6 +349,7 @@ export function useSupabaseCalendar() {
       const { error } = await supabase.from('calendar_events').update({
         task_id: task.taskId || null,
         completed: false,
+        subtasks: [],
       }).eq('id', slotId);
       if (error) {
         console.error('Failed to update calendar event:', error);
@@ -362,6 +364,7 @@ export function useSupabaseCalendar() {
         start_time: slot.startTime,
         end_time: slot.endTime,
         completed: false,
+        subtasks: [],
       }).select('id').maybeSingle();
 
       if (error || !data) {
@@ -386,6 +389,44 @@ export function useSupabaseCalendar() {
       });
     }
   }, [user, calendar, fetchCalendar]);
+
+  const addSubtaskToDaySlot = useCallback(async (date: string, slotId: string, task: QuickTask) => {
+    const dayData = calendar[date];
+    const slot = dayData?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const existingSubtasks = slot.task.subtasks || [];
+    if (existingSubtasks.length >= 4) return;
+
+    const nextSubtasks: SubtaskData[] = [
+      ...existingSubtasks,
+      { taskId: task.id, name: task.name, color: task.color, percentage: 25 },
+    ];
+
+    setCalendar(prev => {
+      const dd = prev[date];
+      if (!dd) return prev;
+      return {
+        ...prev,
+        [date]: {
+          ...dd,
+          timeSlots: dd.timeSlots.map(s =>
+            s.id === slotId && s.task ? { ...s, task: { ...s.task, subtasks: nextSubtasks } } : s
+          ),
+        },
+      };
+    });
+
+    const dbId = slotId.replace('dst-', '');
+
+    const { error } = await supabase.from('calendar_events').update({ subtasks: nextSubtasks as any }).eq('id', dbId);
+    if (error) {
+      console.error('Subtask insertion failed:', error);
+      return;
+    }
+
+    fetchCalendar();
+  }, [calendar, fetchCalendar]);
 
   const toggleDaySlotTask = useCallback(async (date: string, slotId: string) => {
     let newCompleted = false;
@@ -1121,6 +1162,7 @@ export function useSupabaseCalendar() {
     updateDayTask,
     removeDayTask,
     assignTaskToDaySlot,
+    addSubtaskToDaySlot,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
