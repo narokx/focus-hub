@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
-import { DayData, QuickTask, Routine, SubtaskData, generateDefaultTimeSlots } from '@/types';
+import { DayData, QuickTask, Routine, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
 import { RoutinePickerModal } from './RoutinePickerModal';
@@ -28,8 +28,6 @@ interface HeatmapCalendarProps {
   onUpdateDaySlotTaskName?: (date: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
-  onAddSubtaskToSlot?: (date: string, slotId: string, task: QuickTask) => void;
-  onUpdateSlotSubtasks?: (date: string, slotId: string, subtasks: SubtaskData[]) => void;
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
   onUpdateDayColor?: (date: string, color: string) => void;
@@ -141,8 +139,6 @@ export function HeatmapCalendar({
   onUpdateDaySlotTaskName,
   availableTasks,
   onAssignTaskToSlot,
-  onAddSubtaskToSlot,
-  onUpdateSlotSubtasks,
   onApplyRoutine,
   onClearDayTimeline,
   onUpdateDayColor,
@@ -154,7 +150,6 @@ export function HeatmapCalendar({
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const isMobile = useIsMobile();
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
-  const [pendingSubtask, setPendingSubtask] = useState<{ date: string; slotId: string; newTask: QuickTask } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -182,20 +177,6 @@ export function HeatmapCalendar({
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
   }, [timeListWidth]);
-
-  const handleTaskSelection = (date: string, slotId: string, newTask: QuickTask) => {
-    const existingSlot = calendar[date]?.timeSlots.find(s => s.id === slotId);
-
-    if (existingSlot?.task && !isMobile) {
-      setPendingSubtask({ date, slotId, newTask });
-    } else {
-      onAssignTaskToSlot?.(date, slotId, { name: newTask.name, color: newTask.color, taskId: newTask.id });
-    }
-  };
-
-  const handleAddSubtask = (pending: { date: string; slotId: string; newTask: QuickTask }) => {
-    onAddSubtaskToSlot?.(pending.date, pending.slotId, pending.newTask);
-  };
 
   const showCalendarGrid = !isMobile || !selectedDate;
   const showTimeline = !!selectedDate;
@@ -271,8 +252,6 @@ export function HeatmapCalendar({
                 onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate!, taskId, name)}
                 onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate!, slotId, name) : undefined}
                 onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
-                onSlotAssignClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
-                onUpdateSlotSubtasks={onUpdateSlotSubtasks ? (slotId, subtasks) => onUpdateSlotSubtasks(selectedDate!, slotId, subtasks) : undefined}
               />
             </div>
 
@@ -280,7 +259,7 @@ export function HeatmapCalendar({
               <TaskPickerModal
                 tasks={availableTasks}
                 onSelect={(task) => {
-handleTaskSelection(selectedDate!, pickerSlotId, task);
+                  onAssignTaskToSlot(selectedDate!, pickerSlotId, { name: task.name, color: task.color, taskId: task.id });
                   setPickerSlotId(null);
                 }}
                 onClose={() => setPickerSlotId(null)}
@@ -354,39 +333,6 @@ handleTaskSelection(selectedDate!, pickerSlotId, task);
           </div>
         </div>
       )}
-
-
-
-      <AlertDialog open={!!pendingSubtask} onOpenChange={() => setPendingSubtask(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Task Already Assigned</AlertDialogTitle>
-            <AlertDialogDescription>
-              Would you like to replace the existing task or add "{pendingSubtask?.newTask.name}" as a subtask?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel onClick={() => {
-              if (pendingSubtask) {
-                onAssignTaskToSlot?.(pendingSubtask.date, pendingSubtask.slotId, {
-                  name: pendingSubtask.newTask.name,
-                  color: pendingSubtask.newTask.color,
-                  taskId: pendingSubtask.newTask.id,
-                });
-              }
-              setPendingSubtask(null);
-            }}>
-              Replace Existing
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (pendingSubtask) handleAddSubtask(pendingSubtask);
-              setPendingSubtask(null);
-            }}>
-              Add as Subtask
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {showRoutinePicker && routines && selectedDate && (
         <RoutinePickerModal

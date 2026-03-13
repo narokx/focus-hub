@@ -52,61 +52,21 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
 
     for (const slot of day.timeSlots || []) {
       if (!slot.task) continue;
-
-      const baseHours = slotDuration(slot);
-      const doneBaseHours = slot.task.completed ? baseHours : 0;
-
-      if (slot.task.subtasks && slot.task.subtasks.length > 0) {
-        let subtaskTotalPct = 0;
-
-        slot.task.subtasks.forEach(sub => {
-          const subHours = baseHours * (sub.percentage / 100);
-          const subDoneHours = doneBaseHours * (sub.percentage / 100);
-          subtaskTotalPct += sub.percentage;
-
-          const subKey = sub.taskId || `sub-${sub.name}`;
-          const existingSub = map.get(subKey);
-          if (existingSub) {
-            existingSub.hours += subHours;
-            existingSub.doneHours += subDoneHours;
-            existingSub.count += 1;
-          } else {
-            map.set(subKey, { name: sub.name, color: getColorValue(sub.color), hours: subHours, doneHours: subDoneHours, count: 1 });
-          }
-        });
-
-        const parentHours = baseHours * ((100 - subtaskTotalPct) / 100);
-        const parentDoneHours = doneBaseHours * ((100 - subtaskTotalPct) / 100);
-        const parentKey = slot.task.taskId || `task-${slot.task.name}`;
-        const existingParent = map.get(parentKey);
-        if (existingParent) {
-          existingParent.hours += parentHours;
-          existingParent.doneHours += parentDoneHours;
-          existingParent.count += 1;
-        } else {
-          map.set(parentKey, {
-            name: slot.task.name,
-            color: getColorValue(slot.task.color),
-            hours: parentHours,
-            doneHours: parentDoneHours,
-            count: 1,
-          });
-        }
+      const key = slot.task.name;
+      const dur = slotDuration(slot);
+      const doneDur = slot.task.completed ? dur : 0;
+      const existing = map.get(key);
+      if (existing) {
+        existing.hours += dur;
+        existing.doneHours += doneDur;
+        existing.count += 1;
       } else {
-        const key = slot.task.taskId || `task-${slot.task.name}`;
-        const existing = map.get(key);
-        if (existing) {
-          existing.hours += baseHours;
-          existing.doneHours += doneBaseHours;
-          existing.count += 1;
-        } else {
-          map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: baseHours, doneHours: doneBaseHours, count: 1 });
-        }
+        map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: dur, doneHours: doneDur, count: 1 });
       }
     }
 
     for (const task of day.tasks || []) {
-      const key = task.taskId || task.name;
+      const key = task.name;
       const existing = map.get(key);
       if (existing) {
         existing.count += 1;
@@ -123,8 +83,6 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
   const [range, setRange] = useState<Range>('this-week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [sortKey, setSortKey] = useState<'hours' | 'name' | 'color'>('hours');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -151,21 +109,11 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
     }
   }, [range, calendar, customStart, customEnd]);
 
-  const taskStats = useMemo(() => computeStats(calendar, dateRange), [calendar, dateRange]);
+  const stats = useMemo(() => computeStats(calendar, dateRange), [calendar, dateRange]);
 
-  const sortedTaskStats = useMemo(() => {
-    return [...taskStats].sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === 'hours') cmp = a.hours - b.hours;
-      else if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
-      else if (sortKey === 'color') cmp = a.color.localeCompare(b.color);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [taskStats, sortKey, sortDir]);
-
-  const totalHours = taskStats.reduce((sum, s) => sum + s.hours, 0);
-  const totalDone = taskStats.reduce((sum, s) => sum + s.doneHours, 0);
-  const maxHours = Math.max(...taskStats.map(s => s.hours), 1);
+  const totalHours = stats.reduce((sum, s) => sum + s.hours, 0);
+  const totalDone = stats.reduce((sum, s) => sum + s.doneHours, 0);
+  const maxHours = Math.max(...stats.map(s => s.hours), 1);
 
   const rangeLabel = useMemo(() => {
     const now = new Date();
@@ -233,44 +181,20 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
           <div className="text-[10px] text-muted-foreground">Completed</div>
         </div>
         <div className="bg-secondary/40 rounded-lg p-2 text-center">
-          <div className="text-base font-bold text-foreground">{taskStats.length}</div>
+          <div className="text-base font-bold text-foreground">{stats.length}</div>
           <div className="text-[10px] text-muted-foreground">Tasks</div>
         </div>
       </div>
 
       {/* Task breakdown */}
       <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
-        {taskStats.length === 0 ? (
+        {stats.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground italic text-center">No tasks in this period.<br />Schedule some tasks on the calendar!</p>
           </div>
         ) : (
-          <>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <span>Task Distribution</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <select
-                  className="text-xs bg-secondary rounded px-2 py-1 border-none outline-none text-foreground"
-                  value={sortKey}
-                  onChange={(e) => setSortKey(e.target.value as 'hours' | 'name' | 'color')}
-                >
-                  <option value="hours">Hours</option>
-                  <option value="name">Name</option>
-                  <option value="color">Color</option>
-                </select>
-                <button
-                  onClick={() => setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
-                  className="text-xs bg-secondary hover:bg-secondary/80 rounded px-2 py-1"
-                >
-                  {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
-                </button>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {sortedTaskStats.map((stat, i) => {
+          <div className="flex flex-col gap-2">
+            {stats.map((stat, i) => {
               const successPct = stat.hours > 0 ? (stat.doneHours / stat.hours) * 100 : 0;
               const failedHours = stat.hours - stat.doneHours;
               const failedPct = stat.hours > 0 ? (failedHours / stat.hours) * 100 : 0;
@@ -319,9 +243,8 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
                   </div>
                 </div>
               );
-              })}
-            </div>
-          </>
+            })}
+          </div>
         )}
       </div>
       {/* Routine Analytics Section */}
