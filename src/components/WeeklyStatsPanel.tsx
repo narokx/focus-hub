@@ -52,16 +52,56 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
 
     for (const slot of day.timeSlots || []) {
       if (!slot.task) continue;
-      const key = slot.task.name;
-      const dur = slotDuration(slot);
-      const doneDur = slot.task.completed ? dur : 0;
-      const existing = map.get(key);
-      if (existing) {
-        existing.hours += dur;
-        existing.doneHours += doneDur;
-        existing.count += 1;
+
+      const baseHours = slotDuration(slot);
+      const doneBaseHours = slot.task.completed ? baseHours : 0;
+
+      if (slot.task.subtasks && slot.task.subtasks.length > 0) {
+        let subtaskTotalPct = 0;
+
+        slot.task.subtasks.forEach(sub => {
+          const subHours = baseHours * (sub.percentage / 100);
+          const subDoneHours = doneBaseHours * (sub.percentage / 100);
+          subtaskTotalPct += sub.percentage;
+
+          const subKey = sub.taskId || `sub-${sub.name}`;
+          const existingSub = map.get(subKey);
+          if (existingSub) {
+            existingSub.hours += subHours;
+            existingSub.doneHours += subDoneHours;
+            existingSub.count += 1;
+          } else {
+            map.set(subKey, { name: sub.name, color: getColorValue(sub.color), hours: subHours, doneHours: subDoneHours, count: 1 });
+          }
+        });
+
+        const parentHours = baseHours * ((100 - subtaskTotalPct) / 100);
+        const parentDoneHours = doneBaseHours * ((100 - subtaskTotalPct) / 100);
+        const parentKey = slot.task.taskId || `task-${slot.task.name}`;
+        const existingParent = map.get(parentKey);
+        if (existingParent) {
+          existingParent.hours += parentHours;
+          existingParent.doneHours += parentDoneHours;
+          existingParent.count += 1;
+        } else {
+          map.set(parentKey, {
+            name: slot.task.name,
+            color: getColorValue(slot.task.color),
+            hours: parentHours,
+            doneHours: parentDoneHours,
+            count: 1,
+          });
+        }
       } else {
-        map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: dur, doneHours: doneDur, count: 1 });
+        const key = slot.task.taskId || `task-${slot.task.name}`;
+        const existing = map.get(key);
+        if (existing) {
+          existing.hours += baseHours;
+          existing.doneHours += doneBaseHours;
+          existing.count += 1;
+        } else {
+          map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: baseHours, doneHours: doneBaseHours, count: 1 });
+        }
       }
     }
 

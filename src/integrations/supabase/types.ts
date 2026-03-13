@@ -22,6 +22,7 @@ export type Database = {
           id: string
           start_time: string
           task_id: string | null
+          subtasks: Json
           user_id: string | null
         }
         Insert: {
@@ -31,6 +32,7 @@ export type Database = {
           id?: string
           start_time: string
           task_id?: string | null
+          subtasks?: Json
           user_id?: string | null
         }
         Update: {
@@ -40,6 +42,7 @@ export type Database = {
           id?: string
           start_time?: string
           task_id?: string | null
+          subtasks?: Json
           user_id?: string | null
         }
         Relationships: [
@@ -130,6 +133,7 @@ export type Database = {
           routine_id: string | null
           start_time: string
           task_id: string | null
+          subtasks: Json
         }
         Insert: {
           end_time: string
@@ -137,6 +141,7 @@ export type Database = {
           routine_id?: string | null
           start_time: string
           task_id?: string | null
+          subtasks?: Json
         }
         Update: {
           end_time?: string
@@ -144,6 +149,7 @@ export type Database = {
           routine_id?: string | null
           start_time?: string
           task_id?: string | null
+          subtasks?: Json
         }
         Relationships: [
           {
