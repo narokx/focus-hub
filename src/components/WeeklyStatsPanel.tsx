@@ -83,6 +83,8 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
   const [range, setRange] = useState<Range>('this-week');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [sortKey, setSortKey] = useState<'hours' | 'name' | 'color'>('hours');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -109,11 +111,21 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
     }
   }, [range, calendar, customStart, customEnd]);
 
-  const stats = useMemo(() => computeStats(calendar, dateRange), [calendar, dateRange]);
+  const taskStats = useMemo(() => computeStats(calendar, dateRange), [calendar, dateRange]);
 
-  const totalHours = stats.reduce((sum, s) => sum + s.hours, 0);
-  const totalDone = stats.reduce((sum, s) => sum + s.doneHours, 0);
-  const maxHours = Math.max(...stats.map(s => s.hours), 1);
+  const sortedTaskStats = useMemo(() => {
+    return [...taskStats].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'hours') cmp = a.hours - b.hours;
+      else if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortKey === 'color') cmp = a.color.localeCompare(b.color);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [taskStats, sortKey, sortDir]);
+
+  const totalHours = taskStats.reduce((sum, s) => sum + s.hours, 0);
+  const totalDone = taskStats.reduce((sum, s) => sum + s.doneHours, 0);
+  const maxHours = Math.max(...taskStats.map(s => s.hours), 1);
 
   const rangeLabel = useMemo(() => {
     const now = new Date();
@@ -181,20 +193,44 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
           <div className="text-[10px] text-muted-foreground">Completed</div>
         </div>
         <div className="bg-secondary/40 rounded-lg p-2 text-center">
-          <div className="text-base font-bold text-foreground">{stats.length}</div>
+          <div className="text-base font-bold text-foreground">{taskStats.length}</div>
           <div className="text-[10px] text-muted-foreground">Tasks</div>
         </div>
       </div>
 
       {/* Task breakdown */}
       <div className="flex-1 overflow-auto scrollbar-thin min-h-0">
-        {stats.length === 0 ? (
+        {taskStats.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-sm text-muted-foreground italic text-center">No tasks in this period.<br />Schedule some tasks on the calendar!</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {stats.map((stat, i) => {
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                <span>Task Distribution</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="text-xs bg-secondary rounded px-2 py-1 border-none outline-none text-foreground"
+                  value={sortKey}
+                  onChange={(e) => setSortKey(e.target.value as 'hours' | 'name' | 'color')}
+                >
+                  <option value="hours">Hours</option>
+                  <option value="name">Name</option>
+                  <option value="color">Color</option>
+                </select>
+                <button
+                  onClick={() => setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
+                  className="text-xs bg-secondary hover:bg-secondary/80 rounded px-2 py-1"
+                >
+                  {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {sortedTaskStats.map((stat, i) => {
               const successPct = stat.hours > 0 ? (stat.doneHours / stat.hours) * 100 : 0;
               const failedHours = stat.hours - stat.doneHours;
               const failedPct = stat.hours > 0 ? (failedHours / stat.hours) * 100 : 0;
@@ -243,8 +279,9 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
                   </div>
                 </div>
               );
-            })}
-          </div>
+              })}
+            </div>
+          </>
         )}
       </div>
       {/* Routine Analytics Section */}
