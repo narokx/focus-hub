@@ -76,6 +76,8 @@ export default function Index() {
     updateDayTask,
     removeDayTask,
     assignTaskToDaySlot,
+    addSubtaskToDaySlot,
+    updateDaySlotSubtasks,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
@@ -439,6 +441,8 @@ export default function Index() {
                 onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
+                onAddSubtaskToSlot={addSubtaskToDaySlot}
+                onUpdateSlotSubtasks={updateDaySlotSubtasks}
                 onApplyRoutine={(date, routine) => {
                   setPendingRoutineDrop({ routine, targetDate: date });
                   setRoutineModalOpen(true);
@@ -659,6 +663,8 @@ export default function Index() {
             onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
+            onAddSubtaskToSlot={addSubtaskToDaySlot}
+            onUpdateSlotSubtasks={updateDaySlotSubtasks}
             onApplyRoutine={(date, routine) => {
               setPendingRoutineDrop({ routine, targetDate: date });
               setRoutineModalOpen(true);
