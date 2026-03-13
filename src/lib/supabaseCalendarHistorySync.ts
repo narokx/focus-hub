@@ -60,6 +60,8 @@ async function replaceDateInSupabase(args: { userId: string; date: string; targe
       task_id: t.taskId || null,
       completed: !!t.completed,
       order_index: i,
+      day_color: targetDay?.dayColor || null,
+      is_custom_color: !!targetDay?.isCustomColor,
     };
     if (isUuid(t.id)) row.id = t.id;
     return row;
@@ -67,6 +69,19 @@ async function replaceDateInSupabase(args: { userId: string; date: string; targe
 
   if (bufferRows.length > 0) {
     const ins = await supabase.from('daily_task_buffer').insert(bufferRows);
+    if (ins.error) throw ins.error;
+  } else if (targetDay?.dayColor) {
+    // Preserve day-level color even when there are no buffer tasks
+    const sentinel: BufferInsert = {
+      user_id: userId,
+      date,
+      task_id: null,
+      completed: false,
+      order_index: 0,
+      day_color: targetDay.dayColor,
+      is_custom_color: !!targetDay.isCustomColor,
+    };
+    const ins = await supabase.from('daily_task_buffer').insert(sentinel);
     if (ins.error) throw ins.error;
   }
 

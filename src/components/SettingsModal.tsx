@@ -15,7 +15,7 @@ import { Routine, generateDefaultTimeSlots } from '@/types';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
-export function SettingsModal({ onImportComplete }: { onImportComplete?: () => void }) {
+export function SettingsModal({ onImportComplete }: { onImportComplete?: () => void | Promise<void> }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -40,7 +40,7 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
       // Fetch all data from Supabase in parallel
       const [tasksRes, routinesRes, routineTasksRes, routineSlotsRes, bufferRes, eventsRes] = await Promise.all([
         supabase.from('tasks').select('id, name, color').eq('user_id', user.id).order('created_at', { ascending: true }),
-        supabase.from('routines').select('id, name').eq('user_id', user.id).order('created_at', { ascending: true }),
+        supabase.from('routines').select('id, name, color').eq('user_id', user.id).order('created_at', { ascending: true }),
         supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
         supabase.from('routine_time_slots').select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)').order('start_time', { ascending: true }),
         supabase.from('daily_task_buffer').select('id, date, task_id, completed, order_index, tasks(id, name, color)').eq('user_id', user.id).order('order_index', { ascending: true }),
@@ -91,7 +91,7 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
           timeSlots = generateDefaultTimeSlots();
         }
 
-        return { id: r.id, name: r.name, tasks, timeSlots };
+        return { id: r.id, name: r.name, color: r.color || '#3B82F6', tasks, timeSlots };
       });
 
       // Build calendar with nested structure
@@ -219,17 +219,35 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
       .from('routines')
       .select('id, name')
       .eq('user_id', userId);
-    const existingRoutineNames = new Set((existingRoutines || []).map(r => r.name.toLowerCase()));
+    
+    // Convert to map for ID retrieval
+    const existingRoutineMap = new Map((existingRoutines || []).map(r => [r.name.toLowerCase(), r.id]));
 
     for (const routine of routines) {
       if (!routine.name) continue;
 
       let routineId: string;
+      const lowerName = routine.name.toLowerCase();
 
-      if (routine.id && isValidUUID(routine.id) && !existingRoutineNames.has(routine.name.toLowerCase())) {
+      if (existingRoutineMap.has(lowerName)) {
+        // Update color of existing routine and assign ID for task insertion
+        routineId = existingRoutineMap.get(lowerName)!;
+        await supabase
+          .from('routines')
+          .update({ color: routine.color || '#3B82F6' })
+          .eq('id', routineId);
+      } else {
+        // Build payload dynamically based on UUID validity
+        const payload = {
+          ...(routine.id && isValidUUID(routine.id) ? { id: routine.id } : {}),
+          name: routine.name,
+          color: routine.color || '#3B82F6',
+          user_id: userId,
+        };
+
         const { data, error } = await supabase
           .from('routines')
-          .upsert({ id: routine.id, name: routine.name, user_id: userId }, { onConflict: 'id' })
+          .upsert(payload, { onConflict: 'id' })
           .select('id')
           .maybeSingle();
 
@@ -238,25 +256,11 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
           continue;
         }
         routineId = data.id;
-      } else if (existingRoutineNames.has(routine.name.toLowerCase())) {
-        continue;
-      } else {
-        const { data, error } = await supabase
-          .from('routines')
-          .insert({ name: routine.name, user_id: userId })
-          .select('id')
-          .maybeSingle();
-
-        if (error || !data) {
-          console.error('Failed to insert routine:', error);
-          continue;
-        }
-        routineId = data.id;
       }
 
       await supabase.from('routine_tasks').delete().eq('routine_id', routineId);
       await supabase.from('routine_time_slots').delete().eq('routine_id', routineId);
-
+      
       const bufferTasks: any[] = routine.tasks || [];
       const bufferRows = [];
       for (let i = 0; i < bufferTasks.length; i++) {
@@ -444,9 +448,9 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
             await importCalendar(parsed.calendar, user.id, taskNameMap);
           }
 
-          // Refresh UI state
+          // Refresh UI state: await so routines/tasks/calendar are re-fetched before success
           if (onImportComplete) {
-            onImportComplete();
+            await Promise.resolve(onImportComplete());
           }
           setIsImporting(false);
           alert('Data imported successfully!');

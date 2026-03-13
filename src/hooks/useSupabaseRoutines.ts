@@ -18,7 +18,12 @@ export function useSupabaseRoutines() {
 
     // Fetch all three tables in parallel
     const [routinesRes, tasksRes, slotsRes] = await Promise.all([
-      supabase.from('routines').select('id, name, order_index').eq('user_id', user.id).order('order_index', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true }),
+      supabase
+        .from('routines')
+        .select('id, name, color, order_index')
+        .eq('user_id', user.id)
+        .order('order_index', { ascending: true, nullsFirst: false })
+        .order('created_at', { ascending: true }),
       supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
       supabase.from('routine_time_slots').select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)').order('start_time', { ascending: true }),
     ]);
@@ -69,7 +74,13 @@ export function useSupabaseRoutines() {
         timeSlots = defaultSlots;
       }
 
-      return { id: r.id, name: r.name, tasks: bufferTasks, timeSlots };
+      return {
+        id: r.id,
+        name: r.name,
+        color: r.color || '#3B82F6',
+        tasks: bufferTasks,
+        timeSlots,
+      };
     });
 
     setRoutines(mapped);
@@ -249,17 +260,24 @@ export function useSupabaseRoutines() {
     await fetchRoutines();
   }, [user, fetchRoutines]);
 
-  const updateRoutine = useCallback(async (id: string, updates: Partial<Routine>) => {
-    setRoutines(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  const updateRoutine = useCallback(
+    async (id: string, updates: Partial<Routine>) => {
+      setRoutines(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)));
 
-    if (updates.name !== undefined) {
-      const { error } = await supabase.from('routines').update({ name: updates.name }).eq('id', id);
+      const payload: Record<string, any> = {};
+      if (updates.name !== undefined) payload.name = updates.name;
+      if (updates.color !== undefined) payload.color = updates.color;
+
+      if (Object.keys(payload).length === 0) return;
+
+      const { error } = await supabase.from('routines').update(payload).eq('id', id);
       if (error) {
         console.error('Failed to update routine:', error);
         fetchRoutines();
       }
-    }
-  }, [fetchRoutines]);
+    },
+    [fetchRoutines]
+  );
 
   const deleteRoutine = useCallback(async (id: string) => {
     const prev = routines;

@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, pointerWithin } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  pointerWithin,
+  useSensors,
+  useSensor,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+} from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { Calendar, Layers, List, Wrench, Undo2, Redo2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
@@ -76,6 +87,7 @@ export default function Index() {
     batchApplyRoutine,
     clearDayTimeline,
     fetchCalendar,
+    updateDayColor,
   } = useSupabaseCalendar();
 
   const {
@@ -99,6 +111,23 @@ export default function Index() {
     color?: TaskColor;
     routine?: typeof state.routines[0];
   } | null>(null);
+
+  const sensors = useSensors(
+    // Desktop/Mouse: Activates after 5px of movement
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    // Mobile/Touch: Activates only after a 250ms hold
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5, // Allows 5px of jitter during the 250ms hold
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
 
   // State for routine application modal
   const [routineModalOpen, setRoutineModalOpen] = useState(false);
@@ -357,7 +386,12 @@ export default function Index() {
   // ── Mobile Layout ──────────────────────────────────────────────
   if (isMobile) {
     return (
-      <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
         <div className={cn("flex flex-col h-screen bg-background", isApplyingRoutine && "pointer-events-none")}>
           {/* Mobile header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card">
@@ -381,7 +415,7 @@ export default function Index() {
               >
                 <Redo2 className="w-4 h-4" />
               </button>
-              <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); fetchCalendar(); }} />
+              <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
             </div>
           </div>
 
@@ -410,6 +444,7 @@ export default function Index() {
                   setRoutineModalOpen(true);
                 }}
                 onClearDayTimeline={clearDayTimeline}
+                onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
               />
             )}
             {mobileTab === 'routines' && (
@@ -506,6 +541,7 @@ export default function Index() {
   // ── Desktop Layout ─────────────────────────────────────────────
   return (
     <DndContext
+      sensors={sensors}
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
@@ -535,7 +571,7 @@ export default function Index() {
               <Redo2 className="w-4 h-4" />
             </button>
           </div>
-          <SettingsModal onImportComplete={() => { fetchTasks(); fetchRoutines(); fetchCalendar(); }} />
+          <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
         </div>
 
         {/* Routines Window */}
@@ -628,6 +664,7 @@ export default function Index() {
               setRoutineModalOpen(true);
             }}
             onClearDayTimeline={clearDayTimeline}
+            onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
           />
         </FloatingWindow>
 

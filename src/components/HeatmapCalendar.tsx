@@ -30,6 +30,7 @@ interface HeatmapCalendarProps {
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
+  onUpdateDayColor?: (date: string, color: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -47,8 +48,20 @@ function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high'
   return 'high';
 }
 
-function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
-  date: Date; dayData?: DayData; currentMonth: Date; onClick: () => void; isSelected: boolean;
+function DayCell({
+  date,
+  dayData,
+  currentMonth,
+  onClick,
+  isSelected,
+  onUpdateDayColor,
+}: {
+  date: Date;
+  dayData?: DayData;
+  currentMonth: Date;
+  onClick: () => void;
+  isSelected: boolean;
+  onUpdateDayColor?: (date: string, color: string) => void;
 }) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({
@@ -63,10 +76,21 @@ function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
   const slotCount = (dayData?.timeSlots || []).filter(s => s.task).length;
   const taskCount = (dayData?.tasks.length || 0) + slotCount;
 
+  const baseDayColor = dayData?.dayColor;
+  let successColor: string | null = null;
+  if (level === 'low') successColor = '#ef4444';
+  else if (level === 'mid') successColor = '#eab308';
+  else if (level === 'high') successColor = '#22c55e';
+
+ const style = baseDayColor
+    ? { background: `linear-gradient(135deg, ${baseDayColor} 50%, ${successColor || 'transparent'} 50%)` }
+    : undefined;
+
   return (
     <div
       ref={setNodeRef}
       onClick={onClick}
+      style={style}
       className={cn(
         'calendar-cell',
         !inMonth && 'opacity-30',
@@ -83,6 +107,17 @@ function DayCell({ date, dayData, currentMonth, onClick, isSelected }: {
         <span className="text-xs font-medium">{format(date, 'd')}</span>
         {taskCount > 0 && <span className="text-[10px] opacity-70">{taskCount}</span>}
       </div>
+      {/* Hidden color picker for per-day manual color override */}
+      {onUpdateDayColor && (
+        <input
+          type="color"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          value={dayData?.dayColor || '#ffffff'}
+          onChange={(e) => onUpdateDayColor(dateStr, e.target.value)}
+        />
+      )}
     </div>
   );
 }
@@ -106,6 +141,7 @@ export function HeatmapCalendar({
   onAssignTaskToSlot,
   onApplyRoutine,
   onClearDayTimeline,
+  onUpdateDayColor,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
@@ -270,6 +306,7 @@ export function HeatmapCalendar({
                     currentMonth={currentMonth}
                     onClick={() => onDayClick(dateStr)}
                     isSelected={selectedDate === dateStr}
+                    onUpdateDayColor={onUpdateDayColor}
                   />
                 );
               })}

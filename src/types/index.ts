@@ -33,11 +33,15 @@ export interface DayData {
   date: string;
   tasks: DayTask[]; // unassigned buffer
   timeSlots: TimeSlot[];
+  // Optional per-day color metadata, synced via daily_task_buffer.day_color/is_custom_color
+  dayColor?: string;
+  isCustomColor?: boolean;
 }
 
 export interface Routine {
   id: string;
   name: string;
+  color?: TaskColor;
   tasks: Array<{
     id: string;
     taskId: string;

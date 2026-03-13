@@ -126,6 +126,14 @@ function RoutineItemContent({
           </span>
         )}
 
+        <input
+          type="color"
+          value={routine.color || '#3B82F6'}
+          onChange={(e) => onUpdateRoutine(routine.id, { color: e.target.value })}
+          className="w-7 h-7 rounded-md border border-border bg-transparent cursor-pointer"
+          title="Routine color"
+        />
+
         <span className="text-xs text-muted-foreground">{totalTasks} tasks</span>
         {onClearRoutineTimeline && isExpanded && (
           <button
