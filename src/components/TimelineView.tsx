@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star } from 'lucide-react';
-import { TimeSlot, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
+import { Plus, Trash2, X, Pencil, FileText, Star, Layers, SlidersHorizontal } from 'lucide-react';
+import { SubtaskData, TimeSlot, TimeSlotTask, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { cn } from '@/lib/utils';
@@ -46,9 +46,68 @@ interface TimelineViewProps {
   onRemoveUnassigned: (taskId: string) => void;
   onUpdateUnassignedName?: (taskId: string, name: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  onAddSubtask?: (slotId: string) => void;
+  onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
   timeColumnWidth?: number;
   onTimeColumnWidthChange?: (width: number) => void;
   onEmptySlotClick?: (slotId: string) => void;
+}
+
+
+function getTaskSegments(task: TimeSlotTask): Array<{ key: string; name: string; color: string; percentage: number }> {
+  const subtasks = task.subtasks || [];
+  const subTotal = subtasks.reduce((sum, sub) => sum + sub.percentage, 0);
+  const parentPct = Math.max(0, 100 - subTotal);
+
+  return [
+    { key: `parent-${task.taskId || task.id}`, name: task.name, color: getColorValue(task.color), percentage: parentPct },
+    ...subtasks.map((sub, i) => ({
+      key: `sub-${sub.taskId}-${i}`,
+      name: sub.name,
+      color: getColorValue(sub.color),
+      percentage: Math.max(0, sub.percentage),
+    })),
+  ].filter(s => s.percentage > 0);
+}
+
+function SubtaskEditor({ task, onUpdate }: { task: TimeSlotTask; onUpdate: (subs: SubtaskData[]) => void }) {
+  const subtasks = task.subtasks || [];
+
+  const updatePct = (index: number, val: number) => {
+    const next = subtasks.map((sub, i) => (i === index ? { ...sub, percentage: val } : sub));
+    onUpdate(next);
+  };
+
+  const total = subtasks.reduce((sum, sub) => sum + sub.percentage, 0);
+
+  return (
+    <div className="p-3 space-y-3 bg-card border rounded-lg shadow-xl mt-2">
+      <h4 className="text-sm font-bold">Adjust Time Ratios</h4>
+      {subtasks.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">No subtasks added yet.</p>
+      ) : (
+        subtasks.map((sub, i) => (
+          <div key={`${sub.taskId}-${i}`} className="space-y-1">
+            <div className="flex justify-between text-xs">
+              <span>{sub.name}</span>
+              <span>{sub.percentage}%</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="100"
+              value={sub.percentage}
+              onChange={(e) => updatePct(i, parseInt(e.target.value, 10))}
+              className="w-full accent-primary"
+            />
+          </div>
+        ))
+      )}
+      <p className="text-[10px] text-muted-foreground italic">
+        The remaining {Math.max(0, 100 - total)}% belongs to {task.name}.
+      </p>
+    </div>
+  );
 }
 
 function DraggableSlotTask({
@@ -58,6 +117,8 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
+  onAddSubtask,
+  onUpdateSlotSubtasks,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -65,12 +126,15 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  onAddSubtask?: (slotId: string) => void;
+  onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
 }) {
   const task = slot.task!;
   const [isEditing, setIsEditing] = React.useState(false);
   const [editName, setEditName] = React.useState(task.name);
   const [notesOpen, setNotesOpen] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
+  const [showSubtaskEditor, setShowSubtaskEditor] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
@@ -166,14 +230,21 @@ function DraggableSlotTask({
             style={{ color: 'inherit' }}
           />
         ) : (
-          <span
-            className={cn(
-              'flex-1 truncate',
-              task.completed && 'line-through opacity-60'
-            )}
-          >
-            {task.name}
-          </span>
+          <div className={cn('flex-1 min-w-0', task.completed && 'line-through opacity-60')}>
+            <div className="w-full h-6 rounded overflow-hidden flex">
+              {getTaskSegments(task).map(segment => (
+                <div
+                  key={segment.key}
+                  className="h-full px-1 flex items-center min-w-0"
+                  style={{ width: `${segment.percentage}%`, backgroundColor: segment.color }}
+                >
+                  <span className="text-[10px] font-medium truncate mix-blend-difference text-white">
+                    {segment.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {/* Pencil edit icon */}
@@ -213,6 +284,41 @@ function DraggableSlotTask({
           </button>
         )}
 
+
+        {showActions && onAddSubtask && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddSubtask(slot.id);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Add subtask"
+          >
+            <Layers className="w-2.5 h-2.5" />
+          </button>
+        )}
+
+        {showActions && onUpdateSlotSubtasks && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSubtaskEditor(prev => !prev);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
+              textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Edit subtask ratios"
+          >
+            <SlidersHorizontal className="w-2.5 h-2.5" />
+          </button>
+        )}
+
         <button
           onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
           onPointerDown={(e) => e.stopPropagation()}
@@ -224,6 +330,10 @@ function DraggableSlotTask({
           <X className="w-3 h-3" />
         </button>
       </div>
+
+      {showSubtaskEditor && onUpdateSlotSubtasks && (
+        <SubtaskEditor task={task} onUpdate={(subs) => onUpdateSlotSubtasks(slot.id, subs)} />
+      )}
 
       {notesOpen && (
         <TaskNotesModal
@@ -248,6 +358,8 @@ function TimeSlotRow({
   onUpdateSlotTaskName,
   timeColumnWidth,
   onEmptySlotClick,
+  onAddSubtask,
+  onUpdateSlotSubtasks,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -259,6 +371,8 @@ function TimeSlotRow({
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
   timeColumnWidth: number;
   onEmptySlotClick?: (slotId: string) => void;
+  onAddSubtask?: (slotId: string) => void;
+  onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
@@ -309,6 +423,8 @@ function TimeSlotRow({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
+            onAddSubtask={onAddSubtask}
+            onUpdateSlotSubtasks={onUpdateSlotSubtasks}
           />
         ) : (
           <span
@@ -410,6 +526,8 @@ export function TimelineView({
   onRemoveUnassigned,
   onUpdateUnassignedName,
   onUpdateSlotTaskName,
+  onAddSubtask,
+  onUpdateSlotSubtasks,
   onEmptySlotClick,
 }: TimelineViewProps) {
   const timeColWidth = DEFAULT_TIME_COL;
@@ -428,6 +546,8 @@ export function TimelineView({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
+            onAddSubtask={onAddSubtask}
+            onUpdateSlotSubtasks={onUpdateSlotSubtasks}
             timeColumnWidth={timeColWidth}
             onEmptySlotClick={onEmptySlotClick}
           />
