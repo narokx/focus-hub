@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star, Layers, SlidersHorizontal } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, FileText, Star, SlidersHorizontal } from 'lucide-react';
 import { SubtaskData, TimeSlot, TimeSlotTask, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
@@ -32,6 +32,25 @@ function getDurationScale(minutes: number): number {
   return heightPercent / 100;
 }
 
+
+const getSlotBackground = (task: TimeSlotTask) => {
+  if (!task.subtasks || task.subtasks.length === 0) return getColorValue(task.color);
+
+  const segments = [
+    { color: getColorValue(task.color), pct: 100 - task.subtasks.reduce((acc, s) => acc + s.percentage, 0) },
+    ...task.subtasks.map(s => ({ color: getColorValue(s.color), pct: s.percentage })),
+  ].filter(s => s.pct > 0);
+
+  let currentPos = 0;
+  const stops = segments.map(s => {
+    const start = currentPos;
+    currentPos += s.pct;
+    return `${s.color} ${start}%, ${s.color} ${currentPos}%`;
+  });
+
+  return `linear-gradient(to right, ${stops.join(', ')})`;
+};
+
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
   unassignedTasks: Array<{ id: string; taskId?: string; name: string; color: TaskColor; completed?: boolean }>;
@@ -51,64 +70,44 @@ interface TimelineViewProps {
   timeColumnWidth?: number;
   onTimeColumnWidthChange?: (width: number) => void;
   onEmptySlotClick?: (slotId: string) => void;
+  onSlotAssignClick?: (slotId: string) => void;
+  onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
 }
 
 
-function getTaskSegments(task: TimeSlotTask): Array<{ key: string; name: string; color: string; percentage: number }> {
-  const subtasks = task.subtasks || [];
-  const subTotal = subtasks.reduce((sum, sub) => sum + sub.percentage, 0);
-  const parentPct = Math.max(0, 100 - subTotal);
-
-  return [
-    { key: `parent-${task.taskId || task.id}`, name: task.name, color: getColorValue(task.color), percentage: parentPct },
-    ...subtasks.map((sub, i) => ({
-      key: `sub-${sub.taskId}-${i}`,
-      name: sub.name,
-      color: getColorValue(sub.color),
-      percentage: Math.max(0, sub.percentage),
-    })),
-  ].filter(s => s.percentage > 0);
-}
-
-function SubtaskEditor({ task, onUpdate }: { task: TimeSlotTask; onUpdate: (subs: SubtaskData[]) => void }) {
+const SubtaskEditor = ({ task, onUpdate }: { task: TimeSlotTask; onUpdate: (subs: SubtaskData[]) => void }) => {
   const subtasks = task.subtasks || [];
 
   const updatePct = (index: number, val: number) => {
-    const next = subtasks.map((sub, i) => (i === index ? { ...sub, percentage: val } : sub));
-    onUpdate(next);
+    const newSubs = subtasks.map((sub, i) => (i === index ? { ...sub, percentage: val } : sub));
+    onUpdate(newSubs);
   };
-
-  const total = subtasks.reduce((sum, sub) => sum + sub.percentage, 0);
 
   return (
     <div className="p-3 space-y-3 bg-card border rounded-lg shadow-xl mt-2">
       <h4 className="text-sm font-bold">Adjust Time Ratios</h4>
-      {subtasks.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">No subtasks added yet.</p>
-      ) : (
-        subtasks.map((sub, i) => (
-          <div key={`${sub.taskId}-${i}`} className="space-y-1">
-            <div className="flex justify-between text-xs">
-              <span>{sub.name}</span>
-              <span>{sub.percentage}%</span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="100"
-              value={sub.percentage}
-              onChange={(e) => updatePct(i, parseInt(e.target.value, 10))}
-              className="w-full accent-primary"
-            />
+      {subtasks.map((sub, i) => (
+        <div key={`${sub.taskId}-${i}`} className="space-y-1">
+          <div className="flex justify-between text-xs">
+            <span>{sub.name}</span>
+            <span>{sub.percentage}%</span>
           </div>
-        ))
-      )}
+          <input
+            type="range"
+            min="1"
+            max="100"
+            value={sub.percentage}
+            onChange={(e) => updatePct(i, parseInt(e.target.value, 10))}
+            className="w-full accent-primary"
+          />
+        </div>
+      ))}
       <p className="text-[10px] text-muted-foreground italic">
-        The remaining {Math.max(0, 100 - total)}% belongs to {task.name}.
+        The remaining {100 - subtasks.reduce((a, b) => a + b.percentage, 0)}% belongs to {task.name}.
       </p>
     </div>
   );
-}
+};
 
 function DraggableSlotTask({
   slot,
@@ -117,7 +116,7 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
-  onAddSubtask,
+  onSlotAssignClick,
   onUpdateSlotSubtasks,
 }: {
   slot: TimeSlot;
@@ -126,7 +125,7 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
-  onAddSubtask?: (slotId: string) => void;
+  onSlotAssignClick?: (slotId: string) => void;
   onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
 }) {
   const task = slot.task!;
@@ -162,6 +161,7 @@ function DraggableSlotTask({
 
   const textColor = getContrastColor(task.color);
   const bgColor = getColorValue(task.color);
+  const slotBackground = getSlotBackground(task);
   const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
@@ -182,7 +182,7 @@ function DraggableSlotTask({
     <>
       <div
         ref={setNodeRef}
-        style={{ ...style, backgroundColor: bgColor, color: textColor }}
+        style={{ ...style, background: slotBackground, color: textColor }}
         className={cn(
           'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
           isDragging && 'opacity-50'
@@ -230,21 +230,14 @@ function DraggableSlotTask({
             style={{ color: 'inherit' }}
           />
         ) : (
-          <div className={cn('flex-1 min-w-0', task.completed && 'line-through opacity-60')}>
-            <div className="w-full h-6 rounded overflow-hidden flex">
-              {getTaskSegments(task).map(segment => (
-                <div
-                  key={segment.key}
-                  className="h-full px-1 flex items-center min-w-0"
-                  style={{ width: `${segment.percentage}%`, backgroundColor: segment.color }}
-                >
-                  <span className="text-[10px] font-medium truncate mix-blend-difference text-white">
-                    {segment.name}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <span
+            className={cn(
+              'flex-1 truncate mix-blend-difference text-white',
+              task.completed && 'line-through opacity-60'
+            )}
+          >
+            {task.name}{task.subtasks?.map(s => ` > ${s.name}`).join('')}
+          </span>
         )}
 
         {/* Pencil edit icon */}
@@ -285,24 +278,24 @@ function DraggableSlotTask({
         )}
 
 
-        {showActions && onAddSubtask && (
+        {showActions && onSlotAssignClick && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onAddSubtask(slot.id);
+              onSlotAssignClick(slot.id);
             }}
             onPointerDown={(e) => e.stopPropagation()}
             className={cn(
               'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
               textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
             )}
-            title="Add subtask"
+            title="Assign task"
           >
-            <Layers className="w-2.5 h-2.5" />
+            <Plus className="w-2.5 h-2.5" />
           </button>
         )}
 
-        {showActions && onUpdateSlotSubtasks && (
+        {showActions && onUpdateSlotSubtasks && task.subtasks && task.subtasks.length > 0 && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -313,7 +306,7 @@ function DraggableSlotTask({
               'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
               textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
             )}
-            title="Edit subtask ratios"
+            title="Adjust subtask ratios"
           >
             <SlidersHorizontal className="w-2.5 h-2.5" />
           </button>
@@ -332,7 +325,10 @@ function DraggableSlotTask({
       </div>
 
       {showSubtaskEditor && onUpdateSlotSubtasks && (
-        <SubtaskEditor task={task} onUpdate={(subs) => onUpdateSlotSubtasks(slot.id, subs)} />
+        <SubtaskEditor
+          task={task}
+          onUpdate={(subs) => onUpdateSlotSubtasks(slot.id, subs)}
+        />
       )}
 
       {notesOpen && (
@@ -358,7 +354,7 @@ function TimeSlotRow({
   onUpdateSlotTaskName,
   timeColumnWidth,
   onEmptySlotClick,
-  onAddSubtask,
+  onSlotAssignClick,
   onUpdateSlotSubtasks,
 }: {
   slot: TimeSlot;
@@ -371,7 +367,7 @@ function TimeSlotRow({
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
   timeColumnWidth: number;
   onEmptySlotClick?: (slotId: string) => void;
-  onAddSubtask?: (slotId: string) => void;
+  onSlotAssignClick?: (slotId: string) => void;
   onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -423,7 +419,7 @@ function TimeSlotRow({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
-            onAddSubtask={onAddSubtask}
+            onSlotAssignClick={onSlotAssignClick}
             onUpdateSlotSubtasks={onUpdateSlotSubtasks}
           />
         ) : (
@@ -529,6 +525,8 @@ export function TimelineView({
   onAddSubtask,
   onUpdateSlotSubtasks,
   onEmptySlotClick,
+  onSlotAssignClick,
+  onUpdateSlotSubtasks,
 }: TimelineViewProps) {
   const timeColWidth = DEFAULT_TIME_COL;
 
@@ -546,7 +544,7 @@ export function TimelineView({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
-            onAddSubtask={onAddSubtask}
+            onSlotAssignClick={onSlotAssignClick}
             onUpdateSlotSubtasks={onUpdateSlotSubtasks}
             timeColumnWidth={timeColWidth}
             onEmptySlotClick={onEmptySlotClick}

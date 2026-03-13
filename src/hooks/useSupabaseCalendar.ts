@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { DayData, DayTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
@@ -640,6 +640,61 @@ export function useSupabaseCalendar() {
     return resolvedId;
   }, [user, calendar, fetchCalendar]);
 
+
+
+  const addSubtaskToDaySlot = useCallback((date: string, slotId: string, task: { name: string; color: string; taskId?: string }) => {
+    setCalendar(prev => {
+      const dayData = prev[date];
+      if (!dayData) return prev;
+
+      return {
+        ...prev,
+        [date]: {
+          ...dayData,
+          timeSlots: dayData.timeSlots.map(s => {
+            if (s.id !== slotId || !s.task) return s;
+            const existingSubs = s.task.subtasks || [];
+            if (existingSubs.length >= 4) return s;
+
+            const subtask = {
+              taskId: task.taskId || '',
+              name: task.name,
+              color: task.color,
+              percentage: 20,
+            };
+
+            const nextSubs = [...existingSubs, subtask];
+            const totalPct = nextSubs.reduce((sum, sub) => sum + sub.percentage, 0);
+            if (totalPct > 90 && nextSubs.length > 0) {
+              const scale = 90 / totalPct;
+              for (const sub of nextSubs) {
+                sub.percentage = Math.max(1, Math.round(sub.percentage * scale));
+              }
+            }
+
+            return { ...s, task: { ...s.task, subtasks: nextSubs } };
+          }),
+        },
+      };
+    });
+  }, []);
+
+  const updateDaySlotSubtasks = useCallback((date: string, slotId: string, subtasks: SubtaskData[]) => {
+    setCalendar(prev => {
+      const dayData = prev[date];
+      if (!dayData) return prev;
+      const clamped = subtasks.slice(0, 4).map(sub => ({ ...sub }));
+      return {
+        ...prev,
+        [date]: {
+          ...dayData,
+          timeSlots: dayData.timeSlots.map(s =>
+            s.id === slotId && s.task ? { ...s, task: { ...s.task, subtasks: clamped } } : s
+          ),
+        },
+      };
+    });
+  }, []);
   const moveSlotToSlot = useCallback(async (
     sourcePrefix: string, sourceSlotId: string,
     targetPrefix: string, targetSlotId: string
@@ -1201,6 +1256,7 @@ export function useSupabaseCalendar() {
     batchApplyRoutine,
     clearDayTimeline,
     fetchCalendar,
+    updateDayColor,
   };
 }
 

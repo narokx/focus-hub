@@ -139,7 +139,12 @@ export default function Index() {
     targetDate: string;
   } | null>(null);
   const [isApplyingRoutine, setIsApplyingRoutine] = useState(false);
-  const [pendingDaySlotAssignment, setPendingDaySlotAssignment] = useState<{ date: string; slotId: string; task: { name: string; color: string; taskId?: string }; activeData: any; } | null>(null);
+  const [pendingDaySlotAssignment, setPendingDaySlotAssignment] = useState<{
+    date: string;
+    slotId: string;
+    task: { name: string; color: string; taskId?: string };
+    activeData: any;
+  } | null>(null);
 
   // History for undo/redo
   const history = useHistory(state);
@@ -247,8 +252,11 @@ export default function Index() {
     if (!pendingDaySlotAssignment) return;
     const { date, slotId, task, activeData } = pendingDaySlotAssignment;
 
-    if (mode === 'replace') assignTaskToDaySlot(date, slotId, task);
-    else addSubtaskToDaySlot(date, slotId, { id: task.taskId || '', name: task.name, color: task.color });
+    if (mode === 'replace') {
+      assignTaskToDaySlot(date, slotId, task);
+    } else {
+      addSubtaskToDaySlot(date, slotId, task);
+    }
 
     consumeDraggedUnassigned(activeData);
     setSelectedDate(date);
@@ -323,7 +331,7 @@ export default function Index() {
         const date = prefix.substring(4);
         const existingSlot = state.calendar[date]?.timeSlots.find(s => s.id === slotId);
 
-        if (existingSlot?.task) {
+        if (existingSlot?.task && !isMobile) {
           setPendingDaySlotAssignment({ date, slotId, task, activeData });
           return;
         }
@@ -567,8 +575,12 @@ export default function Index() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-              <AlertDialogCancel onClick={() => confirmDaySlotAssignment('replace')}>Replace Existing</AlertDialogCancel>
-              <AlertDialogAction onClick={() => confirmDaySlotAssignment('subtask')}>Add as Subtask</AlertDialogAction>
+              <AlertDialogCancel onClick={() => confirmDaySlotAssignment('replace')}>
+                Replace Existing
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={() => confirmDaySlotAssignment('subtask')}>
+                Add as Subtask
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -708,6 +720,8 @@ export default function Index() {
             onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
+            onAddSubtaskToSlot={addSubtaskToDaySlot}
+            onUpdateSlotSubtasks={updateDaySlotSubtasks}
             onApplyRoutine={(date, routine) => {
               setPendingRoutineDrop({ routine, targetDate: date });
               setRoutineModalOpen(true);
@@ -790,8 +804,12 @@ export default function Index() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-              <AlertDialogCancel onClick={() => confirmDaySlotAssignment('replace')}>Replace Existing</AlertDialogCancel>
-              <AlertDialogAction onClick={() => confirmDaySlotAssignment('subtask')}>Add as Subtask</AlertDialogAction>
+              <AlertDialogCancel onClick={() => confirmDaySlotAssignment('replace')}>
+                Replace Existing
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={() => confirmDaySlotAssignment('subtask')}>
+                Add as Subtask
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

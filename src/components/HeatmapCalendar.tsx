@@ -154,7 +154,7 @@ export function HeatmapCalendar({
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const isMobile = useIsMobile();
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
-  const [pickerMode, setPickerMode] = useState<'assign' | 'subtask'>('assign');
+  const [pendingSubtask, setPendingSubtask] = useState<{ date: string; slotId: string; newTask: QuickTask } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -182,6 +182,20 @@ export function HeatmapCalendar({
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
   }, [timeListWidth]);
+
+  const handleTaskSelection = (date: string, slotId: string, newTask: QuickTask) => {
+    const existingSlot = calendar[date]?.timeSlots.find(s => s.id === slotId);
+
+    if (existingSlot?.task && !isMobile) {
+      setPendingSubtask({ date, slotId, newTask });
+    } else {
+      onAssignTaskToSlot?.(date, slotId, { name: newTask.name, color: newTask.color, taskId: newTask.id });
+    }
+  };
+
+  const handleAddSubtask = (pending: { date: string; slotId: string; newTask: QuickTask }) => {
+    onAddSubtaskToSlot?.(pending.date, pending.slotId, pending.newTask);
+  };
 
   const showCalendarGrid = !isMobile || !selectedDate;
   const showTimeline = !!selectedDate;
@@ -256,8 +270,8 @@ export function HeatmapCalendar({
                 onRemoveUnassigned={(taskId) => onRemoveDayTask(selectedDate!, taskId)}
                 onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate!, taskId, name)}
                 onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate!, slotId, name) : undefined}
-                onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => { setPickerMode('assign'); setPickerSlotId(slotId); } : undefined}
-                onAddSubtask={availableTasks && onAddSubtaskToSlot ? (slotId) => { setPickerMode('subtask'); setPickerSlotId(slotId); } : undefined}
+                onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
+                onSlotAssignClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
                 onUpdateSlotSubtasks={onUpdateSlotSubtasks ? (slotId, subtasks) => onUpdateSlotSubtasks(selectedDate!, slotId, subtasks) : undefined}
               />
             </div>
@@ -266,11 +280,7 @@ export function HeatmapCalendar({
               <TaskPickerModal
                 tasks={availableTasks}
                 onSelect={(task) => {
-                  if (pickerMode === 'subtask') {
-                    onAddSubtaskToSlot?.(selectedDate!, pickerSlotId, task);
-                  } else {
-                    onAssignTaskToSlot(selectedDate!, pickerSlotId, { name: task.name, color: task.color, taskId: task.id });
-                  }
+handleTaskSelection(selectedDate!, pickerSlotId, task);
                   setPickerSlotId(null);
                 }}
                 onClose={() => setPickerSlotId(null)}
@@ -344,6 +354,39 @@ export function HeatmapCalendar({
           </div>
         </div>
       )}
+
+
+
+      <AlertDialog open={!!pendingSubtask} onOpenChange={() => setPendingSubtask(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Task Already Assigned</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to replace the existing task or add "{pendingSubtask?.newTask.name}" as a subtask?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel onClick={() => {
+              if (pendingSubtask) {
+                onAssignTaskToSlot?.(pendingSubtask.date, pendingSubtask.slotId, {
+                  name: pendingSubtask.newTask.name,
+                  color: pendingSubtask.newTask.color,
+                  taskId: pendingSubtask.newTask.id,
+                });
+              }
+              setPendingSubtask(null);
+            }}>
+              Replace Existing
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingSubtask) handleAddSubtask(pendingSubtask);
+              setPendingSubtask(null);
+            }}>
+              Add as Subtask
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {showRoutinePicker && routines && selectedDate && (
         <RoutinePickerModal
