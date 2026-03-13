@@ -65,6 +65,8 @@ interface TimelineViewProps {
   onRemoveUnassigned: (taskId: string) => void;
   onUpdateUnassignedName?: (taskId: string, name: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  onAddSubtask?: (slotId: string) => void;
+  onUpdateSlotSubtasks?: (slotId: string, subtasks: SubtaskData[]) => void;
   timeColumnWidth?: number;
   onTimeColumnWidthChange?: (width: number) => void;
   onEmptySlotClick?: (slotId: string) => void;
@@ -520,6 +522,8 @@ export function TimelineView({
   onRemoveUnassigned,
   onUpdateUnassignedName,
   onUpdateSlotTaskName,
+  onAddSubtask,
+  onUpdateSlotSubtasks,
   onEmptySlotClick,
   onSlotAssignClick,
   onUpdateSlotSubtasks,
