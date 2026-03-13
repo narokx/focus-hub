@@ -31,6 +31,7 @@ import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
 import { TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type MobileTab = 'calendar' | 'routines' | 'tasks';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
@@ -76,6 +77,8 @@ export default function Index() {
     updateDayTask,
     removeDayTask,
     assignTaskToDaySlot,
+    addSubtaskToDaySlot,
+    updateDaySlotSubtasks,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
@@ -136,6 +139,12 @@ export default function Index() {
     targetDate: string;
   } | null>(null);
   const [isApplyingRoutine, setIsApplyingRoutine] = useState(false);
+  const [pendingDaySlotAssignment, setPendingDaySlotAssignment] = useState<{
+    date: string;
+    slotId: string;
+    task: { name: string; color: string; taskId?: string };
+    activeData: any;
+  } | null>(null);
 
   // History for undo/redo
   const history = useHistory(state);
@@ -230,6 +239,30 @@ export default function Index() {
     setActiveDragData(event.active.data.current as any);
   };
 
+  const consumeDraggedUnassigned = (activeData: any) => {
+    if (activeData.source === 'unassigned' && activeData.sourcePrefix?.startsWith('day-')) {
+      removeDayTask(activeData.sourcePrefix.substring(4), activeData.unassignedTaskId);
+    }
+    if (activeData.source === 'unassigned' && activeData.sourcePrefix?.startsWith('routine-')) {
+      removeTaskFromRoutine(activeData.sourcePrefix.substring(8), activeData.unassignedTaskId);
+    }
+  };
+
+  const confirmDaySlotAssignment = (mode: 'replace' | 'subtask') => {
+    if (!pendingDaySlotAssignment) return;
+    const { date, slotId, task, activeData } = pendingDaySlotAssignment;
+
+    if (mode === 'replace') {
+      assignTaskToDaySlot(date, slotId, task);
+    } else {
+      addSubtaskToDaySlot(date, slotId, task);
+    }
+
+    consumeDraggedUnassigned(activeData);
+    setSelectedDate(date);
+    setPendingDaySlotAssignment(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
@@ -296,6 +329,13 @@ export default function Index() {
 
       if (prefix.startsWith('day-')) {
         const date = prefix.substring(4);
+        const existingSlot = state.calendar[date]?.timeSlots.find(s => s.id === slotId);
+
+        if (existingSlot?.task && !isMobile) {
+          setPendingDaySlotAssignment({ date, slotId, task, activeData });
+          return;
+        }
+
         assignTaskToDaySlot(date, slotId, task);
         if (activeData.source === 'unassigned' && activeData.sourcePrefix === prefix) {
           removeDayTask(date, activeData.unassignedTaskId);
@@ -439,6 +479,8 @@ export default function Index() {
                 onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
+                onAddSubtaskToSlot={addSubtaskToDaySlot}
+                onUpdateSlotSubtasks={updateDaySlotSubtasks}
                 onApplyRoutine={(date, routine) => {
                   setPendingRoutineDrop({ routine, targetDate: date });
                   setRoutineModalOpen(true);
@@ -523,6 +565,25 @@ export default function Index() {
             }
           }}
         />
+
+        <AlertDialog open={!!pendingDaySlotAssignment} onOpenChange={() => setPendingDaySlotAssignment(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Task Already Assigned</AlertDialogTitle>
+              <AlertDialogDescription>
+                Would you like to replace the existing task or add "{pendingDaySlotAssignment?.task.name}" as a subtask?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel onClick={() => confirmDaySlotAssignment('replace')}>
+                Replace Existing
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={() => confirmDaySlotAssignment('subtask')}>
+                Add as Subtask
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Loading overlay during batch operations */}
         {isApplyingRoutine && (
@@ -659,6 +720,8 @@ export default function Index() {
             onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
+            onAddSubtaskToSlot={addSubtaskToDaySlot}
+            onUpdateSlotSubtasks={updateDaySlotSubtasks}
             onApplyRoutine={(date, routine) => {
               setPendingRoutineDrop({ routine, targetDate: date });
               setRoutineModalOpen(true);
@@ -731,6 +794,25 @@ export default function Index() {
             }
           }}
         />
+
+        <AlertDialog open={!!pendingDaySlotAssignment} onOpenChange={() => setPendingDaySlotAssignment(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Task Already Assigned</AlertDialogTitle>
+              <AlertDialogDescription>
+                Would you like to replace the existing task or add "{pendingDaySlotAssignment?.task.name}" as a subtask?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+              <AlertDialogCancel onClick={() => confirmDaySlotAssignment('replace')}>
+                Replace Existing
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={() => confirmDaySlotAssignment('subtask')}>
+                Add as Subtask
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Loading overlay during batch operations */}
         {isApplyingRoutine && (

@@ -30,6 +30,8 @@ interface TaskMetric {
 
 export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<'hours' | 'name' | 'color'>('hours');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   const toggleRoutine = (id: string) => {
     setSelectedIds(prev => {
@@ -40,35 +42,84 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
     });
   };
 
-  const metrics = useMemo(() => {
+  const taskMetrics = useMemo(() => {
     const map = new Map<string, TaskMetric>();
     const selected = routines.filter(r => selectedIds.has(r.id));
 
     for (const routine of selected) {
       for (const slot of routine.timeSlots) {
         if (!slot.task) continue;
-        const dur = slotDurationHours(slot);
-        const key = slot.task.name;
-        const existing = map.get(key);
-        if (existing) {
-          existing.totalHours += dur;
-          existing.frequency += 1;
-        } else {
-          map.set(key, {
-            name: slot.task.name,
-            color: getColorValue(slot.task.color),
-            totalHours: dur,
-            frequency: 1,
+        const baseHours = slotDurationHours(slot);
+
+        if (slot.task.subtasks && slot.task.subtasks.length > 0) {
+          let subtaskTotalPct = 0;
+
+          slot.task.subtasks.forEach(sub => {
+            const subHours = baseHours * (sub.percentage / 100);
+            subtaskTotalPct += sub.percentage;
+
+            const subKey = sub.taskId || `sub-${sub.name}`;
+            const existingSub = map.get(subKey);
+            if (existingSub) {
+              existingSub.totalHours += subHours;
+              existingSub.frequency += 1;
+            } else {
+              map.set(subKey, {
+                name: sub.name,
+                color: getColorValue(sub.color),
+                totalHours: subHours,
+                frequency: 1,
+              });
+            }
           });
+
+          const parentHours = baseHours * ((100 - subtaskTotalPct) / 100);
+          const parentKey = slot.task.taskId || `task-${slot.task.name}`;
+          const existingParent = map.get(parentKey);
+          if (existingParent) {
+            existingParent.totalHours += parentHours;
+            existingParent.frequency += 1;
+          } else {
+            map.set(parentKey, {
+              name: slot.task.name,
+              color: getColorValue(slot.task.color),
+              totalHours: parentHours,
+              frequency: 1,
+            });
+          }
+        } else {
+          const key = slot.task.taskId || `task-${slot.task.name}`;
+          const existing = map.get(key);
+          if (existing) {
+            existing.totalHours += baseHours;
+            existing.frequency += 1;
+          } else {
+            map.set(key, {
+              name: slot.task.name,
+              color: getColorValue(slot.task.color),
+              totalHours: baseHours,
+              frequency: 1,
+            });
+          }
         }
       }
     }
 
-    return Array.from(map.values()).sort((a, b) => b.totalHours - a.totalHours);
+    return map;
   }, [routines, selectedIds]);
 
+  const sortedMetrics = useMemo(() => {
+    return Array.from(taskMetrics.values()).sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === 'hours') cmp = a.totalHours - b.totalHours;
+      else if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sortKey === 'color') cmp = a.color.localeCompare(b.color);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [taskMetrics, sortKey, sortDir]);
+
   const selectedCount = selectedIds.size;
-  const maxHours = Math.max(...metrics.map(m => m.totalHours), 0.1);
+  const maxHours = Math.max(...sortedMetrics.map(m => m.totalHours), 0.1);
 
   return (
     <div className="flex flex-col gap-3">
@@ -107,7 +158,7 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
         <p className="text-xs text-muted-foreground italic text-center py-4">
           Select routines above to see analytics
         </p>
-      ) : metrics.length === 0 ? (
+      ) : sortedMetrics.length === 0 ? (
         <p className="text-xs text-muted-foreground italic text-center py-4">
           No assigned tasks in selected routines
         </p>
@@ -117,14 +168,14 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-secondary/40 rounded-lg p-2 text-center">
               <div className="text-base font-bold text-foreground">
-                {metrics.reduce((s, m) => s + m.totalHours, 0).toFixed(1)}h
+                {sortedMetrics.reduce((s, m) => s + m.totalHours, 0).toFixed(1)}h
               </div>
               <div className="text-[10px] text-muted-foreground">Total Hours</div>
             </div>
             <div className="bg-secondary/40 rounded-lg p-2 text-center">
               <div className="text-base font-bold text-foreground">
                 {selectedCount > 0
-                  ? (metrics.reduce((s, m) => s + m.totalHours, 0) / selectedCount).toFixed(1)
+                  ? (sortedMetrics.reduce((s, m) => s + m.totalHours, 0) / selectedCount).toFixed(1)
                   : '0.0'}h
               </div>
               <div className="text-[10px] text-muted-foreground">Daily Avg</div>
@@ -132,8 +183,30 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
           </div>
 
           {/* Task breakdown bars */}
-          <div className="flex flex-col gap-2">
-            {metrics.map((m, i) => {
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-medium">Task Breakdown</h4>
+            <div className="flex items-center gap-2">
+              <select
+                className="text-xs bg-secondary rounded px-2 py-1 border-none outline-none text-foreground"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as 'hours' | 'name' | 'color')}
+              >
+                <option value="hours">Hours</option>
+                <option value="name">Name</option>
+                <option value="color">Color</option>
+              </select>
+              <button
+                onClick={() => setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="text-xs bg-secondary hover:bg-secondary/80 rounded px-2 py-1"
+                aria-label="Toggle Sort Direction"
+              >
+                {sortDir === 'asc' ? '↑ Asc' : '↓ Desc'}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {sortedMetrics.map((m, i) => {
               const dailyAvg = m.totalHours / selectedCount;
               return (
                 <div key={i} className="flex items-center gap-2">
