@@ -429,6 +429,70 @@ export default function Index() {
   };
 
 
+  const clearSourceTimelineSlot = useCallback(async (
+    source?: { type: 'timeslot'; sourcePrefix: string; sourceSlotId: string }
+  ) => {
+    if (!source || source.type !== 'timeslot') return;
+    if (!source.sourcePrefix.startsWith('day-')) return;
+
+    await moveDaySlotToUnassigned(
+      source.sourcePrefix.substring(4),
+      source.sourceSlotId,
+    );
+  }, [moveDaySlotToUnassigned]);
+
+  const handlePendingSlotReplace = useCallback(async () => {
+    if (!pendingDaySlotAssignment) return;
+
+    await assignTaskToDaySlot(
+      pendingDaySlotAssignment.date,
+      pendingDaySlotAssignment.slotId,
+      {
+        name: pendingDaySlotAssignment.task.name,
+        color: pendingDaySlotAssignment.task.color,
+        taskId: pendingDaySlotAssignment.task.id,
+      }
+    );
+
+    await clearSourceTimelineSlot(pendingDaySlotAssignment.source);
+    setPendingDaySlotAssignment(null);
+  }, [pendingDaySlotAssignment, assignTaskToDaySlot, clearSourceTimelineSlot]);
+
+  const handlePendingSlotAddSubtask = useCallback(async () => {
+    if (!pendingDaySlotAssignment) return;
+
+    await addSubtaskToDaySlot(
+      pendingDaySlotAssignment.date,
+      pendingDaySlotAssignment.slotId,
+      pendingDaySlotAssignment.task,
+    );
+
+    await clearSourceTimelineSlot(pendingDaySlotAssignment.source);
+    setPendingDaySlotAssignment(null);
+  }, [pendingDaySlotAssignment, addSubtaskToDaySlot, clearSourceTimelineSlot]);
+
+  const renderPendingDaySlotAssignmentDialog = () => (
+    <AlertDialog open={!!pendingDaySlotAssignment} onOpenChange={(open) => { if (!open) setPendingDaySlotAssignment(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Task already exists in this slot</AlertDialogTitle>
+          <AlertDialogDescription>
+            Choose whether to replace the existing task or add the dropped task as a subtask.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handlePendingSlotReplace}>
+            Replace
+          </AlertDialogAction>
+          <AlertDialogAction onClick={handlePendingSlotAddSubtask}>
+            Add as Subtask
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   // ── Mobile Layout ──────────────────────────────────────────────
   if (isMobile) {
     return (
@@ -582,57 +646,7 @@ export default function Index() {
           </div>
         )}
 
-        <AlertDialog open={!!pendingDaySlotAssignment} onOpenChange={(open) => { if (!open) setPendingDaySlotAssignment(null); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Task already exists in this slot</AlertDialogTitle>
-              <AlertDialogDescription>
-                Choose whether to replace the existing task or add the dropped task as a subtask.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (!pendingDaySlotAssignment) return;
-                  await assignTaskToDaySlot(
-                    pendingDaySlotAssignment.date,
-                    pendingDaySlotAssignment.slotId,
-                    {
-                      name: pendingDaySlotAssignment.task.name,
-                      color: pendingDaySlotAssignment.task.color,
-                      taskId: pendingDaySlotAssignment.task.id,
-                    }
-                  );
-
-                  if (pendingDaySlotAssignment.source?.type === 'timeslot' && pendingDaySlotAssignment.source.sourcePrefix.startsWith('day-')) {
-                    await moveDaySlotToUnassigned(
-                      pendingDaySlotAssignment.source.sourcePrefix.substring(4),
-                      pendingDaySlotAssignment.source.sourceSlotId,
-                    );
-                  }
-
-                  setPendingDaySlotAssignment(null);
-                }}
-              >
-                Replace
-              </AlertDialogAction>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (!pendingDaySlotAssignment) return;
-                  await addSubtaskToDaySlot(
-                    pendingDaySlotAssignment.date,
-                    pendingDaySlotAssignment.slotId,
-                    pendingDaySlotAssignment.task,
-                  );
-                  setPendingDaySlotAssignment(null);
-                }}
-              >
-                Add as Subtask
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {renderPendingDaySlotAssignmentDialog()}
       </div>
     </DndContext>
   );
@@ -843,57 +857,7 @@ export default function Index() {
           </div>
         )}
 
-        <AlertDialog open={!!pendingDaySlotAssignment} onOpenChange={(open) => { if (!open) setPendingDaySlotAssignment(null); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Task already exists in this slot</AlertDialogTitle>
-              <AlertDialogDescription>
-                Choose whether to replace the existing task or add the dropped task as a subtask.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (!pendingDaySlotAssignment) return;
-                  await assignTaskToDaySlot(
-                    pendingDaySlotAssignment.date,
-                    pendingDaySlotAssignment.slotId,
-                    {
-                      name: pendingDaySlotAssignment.task.name,
-                      color: pendingDaySlotAssignment.task.color,
-                      taskId: pendingDaySlotAssignment.task.id,
-                    }
-                  );
-
-                  if (pendingDaySlotAssignment.source?.type === 'timeslot' && pendingDaySlotAssignment.source.sourcePrefix.startsWith('day-')) {
-                    await moveDaySlotToUnassigned(
-                      pendingDaySlotAssignment.source.sourcePrefix.substring(4),
-                      pendingDaySlotAssignment.source.sourceSlotId,
-                    );
-                  }
-
-                  setPendingDaySlotAssignment(null);
-                }}
-              >
-                Replace
-              </AlertDialogAction>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (!pendingDaySlotAssignment) return;
-                  await addSubtaskToDaySlot(
-                    pendingDaySlotAssignment.date,
-                    pendingDaySlotAssignment.slotId,
-                    pendingDaySlotAssignment.task,
-                  );
-                  setPendingDaySlotAssignment(null);
-                }}
-              >
-                Add as Subtask
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        {renderPendingDaySlotAssignmentDialog()}
       </div>
     </DndContext>
   );
