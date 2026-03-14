@@ -242,7 +242,7 @@ function DraggableSlotTask({
           </button>
         )}
 
-        {showActions && onAddSubtask && availableTasks && availableTasks.length > 0 && (
+        {showActions && onAddSubtask && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
