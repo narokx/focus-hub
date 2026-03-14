@@ -58,6 +58,7 @@ export default function Index() {
     addTaskToRoutine,
     removeTaskFromRoutine,
     assignTaskToRoutineSlot,
+    addSubtaskToRoutineSlot,
     removeTaskFromRoutineSlot,
     moveRoutineSlotToUnassigned,
     addRoutineTimeSlot,
@@ -572,6 +573,7 @@ export default function Index() {
                 onUpdateRoutineSlotTaskName={async (routineId, slotId, name) => { await updateRoutineSlotTaskName(routineId, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
                 onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
+                onAddSubtaskToRoutineSlot={addSubtaskToRoutineSlot}
                 onClearRoutineTimeline={clearRoutineTimeline}
               />
             )}
@@ -714,6 +716,7 @@ export default function Index() {
             onUpdateRoutineSlotTaskName={async (routineId, slotId, name) => { await updateRoutineSlotTaskName(routineId, slotId, name); fetchTasks(); }}
             availableTasks={state.quickTasks}
             onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
+            onAddSubtaskToRoutineSlot={addSubtaskToRoutineSlot}
             onReorderRoutines={reorderRoutines}
             onClearRoutineTimeline={clearRoutineTimeline}
           />
