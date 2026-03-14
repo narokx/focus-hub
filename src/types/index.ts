@@ -20,6 +20,14 @@ export interface TimeSlotTask {
   name: string;
   color: TaskColor;
   completed?: boolean;
+  subtasks?: SubtaskData[];
+}
+
+export interface SubtaskData {
+  taskId: string;
+  name: string;
+  color: string;
+  percentage: number;
 }
 
 export interface TimeSlot {
