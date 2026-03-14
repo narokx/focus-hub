@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Routine, QuickTask, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
@@ -16,8 +16,13 @@ export function useSupabaseRoutines() {
   const fetchRoutines = useCallback(async () => {
     if (!user) return;
 
+    const routineSlotsWithSubtasksPromise = supabase
+      .from('routine_time_slots')
+      .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
+      .order('start_time', { ascending: true });
+
     // Fetch all three tables in parallel
-    const [routinesRes, tasksRes, slotsRes] = await Promise.all([
+    const [routinesRes, tasksRes, slotsWithSubtasksRes] = await Promise.all([
       supabase
         .from('routines')
         .select('id, name, color, order_index')
@@ -25,11 +30,27 @@ export function useSupabaseRoutines() {
         .order('order_index', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true }),
       supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
-      supabase.from('routine_time_slots').select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)').order('start_time', { ascending: true }),
+      routineSlotsWithSubtasksPromise,
     ]);
+
+    let slotsRes = slotsWithSubtasksRes;
+    if (slotsWithSubtasksRes.error && slotsWithSubtasksRes.error.message?.toLowerCase().includes('subtasks')) {
+      slotsRes = await supabase
+        .from('routine_time_slots')
+        .select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)')
+        .order('start_time', { ascending: true });
+    }
 
     if (routinesRes.error) {
       console.error('Failed to fetch routines:', routinesRes.error);
+      return;
+    }
+    if (tasksRes.error) {
+      console.error('Failed to fetch routine tasks:', tasksRes.error);
+      return;
+    }
+    if (slotsRes.error) {
+      console.error('Failed to fetch routine time slots:', slotsRes.error);
       return;
     }
 
@@ -67,6 +88,7 @@ export function useSupabaseRoutines() {
               taskId: task.id,
               name: task.name,
               color: task.color || '#3B82F6',
+              subtasks: Array.isArray((s as any).subtasks) ? ((s as any).subtasks as SubtaskData[]) : undefined,
             } : null,
           };
         });
@@ -352,6 +374,61 @@ export function useSupabaseRoutines() {
     }
   }, [fetchRoutines]);
 
+  const addSubtaskToRoutineSlot = useCallback(async (routineId: string, slotId: string, subTask: QuickTask) => {
+    if (!routineId || !slotId || !subTask?.id) return;
+
+    const routine = routines.find(r => r.id === routineId);
+    const slot = routine?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const originalSubtasks = slot.task.subtasks;
+    const existingSubtasks = originalSubtasks || [];
+    if (existingSubtasks.length >= 4) return;
+
+    const newSubtask: SubtaskData = {
+      taskId: subTask.id,
+      name: subTask.name,
+      color: subTask.color,
+      percentage: 25,
+    };
+
+    const updatedSubtasks = [...existingSubtasks, newSubtask];
+
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? {
+            ...r,
+            timeSlots: r.timeSlots.map(s =>
+              s.id === slotId && s.task
+                ? { ...s, task: { ...s.task, subtasks: updatedSubtasks } }
+                : s
+            ),
+          }
+        : r
+    ));
+
+    const { error } = await supabase
+      .from('routine_time_slots')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
+
+    if (error) {
+      console.error('Failed to add subtask to routine slot:', error);
+      setRoutines(prev => prev.map(r =>
+        r.id === routineId
+          ? {
+              ...r,
+              timeSlots: r.timeSlots.map(s =>
+                s.id === slotId && s.task
+                  ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
+                  : s
+              ),
+            }
+          : r
+      ));
+    }
+  }, [routines]);
+
   const removeTaskFromRoutineSlot = useCallback(async (routineId: string, slotId: string) => {
     setRoutines(prev => prev.map(r =>
       r.id === routineId
@@ -538,6 +615,7 @@ export function useSupabaseRoutines() {
     addTaskToRoutine,
     removeTaskFromRoutine,
     assignTaskToRoutineSlot,
+    addSubtaskToRoutineSlot,
     removeTaskFromRoutineSlot,
     moveRoutineSlotToUnassigned,
     addRoutineTimeSlot,

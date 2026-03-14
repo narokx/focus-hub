@@ -28,6 +28,7 @@ interface HeatmapCalendarProps {
   onUpdateDaySlotTaskName?: (date: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onAddSubtaskToSlot?: (date: string, slotId: string, task: QuickTask) => void;
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
   onUpdateDayColor?: (date: string, color: string) => void;
@@ -139,6 +140,7 @@ export function HeatmapCalendar({
   onUpdateDaySlotTaskName,
   availableTasks,
   onAssignTaskToSlot,
+  onAddSubtaskToSlot,
   onApplyRoutine,
   onClearDayTimeline,
   onUpdateDayColor,
@@ -252,6 +254,8 @@ export function HeatmapCalendar({
                 onUpdateUnassignedName={(taskId, name) => onUpdateDayTask(selectedDate!, taskId, name)}
                 onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate!, slotId, name) : undefined}
                 onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
+                availableTasks={availableTasks}
+                onAddSubtask={onAddSubtaskToSlot ? (slotId, task) => onAddSubtaskToSlot(selectedDate, slotId, task) : undefined}
               />
             </div>
 

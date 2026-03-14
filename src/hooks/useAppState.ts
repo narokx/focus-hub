@@ -186,6 +186,38 @@ export function useAppState(
     }));
   }, []);
 
+  const addSubtaskToRoutineSlot = useCallback((routineId: string, slotId: string, subTask: QuickTask) => {
+    setState(prev => ({
+      ...prev,
+      routines: prev.routines.map(r => {
+        if (r.id !== routineId) return r;
+        return {
+          ...r,
+          timeSlots: r.timeSlots.map(s => {
+            if (s.id !== slotId || !s.task) return s;
+            const existingSubtasks = s.task.subtasks || [];
+            if (existingSubtasks.length >= 4) return s;
+            return {
+              ...s,
+              task: {
+                ...s.task,
+                subtasks: [
+                  ...existingSubtasks,
+                  {
+                    taskId: subTask.id,
+                    name: subTask.name,
+                    color: subTask.color,
+                    percentage: 25,
+                  },
+                ],
+              },
+            };
+          }),
+        };
+      }),
+    }));
+  }, []);
+
   const removeTaskFromRoutineSlot = useCallback((routineId: string, slotId: string) => {
     setState(prev => ({
       ...prev,
@@ -584,7 +616,7 @@ export function useAppState(
     state,
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
-    assignTaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
+    assignTaskToRoutineSlot, addSubtaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
     addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, updateRoutineSlotTaskName,
     getDayData, addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
     assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,

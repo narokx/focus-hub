@@ -23,6 +23,7 @@ interface RoutinesPanelProps {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
   onReorderRoutines?: (fromIndex: number, toIndex: number) => void;
   onClearRoutineTimeline?: (routineId: string) => void;
 }
@@ -40,6 +41,7 @@ function RoutineItemContent({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  onAddSubtaskToRoutineSlot,
   onClearRoutineTimeline,
   isOver,
   isDragging,
@@ -59,6 +61,7 @@ function RoutineItemContent({
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
   onClearRoutineTimeline?: (routineId: string) => void;
   isOver: boolean;
   isDragging: boolean;
@@ -163,6 +166,8 @@ function RoutineItemContent({
             onRemoveUnassigned={(taskId) => onRemoveTaskFromRoutine(routine.id, taskId)}
             onUpdateSlotTaskName={onUpdateRoutineSlotTaskName ? (slotId, name) => onUpdateRoutineSlotTaskName(routine.id, slotId, name) : undefined}
             onEmptySlotClick={availableTasks && onAssignTaskToRoutineSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
+            availableTasks={availableTasks}
+            onAddSubtask={onAddSubtaskToRoutineSlot ? (slotId, task) => onAddSubtaskToRoutineSlot(routine.id, slotId, task) : undefined}
           />
           {pickerSlotId && availableTasks && onAssignTaskToRoutineSlot && (
             <TaskPickerModal
@@ -220,6 +225,7 @@ function DraggableRoutineItem(props: {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
   onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -260,6 +266,7 @@ function SortableRoutineItem(props: {
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
+  onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
   onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
@@ -311,6 +318,7 @@ export function RoutinesPanel({
   onUpdateRoutineSlotTaskName,
   availableTasks,
   onAssignTaskToRoutineSlot,
+  onAddSubtaskToRoutineSlot,
   onReorderRoutines,
   onClearRoutineTimeline,
 }: RoutinesPanelProps) {
@@ -381,6 +389,7 @@ export function RoutinesPanel({
               onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
               availableTasks={availableTasks}
               onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+              onAddSubtaskToRoutineSlot={onAddSubtaskToRoutineSlot}
               onClearRoutineTimeline={onClearRoutineTimeline}
             />
           ))
@@ -400,6 +409,7 @@ export function RoutinesPanel({
                 onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
                 availableTasks={availableTasks}
                 onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+                onAddSubtaskToRoutineSlot={onAddSubtaskToRoutineSlot}
                 onClearRoutineTimeline={onClearRoutineTimeline}
               />
             ))}
