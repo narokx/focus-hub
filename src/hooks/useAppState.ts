@@ -587,7 +587,7 @@ export function useAppState(
     assignTaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
     addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, updateRoutineSlotTaskName,
     getDayData, addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
-    assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
+    assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned, addSubtaskToDaySlot,
     addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
