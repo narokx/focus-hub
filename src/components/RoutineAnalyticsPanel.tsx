@@ -49,58 +49,19 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
     for (const routine of selected) {
       for (const slot of routine.timeSlots) {
         if (!slot.task) continue;
-        const baseHours = slotDurationHours(slot);
-
-        if (slot.task.subtasks && slot.task.subtasks.length > 0) {
-          let subtaskTotalPct = 0;
-
-          slot.task.subtasks.forEach(sub => {
-            const subHours = baseHours * (sub.percentage / 100);
-            subtaskTotalPct += sub.percentage;
-
-            const subKey = sub.taskId || `sub-${sub.name}`;
-            const existingSub = map.get(subKey);
-            if (existingSub) {
-              existingSub.totalHours += subHours;
-              existingSub.frequency += 1;
-            } else {
-              map.set(subKey, {
-                name: sub.name,
-                color: getColorValue(sub.color),
-                totalHours: subHours,
-                frequency: 1,
-              });
-            }
-          });
-
-          const parentHours = baseHours * ((100 - subtaskTotalPct) / 100);
-          const parentKey = slot.task.taskId || `task-${slot.task.name}`;
-          const existingParent = map.get(parentKey);
-          if (existingParent) {
-            existingParent.totalHours += parentHours;
-            existingParent.frequency += 1;
-          } else {
-            map.set(parentKey, {
-              name: slot.task.name,
-              color: getColorValue(slot.task.color),
-              totalHours: parentHours,
-              frequency: 1,
-            });
-          }
+        const dur = slotDurationHours(slot);
+        const key = slot.task.name;
+        const existing = map.get(key);
+        if (existing) {
+          existing.totalHours += dur;
+          existing.frequency += 1;
         } else {
-          const key = slot.task.taskId || `task-${slot.task.name}`;
-          const existing = map.get(key);
-          if (existing) {
-            existing.totalHours += baseHours;
-            existing.frequency += 1;
-          } else {
-            map.set(key, {
-              name: slot.task.name,
-              color: getColorValue(slot.task.color),
-              totalHours: baseHours,
-              frequency: 1,
-            });
-          }
+          map.set(key, {
+            name: slot.task.name,
+            color: getColorValue(slot.task.color),
+            totalHours: dur,
+            frequency: 1,
+          });
         }
       }
     }

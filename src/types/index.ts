@@ -14,20 +14,12 @@ export interface DayTask {
   completed: boolean;
 }
 
-export interface SubtaskData {
-  taskId: string;
-  name: string;
-  color: string;
-  percentage: number;
-}
-
 export interface TimeSlotTask {
   id: string;
   taskId: string;
   name: string;
   color: TaskColor;
   completed?: boolean;
-  subtasks?: SubtaskData[];
 }
 
 export interface TimeSlot {
