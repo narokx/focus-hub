@@ -29,8 +29,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
-import { TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
+import { QuickTask, TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type MobileTab = 'calendar' | 'routines' | 'tasks';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
@@ -76,6 +77,7 @@ export default function Index() {
     updateDayTask,
     removeDayTask,
     assignTaskToDaySlot,
+    addSubtaskToDaySlot,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
@@ -136,6 +138,12 @@ export default function Index() {
     targetDate: string;
   } | null>(null);
   const [isApplyingRoutine, setIsApplyingRoutine] = useState(false);
+  const [pendingDaySlotAssignment, setPendingDaySlotAssignment] = useState<{
+    date: string;
+    slotId: string;
+    task: QuickTask;
+    source?: { type: 'timeslot'; sourcePrefix: string; sourceSlotId: string };
+  } | null>(null);
 
   // History for undo/redo
   const history = useHistory(state);
@@ -230,6 +238,13 @@ export default function Index() {
     setActiveDragData(event.active.data.current as any);
   };
 
+  const resolveDaySlotTarget = (prefix: string, slotId: string) => {
+    if (!prefix.startsWith('day-')) return null;
+    const date = prefix.substring(4);
+    const existingSlot = state.calendar[date]?.timeSlots.find(s => s.id === slotId);
+    return { date, existingSlot };
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
@@ -239,6 +254,37 @@ export default function Index() {
 
     const activeData = active.data.current as any;
     const overData = over.data.current as any;
+
+    if (overData?.type === 'timeslot') {
+      const target = resolveDaySlotTarget(overData.prefix, overData.slotId);
+      const targetHasTask = !!target?.existingSlot?.task;
+      const movingFromSameSlot =
+        activeData?.source === 'timeslot' &&
+        activeData?.sourcePrefix === overData.prefix &&
+        activeData?.sourceSlotId === overData.slotId;
+
+      const canPromptForAssignment = activeData?.type === 'task' && !!activeData?.name && !!activeData?.color;
+
+      if (targetHasTask && !movingFromSameSlot && canPromptForAssignment && target) {
+        setPendingDaySlotAssignment({
+          date: target.date,
+          slotId: overData.slotId,
+          task: {
+            id: activeData.taskId || (active.id as string),
+            name: activeData.name,
+            color: activeData.color,
+          },
+          source: activeData?.source === 'timeslot'
+            ? {
+                type: 'timeslot',
+                sourcePrefix: activeData.sourcePrefix,
+                sourceSlotId: activeData.sourceSlotId,
+              }
+            : undefined,
+        });
+        return;
+      }
+    }
 
     // Handle sortable reorder within Quick Tasks
     if (activeData?.type === 'task' && activeData?.source === 'quick-tasks' && overData?.type === 'task' && overData?.source === 'quick-tasks') {
@@ -383,6 +429,70 @@ export default function Index() {
   };
 
 
+  const clearSourceTimelineSlot = useCallback(async (
+    source?: { type: 'timeslot'; sourcePrefix: string; sourceSlotId: string }
+  ) => {
+    if (!source || source.type !== 'timeslot') return;
+    if (!source.sourcePrefix.startsWith('day-')) return;
+
+    await moveDaySlotToUnassigned(
+      source.sourcePrefix.substring(4),
+      source.sourceSlotId,
+    );
+  }, [moveDaySlotToUnassigned]);
+
+  const handlePendingSlotReplace = useCallback(async () => {
+    if (!pendingDaySlotAssignment) return;
+
+    await assignTaskToDaySlot(
+      pendingDaySlotAssignment.date,
+      pendingDaySlotAssignment.slotId,
+      {
+        name: pendingDaySlotAssignment.task.name,
+        color: pendingDaySlotAssignment.task.color,
+        taskId: pendingDaySlotAssignment.task.id,
+      }
+    );
+
+    await clearSourceTimelineSlot(pendingDaySlotAssignment.source);
+    setPendingDaySlotAssignment(null);
+  }, [pendingDaySlotAssignment, assignTaskToDaySlot, clearSourceTimelineSlot]);
+
+  const handlePendingSlotAddSubtask = useCallback(async () => {
+    if (!pendingDaySlotAssignment) return;
+
+    await addSubtaskToDaySlot(
+      pendingDaySlotAssignment.date,
+      pendingDaySlotAssignment.slotId,
+      pendingDaySlotAssignment.task,
+    );
+
+    await clearSourceTimelineSlot(pendingDaySlotAssignment.source);
+    setPendingDaySlotAssignment(null);
+  }, [pendingDaySlotAssignment, addSubtaskToDaySlot, clearSourceTimelineSlot]);
+
+  const renderPendingDaySlotAssignmentDialog = () => (
+    <AlertDialog open={!!pendingDaySlotAssignment} onOpenChange={(open) => { if (!open) setPendingDaySlotAssignment(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Task already exists in this slot</AlertDialogTitle>
+          <AlertDialogDescription>
+            Choose whether to replace the existing task or add the dropped task as a subtask.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handlePendingSlotReplace}>
+            Replace
+          </AlertDialogAction>
+          <AlertDialogAction onClick={handlePendingSlotAddSubtask}>
+            Add as Subtask
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   // ── Mobile Layout ──────────────────────────────────────────────
   if (isMobile) {
     return (
@@ -439,6 +549,7 @@ export default function Index() {
                 onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
+            onAddSubtaskToSlot={addSubtaskToDaySlot}
                 onApplyRoutine={(date, routine) => {
                   setPendingRoutineDrop({ routine, targetDate: date });
                   setRoutineModalOpen(true);
@@ -534,6 +645,8 @@ export default function Index() {
             </div>
           </div>
         )}
+
+        {renderPendingDaySlotAssignmentDialog()}
       </div>
     </DndContext>
   );
@@ -659,6 +772,7 @@ export default function Index() {
             onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
+            onAddSubtaskToSlot={addSubtaskToDaySlot}
             onApplyRoutine={(date, routine) => {
               setPendingRoutineDrop({ routine, targetDate: date });
               setRoutineModalOpen(true);
@@ -742,6 +856,8 @@ export default function Index() {
             </div>
           </div>
         )}
+
+        {renderPendingDaySlotAssignmentDialog()}
       </div>
     </DndContext>
   );

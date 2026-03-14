@@ -1,9 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star } from 'lucide-react';
-import { TimeSlot, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
+import { Plus, Trash2, X, Pencil, FileText, Star, Layers } from 'lucide-react';
+import { QuickTask, TimeSlot, TaskColor, getColorValue, getContrastColor, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 function formatTimeDisplay(time24: string): string {
@@ -46,6 +47,8 @@ interface TimelineViewProps {
   onRemoveUnassigned: (taskId: string) => void;
   onUpdateUnassignedName?: (taskId: string, name: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAddSubtask?: (slotId: string, task: QuickTask) => void;
   timeColumnWidth?: number;
   onTimeColumnWidthChange?: (width: number) => void;
   onEmptySlotClick?: (slotId: string) => void;
@@ -58,6 +61,8 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
+  availableTasks,
+  onAddSubtask,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
@@ -65,6 +70,8 @@ function DraggableSlotTask({
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAddSubtask?: (slotId: string, task: QuickTask) => void;
 }) {
   const task = slot.task!;
   const [isEditing, setIsEditing] = React.useState(false);
@@ -98,6 +105,28 @@ function DraggableSlotTask({
 
   const textColor = getContrastColor(task.color);
   const bgColor = getColorValue(task.color);
+  const subtasks = task.subtasks || [];
+  const subtotal = subtasks.reduce((sum, st) => sum + Math.max(0, Math.min(100, st.percentage || 0)), 0);
+  const parentPercentage = Math.max(0, 100 - Math.min(100, subtotal));
+  const gradientSegments: string[] = [];
+  let currentStop = 0;
+
+  if (parentPercentage > 0) {
+    gradientSegments.push(`${bgColor} ${currentStop}% ${currentStop + parentPercentage}%`);
+    currentStop += parentPercentage;
+  }
+
+  subtasks.forEach((subtask, index) => {
+    const normalizedPercentage = Math.max(0, Math.min(100, subtask.percentage || 0));
+    const isLast = index === subtasks.length - 1;
+    const nextStop = isLast ? 100 : Math.min(100, currentStop + normalizedPercentage);
+    if (nextStop > currentStop) {
+      gradientSegments.push(`${getColorValue(subtask.color)} ${currentStop}% ${nextStop}%`);
+      currentStop = nextStop;
+    }
+  });
+
+  const slotBackground = gradientSegments.length > 0 ? `linear-gradient(90deg, ${gradientSegments.join(', ')})` : bgColor;
   const showActions = !isEditing && (hovered || isTouchDevice);
 
   React.useEffect(() => {
@@ -118,7 +147,7 @@ function DraggableSlotTask({
     <>
       <div
         ref={setNodeRef}
-        style={{ ...style, backgroundColor: bgColor, color: textColor }}
+        style={{ ...style, background: slotBackground, color: textColor }}
         className={cn(
           'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
           isDragging && 'opacity-50'
@@ -213,6 +242,37 @@ function DraggableSlotTask({
           </button>
         )}
 
+        {showActions && onAddSubtask && availableTasks && availableTasks.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className={cn(
+                  'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
+                  textColor === 'white' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+                )}
+                title="Add subtask"
+              >
+                <Layers className="w-2.5 h-2.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              {availableTasks.map((availableTask) => (
+                <DropdownMenuItem
+                  key={availableTask.id}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onAddSubtask(slot.id, availableTask);
+                  }}
+                >
+                  {availableTask.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
         <button
           onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
           onPointerDown={(e) => e.stopPropagation()}
@@ -246,6 +306,8 @@ function TimeSlotRow({
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
+  availableTasks,
+  onAddSubtask,
   timeColumnWidth,
   onEmptySlotClick,
 }: {
@@ -257,6 +319,8 @@ function TimeSlotRow({
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
+  availableTasks?: QuickTask[];
+  onAddSubtask?: (slotId: string, task: QuickTask) => void;
   timeColumnWidth: number;
   onEmptySlotClick?: (slotId: string) => void;
 }) {
@@ -309,6 +373,8 @@ function TimeSlotRow({
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}
+            availableTasks={availableTasks}
+            onAddSubtask={onAddSubtask}
           />
         ) : (
           <span
@@ -410,6 +476,8 @@ export function TimelineView({
   onRemoveUnassigned,
   onUpdateUnassignedName,
   onUpdateSlotTaskName,
+  availableTasks,
+  onAddSubtask,
   onEmptySlotClick,
 }: TimelineViewProps) {
   const timeColWidth = DEFAULT_TIME_COL;
@@ -430,6 +498,8 @@ export function TimelineView({
             onUpdateSlotTaskName={onUpdateSlotTaskName}
             timeColumnWidth={timeColWidth}
             onEmptySlotClick={onEmptySlotClick}
+            availableTasks={availableTasks}
+            onAddSubtask={onAddSubtask}
           />
         ))}
       </div>

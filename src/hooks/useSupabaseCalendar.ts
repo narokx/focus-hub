@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DayData, DayTask, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
-
 export function useSupabaseCalendar() {
   const { user } = useAuth();
   const [calendar, setCalendar] = useState<Record<string, DayData>>({});
@@ -24,7 +23,7 @@ export function useSupabaseCalendar() {
         .order('order_index', { ascending: true }),
       supabase
         .from('calendar_events')
-        .select('id, date, start_time, end_time, task_id, completed, tasks(id, name, color)')
+        .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
         .eq('user_id', user.id)
         .order('start_time', { ascending: true }),
     ]);
@@ -87,6 +86,7 @@ export function useSupabaseCalendar() {
               name: task.name,
               color: task.color || '#3B82F6',
               completed: e.completed || false,
+              subtasks: Array.isArray((e as any).subtasks) ? ((e as any).subtasks as SubtaskData[]) : undefined,
             } : null,
           };
         });
@@ -316,6 +316,68 @@ export function useSupabaseCalendar() {
       fetchCalendar();
     }
   }, [fetchCalendar]);
+
+  const addSubtaskToDaySlot = useCallback(async (date: string, slotId: string, subTask: QuickTask) => {
+    if (!user || !date || !slotId || !subTask?.id) return;
+
+    const dayData = calendar[date];
+    const slot = dayData?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const originalSubtasks = slot.task.subtasks;
+    const existingSubtasks = originalSubtasks || [];
+    if (existingSubtasks.length >= 4) return;
+
+    const newSubtask: SubtaskData = {
+      taskId: subTask.id,
+      name: subTask.name,
+      color: subTask.color,
+      percentage: 25,
+    };
+
+    const updatedSubtasks = [...existingSubtasks, newSubtask];
+
+    setCalendar(prev => {
+      const currentDay = prev[date];
+      if (!currentDay) return prev;
+      return {
+        ...prev,
+        [date]: {
+          ...currentDay,
+          timeSlots: currentDay.timeSlots.map(s =>
+            s.id === slotId && s.task
+              ? { ...s, task: { ...s.task, subtasks: updatedSubtasks } }
+              : s
+          ),
+        },
+      };
+    });
+
+    const { error } = await supabase
+      .from('calendar_events')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
+
+    if (error) {
+      console.error('Failed to add subtask to day slot:', error);
+      // Revert optimistic update on error
+      setCalendar(prev => {
+        const currentDay = prev[date];
+        if (!currentDay) return prev;
+        return {
+          ...prev,
+          [date]: {
+            ...currentDay,
+            timeSlots: currentDay.timeSlots.map(s =>
+              s.id === slotId && s.task
+                ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
+                : s
+            ),
+          },
+        };
+      });
+    }
+  }, [user, calendar]);
 
   const assignTaskToDaySlot = useCallback(async (date: string, slotId: string, task: { name: string; color: string; taskId?: string }) => {
     if (!user) return;
@@ -1121,6 +1183,7 @@ export function useSupabaseCalendar() {
     updateDayTask,
     removeDayTask,
     assignTaskToDaySlot,
+    addSubtaskToDaySlot,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
