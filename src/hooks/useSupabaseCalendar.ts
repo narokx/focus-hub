@@ -5,16 +5,6 @@ import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTime
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function extractCalendarEventId(rawId: string): string | null {
-  if (!rawId) return null;
-  if (UUID_REGEX.test(rawId)) return rawId;
-
-  const match = rawId.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
-  return match ? match[0] : null;
-}
-
 export function useSupabaseCalendar() {
   const { user } = useAuth();
   const [calendar, setCalendar] = useState<Record<string, DayData>>({});
@@ -334,16 +324,10 @@ export function useSupabaseCalendar() {
     const slot = dayData?.timeSlots.find(s => s.id === slotId);
     if (!slot?.task) return;
 
-    const existingSubtasks = slot.task.subtasks || [];
+    const originalSubtasks = slot.task.subtasks;
+    const existingSubtasks = originalSubtasks || [];
     if (existingSubtasks.length >= 4) return;
 
-    const dbSlotId = extractCalendarEventId(slot.id) || extractCalendarEventId(slot.task.id);
-    if (!dbSlotId) {
-      console.error('Failed to add subtask to day slot: invalid calendar event id', { slotId, taskId: slot.task.id });
-      return;
-    }
-
-    const previousSubtasks = [...existingSubtasks];
     const newSubtask: SubtaskData = {
       taskId: subTask.id,
       name: subTask.name,
@@ -369,18 +353,14 @@ export function useSupabaseCalendar() {
       };
     });
 
-    try {
-      const { error } = await supabase
-        .from('calendar_events')
-        .update({ subtasks: updatedSubtasks as any })
-        .eq('id', dbSlotId);
+    const { error } = await supabase
+      .from('calendar_events')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
 
-      if (error) throw error;
-
-      await fetchCalendar();
-    } catch (error) {
+    if (error) {
       console.error('Failed to add subtask to day slot:', error);
-
+      // Revert optimistic update on error
       setCalendar(prev => {
         const currentDay = prev[date];
         if (!currentDay) return prev;
@@ -390,14 +370,14 @@ export function useSupabaseCalendar() {
             ...currentDay,
             timeSlots: currentDay.timeSlots.map(s =>
               s.id === slotId && s.task
-                ? { ...s, task: { ...s.task, subtasks: previousSubtasks } }
+                ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
                 : s
             ),
           },
         };
       });
     }
-  }, [user, calendar, fetchCalendar]);
+  }, [user, calendar]);
 
   const assignTaskToDaySlot = useCallback(async (date: string, slotId: string, task: { name: string; color: string; taskId?: string }) => {
     if (!user) return;
