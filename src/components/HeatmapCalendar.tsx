@@ -255,7 +255,7 @@ export function HeatmapCalendar({
                 onUpdateSlotTaskName={onUpdateDaySlotTaskName ? (slotId, name) => onUpdateDaySlotTaskName(selectedDate!, slotId, name) : undefined}
                 onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
                 availableTasks={availableTasks}
-                onAddSubtask={(slotId, task) => { if (selectedDate && onAddSubtaskToSlot) onAddSubtaskToSlot(selectedDate, slotId, task); }}
+                onAddSubtask={onAddSubtaskToSlot && selectedDate ? (slotId, task) => onAddSubtaskToSlot(selectedDate, slotId, task) : undefined}
               />
             </div>
 
