@@ -45,10 +45,11 @@ export function TaskDetailsModal({
 
   const updatePercentage = (subtaskId: string, nextValue: number) => {
     setDraftSubtasks((prev) => {
-      const withoutCurrent = prev.filter((st) => st.taskId !== subtaskId);
-      const usedByOthers = withoutCurrent.reduce((sum, st) => sum + (st.percentage || 0), 0);
+      const otherSubtasks = prev.filter((st) => st.taskId !== subtaskId);
+      const usedByOthers = otherSubtasks.reduce((sum, st) => sum + (st.percentage || 0), 0);
+      const maxAllowed = Math.max(0, 100 - usedByOthers);
       const safeValue = Math.max(0, Math.min(100, nextValue));
-      const cappedValue = Math.min(safeValue, Math.max(0, 100 - usedByOthers));
+      const cappedValue = Math.min(safeValue, maxAllowed);
 
       return prev.map((st) => (st.taskId === subtaskId ? { ...st, percentage: cappedValue } : st));
     });
@@ -91,39 +92,46 @@ export function TaskDetailsModal({
           {draftSubtasks.length === 0 ? (
             <p className="text-sm text-muted-foreground">No subtasks available for this task.</p>
           ) : (
-            draftSubtasks.map((subtask) => (
-              <div key={subtask.taskId} className="rounded-lg border border-border p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium truncate">{subtask.name}</p>
-                  <button
-                    onClick={async () => {
-                      await onRemoveSubtask(slotId, subtask.taskId);
-                      setDraftSubtasks((prev) => prev.filter((st) => st.taskId !== subtask.taskId));
-                    }}
-                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                    title="Remove subtask"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+            draftSubtasks.map((subtask) => {
+              const usedByOthers = draftSubtasks
+                .filter((st) => st.taskId !== subtask.taskId)
+                .reduce((sum, st) => sum + (st.percentage || 0), 0);
+              const maxAllowed = Math.max(0, 100 - usedByOthers);
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Percentage</span>
-                    <span>{subtask.percentage}% ({formatMinutes(getPercentageMinutes(subtask.percentage || 0))})</span>
+              return (
+                <div key={subtask.taskId} className="rounded-lg border border-border p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium truncate">{subtask.name}</p>
+                    <button
+                      onClick={async () => {
+                        await onRemoveSubtask(slotId, subtask.taskId);
+                        setDraftSubtasks((prev) => prev.filter((st) => st.taskId !== subtask.taskId));
+                      }}
+                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                      title="Remove subtask"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={Math.max(0, 100 - (totalPercentage - (subtask.percentage || 0)))}
-                    step={1}
-                    value={subtask.percentage}
-                    onChange={(e) => updatePercentage(subtask.taskId, Number(e.target.value))}
-                    className="w-full"
-                  />
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>Percentage</span>
+                      <span>{subtask.percentage}% ({formatMinutes(getPercentageMinutes(subtask.percentage || 0))})</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxAllowed}
+                      step={1}
+                      value={subtask.percentage}
+                      onChange={(e) => updatePercentage(subtask.taskId, Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
