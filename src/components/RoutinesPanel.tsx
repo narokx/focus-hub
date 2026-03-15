@@ -3,7 +3,7 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight, Eraser } from 'lucide-react';
-import { Routine, QuickTask, generateDefaultTimeSlots } from '@/types';
+import { Routine, QuickTask, SubtaskData, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -24,6 +24,8 @@ interface RoutinesPanelProps {
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
+  onRemoveSubtaskFromRoutineSlot?: (routineId: string, slotId: string, subtaskIdToRemove: string) => Promise<void> | void;
+  onUpdateRoutineSubtaskPercentages?: (routineId: string, slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
   onReorderRoutines?: (fromIndex: number, toIndex: number) => void;
   onClearRoutineTimeline?: (routineId: string) => void;
 }
@@ -42,6 +44,8 @@ function RoutineItemContent({
   availableTasks,
   onAssignTaskToRoutineSlot,
   onAddSubtaskToRoutineSlot,
+  onRemoveSubtaskFromRoutineSlot,
+  onUpdateRoutineSubtaskPercentages,
   onClearRoutineTimeline,
   isOver,
   isDragging,
@@ -62,6 +66,8 @@ function RoutineItemContent({
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
+  onRemoveSubtaskFromRoutineSlot?: (routineId: string, slotId: string, subtaskIdToRemove: string) => Promise<void> | void;
+  onUpdateRoutineSubtaskPercentages?: (routineId: string, slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
   onClearRoutineTimeline?: (routineId: string) => void;
   isOver: boolean;
   isDragging: boolean;
@@ -168,6 +174,8 @@ function RoutineItemContent({
             onEmptySlotClick={availableTasks && onAssignTaskToRoutineSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
             availableTasks={availableTasks}
             onAddSubtask={onAddSubtaskToRoutineSlot ? (slotId, task) => onAddSubtaskToRoutineSlot(routine.id, slotId, task) : undefined}
+            onRemoveSubtask={onRemoveSubtaskFromRoutineSlot ? (slotId, subtaskIdToRemove) => onRemoveSubtaskFromRoutineSlot(routine.id, slotId, subtaskIdToRemove) : undefined}
+            onUpdateSubtaskPercentages={onUpdateRoutineSubtaskPercentages ? (slotId, updatedSubtasks) => onUpdateRoutineSubtaskPercentages(routine.id, slotId, updatedSubtasks) : undefined}
           />
           {pickerSlotId && availableTasks && onAssignTaskToRoutineSlot && (
             <TaskPickerModal
@@ -226,6 +234,8 @@ function DraggableRoutineItem(props: {
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
+  onRemoveSubtaskFromRoutineSlot?: (routineId: string, slotId: string, subtaskIdToRemove: string) => Promise<void> | void;
+  onUpdateRoutineSubtaskPercentages?: (routineId: string, slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
   onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -267,6 +277,8 @@ function SortableRoutineItem(props: {
   availableTasks?: QuickTask[];
   onAssignTaskToRoutineSlot?: (routineId: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onAddSubtaskToRoutineSlot?: (routineId: string, slotId: string, task: QuickTask) => void;
+  onRemoveSubtaskFromRoutineSlot?: (routineId: string, slotId: string, subtaskIdToRemove: string) => Promise<void> | void;
+  onUpdateRoutineSubtaskPercentages?: (routineId: string, slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
   onClearRoutineTimeline?: (routineId: string) => void;
 }) {
   const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
@@ -319,6 +331,8 @@ export function RoutinesPanel({
   availableTasks,
   onAssignTaskToRoutineSlot,
   onAddSubtaskToRoutineSlot,
+  onRemoveSubtaskFromRoutineSlot,
+  onUpdateRoutineSubtaskPercentages,
   onReorderRoutines,
   onClearRoutineTimeline,
 }: RoutinesPanelProps) {
@@ -390,6 +404,8 @@ export function RoutinesPanel({
               availableTasks={availableTasks}
               onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
               onAddSubtaskToRoutineSlot={onAddSubtaskToRoutineSlot}
+              onRemoveSubtaskFromRoutineSlot={onRemoveSubtaskFromRoutineSlot}
+              onUpdateRoutineSubtaskPercentages={onUpdateRoutineSubtaskPercentages}
               onClearRoutineTimeline={onClearRoutineTimeline}
             />
           ))
@@ -410,6 +426,8 @@ export function RoutinesPanel({
                 availableTasks={availableTasks}
                 onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
                 onAddSubtaskToRoutineSlot={onAddSubtaskToRoutineSlot}
+                onRemoveSubtaskFromRoutineSlot={onRemoveSubtaskFromRoutineSlot}
+                onUpdateRoutineSubtaskPercentages={onUpdateRoutineSubtaskPercentages}
                 onClearRoutineTimeline={onClearRoutineTimeline}
               />
             ))}

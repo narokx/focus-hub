@@ -59,6 +59,8 @@ export default function Index() {
     removeTaskFromRoutine,
     assignTaskToRoutineSlot,
     addSubtaskToRoutineSlot,
+    removeSubtask: removeSubtaskFromRoutineSlot,
+    updateSubtaskPercentages: updateRoutineSubtaskPercentages,
     removeTaskFromRoutineSlot,
     moveRoutineSlotToUnassigned,
     addRoutineTimeSlot,
@@ -79,6 +81,8 @@ export default function Index() {
     removeDayTask,
     assignTaskToDaySlot,
     addSubtaskToDaySlot,
+    removeSubtask: removeSubtaskFromDaySlot,
+    updateSubtaskPercentages: updateDaySubtaskPercentages,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
@@ -551,6 +555,8 @@ export default function Index() {
                 availableTasks={state.quickTasks}
                 onAssignTaskToSlot={assignTaskToDaySlot}
             onAddSubtaskToSlot={addSubtaskToDaySlot}
+                onRemoveSubtaskFromSlot={removeSubtaskFromDaySlot}
+                onUpdateSubtaskPercentagesForSlot={updateDaySubtaskPercentages}
                 onApplyRoutine={(date, routine) => {
                   setPendingRoutineDrop({ routine, targetDate: date });
                   setRoutineModalOpen(true);
@@ -574,6 +580,8 @@ export default function Index() {
                 availableTasks={state.quickTasks}
                 onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
                 onAddSubtaskToRoutineSlot={addSubtaskToRoutineSlot}
+                onRemoveSubtaskFromRoutineSlot={removeSubtaskFromRoutineSlot}
+                onUpdateRoutineSubtaskPercentages={updateRoutineSubtaskPercentages}
                 onClearRoutineTimeline={clearRoutineTimeline}
               />
             )}
@@ -717,6 +725,8 @@ export default function Index() {
             availableTasks={state.quickTasks}
             onAssignTaskToRoutineSlot={assignTaskToRoutineSlot}
             onAddSubtaskToRoutineSlot={addSubtaskToRoutineSlot}
+            onRemoveSubtaskFromRoutineSlot={removeSubtaskFromRoutineSlot}
+            onUpdateRoutineSubtaskPercentages={updateRoutineSubtaskPercentages}
             onReorderRoutines={reorderRoutines}
             onClearRoutineTimeline={clearRoutineTimeline}
           />
@@ -776,6 +786,8 @@ export default function Index() {
             availableTasks={state.quickTasks}
             onAssignTaskToSlot={assignTaskToDaySlot}
             onAddSubtaskToSlot={addSubtaskToDaySlot}
+            onRemoveSubtaskFromSlot={removeSubtaskFromDaySlot}
+            onUpdateSubtaskPercentagesForSlot={updateDaySubtaskPercentages}
             onApplyRoutine={(date, routine) => {
               setPendingRoutineDrop({ routine, targetDate: date });
               setRoutineModalOpen(true);

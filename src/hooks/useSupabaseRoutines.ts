@@ -429,6 +429,96 @@ export function useSupabaseRoutines() {
     }
   }, [routines]);
 
+  const removeSubtask = useCallback(async (routineId: string, slotId: string, subtaskIdToRemove: string) => {
+    if (!routineId || !slotId || !subtaskIdToRemove) return;
+
+    const routine = routines.find(r => r.id === routineId);
+    const slot = routine?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const originalSubtasks = slot.task.subtasks || [];
+    const updatedSubtasks = originalSubtasks.filter(st => st.taskId !== subtaskIdToRemove);
+
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? {
+            ...r,
+            timeSlots: r.timeSlots.map(s =>
+              s.id === slotId && s.task
+                ? { ...s, task: { ...s.task, subtasks: updatedSubtasks } }
+                : s
+            ),
+          }
+        : r
+    ));
+
+    const { error } = await supabase
+      .from('routine_time_slots')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
+
+    if (error) {
+      console.error('Failed to remove subtask from routine slot:', error);
+      setRoutines(prev => prev.map(r =>
+        r.id === routineId
+          ? {
+              ...r,
+              timeSlots: r.timeSlots.map(s =>
+                s.id === slotId && s.task
+                  ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
+                  : s
+              ),
+            }
+          : r
+      ));
+    }
+  }, [routines]);
+
+  const updateSubtaskPercentages = useCallback(async (routineId: string, slotId: string, updatedSubtasks: SubtaskData[]) => {
+    if (!routineId || !slotId) return;
+
+    const routine = routines.find(r => r.id === routineId);
+    const slot = routine?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const originalSubtasks = slot.task.subtasks || [];
+
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? {
+            ...r,
+            timeSlots: r.timeSlots.map(s =>
+              s.id === slotId && s.task
+                ? { ...s, task: { ...s.task, subtasks: updatedSubtasks } }
+                : s
+            ),
+          }
+        : r
+    ));
+
+    const { error } = await supabase
+      .from('routine_time_slots')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
+
+    if (error) {
+      console.error('Failed to update subtask percentages for routine slot:', error);
+      setRoutines(prev => prev.map(r =>
+        r.id === routineId
+          ? {
+              ...r,
+              timeSlots: r.timeSlots.map(s =>
+                s.id === slotId && s.task
+                  ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
+                  : s
+              ),
+            }
+          : r
+      ));
+    }
+  }, [routines]);
+
+
   const removeTaskFromRoutineSlot = useCallback(async (routineId: string, slotId: string) => {
     setRoutines(prev => prev.map(r =>
       r.id === routineId
@@ -616,6 +706,8 @@ export function useSupabaseRoutines() {
     removeTaskFromRoutine,
     assignTaskToRoutineSlot,
     addSubtaskToRoutineSlot,
+    removeSubtask,
+    updateSubtaskPercentages,
     removeTaskFromRoutineSlot,
     moveRoutineSlotToUnassigned,
     addRoutineTimeSlot,
