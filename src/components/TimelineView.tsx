@@ -137,7 +137,8 @@ function DraggableSlotTask({
   });
 
   const slotBackground = gradientSegments.length > 0 ? `linear-gradient(90deg, ${gradientSegments.join(', ')})` : bgColor;
-  const showActions = !isEditing && (hovered || isTouchDevice || subtaskMenuOpen);
+  const isTempSlot = typeof slot.id === 'string' && slot.id.startsWith('ts-');
+  const showActions = !isEditing && (hovered || isTouchDevice || subtaskMenuOpen) && !isTempSlot;
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -160,12 +161,13 @@ function DraggableSlotTask({
         style={{ ...style, background: slotBackground, color: textColor }}
         className={cn(
           'flex items-center gap-2 w-full px-2 py-1 rounded text-sm font-medium cursor-grab active:cursor-grabbing',
-          isDragging && 'opacity-50'
+          isDragging && 'opacity-50',
+          isTempSlot && 'animate-pulse opacity-80'
         )}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         onClick={(e) => {
-          if (isDragging || isEditing) return;
+          if (isDragging || isEditing || isTempSlot) return;
           if ((e.target as HTMLElement).closest('button, input, [role="menuitem"]')) return;
           if (onRemoveSubtask && onUpdateSubtaskPercentages) setDetailsOpen(true);
         }}
@@ -177,7 +179,7 @@ function DraggableSlotTask({
           <Star className="w-3 h-3 flex-shrink-0 fill-current opacity-80" />
         )}
 
-        {showCompleted && onToggleSlotTask && (
+        {showCompleted && onToggleSlotTask && !isTempSlot && (
           <button
             onClick={(e) => { e.stopPropagation(); onToggleSlotTask(slot.id); }}
             onPointerDown={(e) => e.stopPropagation()}
@@ -290,16 +292,18 @@ function DraggableSlotTask({
           </DropdownMenu>
         )}
 
-        <button
-          onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
+        {!isTempSlot && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemoveTaskFromSlot(slot.id); }}
           onPointerDown={(e) => e.stopPropagation()}
           className={cn(
             'w-4 h-4 flex items-center justify-center rounded-full opacity-60 hover:opacity-100 transition-opacity flex-shrink-0',
             textColor === '#ffffff' ? 'hover:bg-white/20' : 'hover:bg-black/10'
           )}
-        >
-          <X className="w-3 h-3" />
-        </button>
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
       </div>
 
       {detailsOpen && onRemoveSubtask && onUpdateSubtaskPercentages && (
