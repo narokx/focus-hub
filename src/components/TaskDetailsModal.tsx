@@ -93,11 +93,6 @@ export function TaskDetailsModal({
             <p className="text-sm text-muted-foreground">No subtasks available for this task.</p>
           ) : (
             draftSubtasks.map((subtask) => {
-              const usedByOthers = draftSubtasks
-                .filter((st) => st.taskId !== subtask.taskId)
-                .reduce((sum, st) => sum + (st.percentage || 0), 0);
-              const maxAllowed = Math.max(0, 100 - usedByOthers);
-
               return (
                 <div key={subtask.taskId} className="rounded-lg border border-border p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
@@ -122,7 +117,7 @@ export function TaskDetailsModal({
                     <input
                       type="range"
                       min={0}
-                      max={maxAllowed}
+                      max={100}
                       step={1}
                       value={subtask.percentage}
                       onChange={(e) => updatePercentage(subtask.taskId, Number(e.target.value))}

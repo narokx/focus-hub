@@ -39,13 +39,7 @@ export function useSupabaseRoutines() {
       routineSlotsWithSubtasksPromise,
     ]);
 
-    let slotsRes = slotsWithSubtasksRes;
-    if (slotsWithSubtasksRes.error && slotsWithSubtasksRes.error.message?.toLowerCase().includes('subtasks')) {
-      slotsRes = await supabase
-        .from('routine_time_slots')
-        .select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)')
-        .order('start_time', { ascending: true });
-    }
+    const slotsRes = slotsWithSubtasksRes;
 
     if (routinesRes.error) {
       console.error('Failed to fetch routines:', routinesRes.error);
