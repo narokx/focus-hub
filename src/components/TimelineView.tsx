@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star, Layers } from 'lucide-react';
-import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
+import { QuickTask, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -215,7 +215,7 @@ function DraggableSlotTask({
               task.completed && 'line-through opacity-60'
             )}
           >
-            {task.subtasks && task.subtasks.length > 0 ? `${task.name} / ${task.subtasks.map(st => st.name).join(' / ')}` : task.name}
+            {task.subtasks && task.subtasks.length > 0 ? `${task.name} / ${task.subtasks[0].name}` : task.name}
           </span>
         )}
 
