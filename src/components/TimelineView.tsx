@@ -78,6 +78,7 @@ function DraggableSlotTask({
   const [editName, setEditName] = React.useState(task.name);
   const [notesOpen, setNotesOpen] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
+  const [subtaskMenuOpen, setSubtaskMenuOpen] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
@@ -127,7 +128,7 @@ function DraggableSlotTask({
   });
 
   const slotBackground = gradientSegments.length > 0 ? `linear-gradient(90deg, ${gradientSegments.join(', ')})` : bgColor;
-  const showActions = !isEditing && (hovered || isTouchDevice);
+  const showActions = !isEditing && (hovered || isTouchDevice || subtaskMenuOpen);
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -243,7 +244,7 @@ function DraggableSlotTask({
         )}
 
         {showActions && onAddSubtask && (
-          <DropdownMenu>
+          <DropdownMenu onOpenChange={setSubtaskMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 onClick={(e) => e.stopPropagation()}
