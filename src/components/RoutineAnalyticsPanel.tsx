@@ -26,12 +26,23 @@ interface TaskMetric {
   color: string;
   totalHours: number;
   frequency: number;
+  occurrences: { source: string; hours: number }[];
 }
 
 export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<'hours' | 'name' | 'color'>('hours');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+
+  const formatMinutesToReadable = (hours: number) => {
+    const totalMinutes = Math.round(hours * 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (hrs === 0) return `${mins}m`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins}m`;
+  };
 
   const toggleRoutine = (id: string) => {
     setSelectedIds(prev => {
@@ -46,17 +57,21 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
     const map = new Map<string, TaskMetric>();
     const selected = routines.filter(r => selectedIds.has(r.id));
 
-    const addMetric = (name: string, color: string, hours: number) => {
+    const addMetric = (name: string, color: string, hours: number, source: string) => {
       const existing = map.get(name);
       if (existing) {
         existing.totalHours += hours;
         existing.frequency += 1;
+        const occurrence = existing.occurrences.find((entry) => entry.source === source);
+        if (occurrence) occurrence.hours += hours;
+        else existing.occurrences.push({ source, hours });
       } else {
         map.set(name, {
           name,
           color: getColorValue(color),
           totalHours: hours,
           frequency: 1,
+          occurrences: [{ source, hours }],
         });
       }
     };
@@ -71,11 +86,11 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
         const mainPct = 100 - subtotalPct;
         const mainDur = dur * (mainPct / 100);
 
-        addMetric(slot.task.name, slot.task.color, mainDur);
+        addMetric(slot.task.name, slot.task.color, mainDur, routine.name);
 
         for (const subtask of subtasks) {
           const subDur = dur * (subtask.percentage / 100);
-          addMetric(subtask.name, subtask.color, subDur);
+          addMetric(subtask.name, subtask.color, subDur, routine.name);
         }
       }
     }
@@ -184,33 +199,54 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
             {sortedMetrics.map((m, i) => {
               const dailyAvg = m.totalHours / selectedCount;
               return (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i}>
                   <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: m.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-medium truncate">{m.name}</span>
-                      <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                        {m.totalHours.toFixed(1)}h · {m.frequency}×
-                      </span>
-                    </div>
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(m.totalHours / maxHours) * 100}%`,
-                          backgroundColor: m.color,
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[9px] text-muted-foreground">
-                        Avg {dailyAvg.toFixed(1)}h/day
-                      </span>
+                    className="flex items-center gap-2 cursor-pointer rounded-sm px-1 py-0.5 hover:bg-secondary/40 transition-colors"
+                    onClick={() => setExpandedTask(expandedTask === m.name ? null : m.name)}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: m.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-medium truncate">{m.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                          {m.totalHours.toFixed(1)}h · {m.frequency}×
+                        </span>
+                      </div>
+                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${(m.totalHours / maxHours) * 100}%`,
+                            backgroundColor: m.color,
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] text-muted-foreground">
+                          Avg {dailyAvg.toFixed(1)}h/day
+                        </span>
+                      </div>
                     </div>
                   </div>
+                  {expandedTask === m.name && m.occurrences.length > 0 && (
+                    <div
+                      className="bg-background/50 rounded-md p-2 mt-1 ml-5 border-l-2 space-y-1"
+                      style={{ borderLeftColor: m.color }}
+                    >
+                      {m.occurrences.map((occurrence) => (
+                        <div
+                          key={`${m.name}-${occurrence.source}`}
+                          className="flex items-center justify-between text-[11px] text-muted-foreground"
+                        >
+                          <span>{occurrence.source}</span>
+                          <span>{formatMinutesToReadable(occurrence.hours)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
