@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
@@ -665,9 +665,14 @@ export function useSupabaseCalendar() {
     setCalendar(prev => {
       const dayData = prev[date];
       if (!dayData) return prev;
+
+      const updatedSlots = dayData.timeSlots
+        .map(s => s.id === slotId ? { ...s, [field]: value } : s)
+        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
       return {
         ...prev,
-        [date]: { ...dayData, timeSlots: dayData.timeSlots.map(s => s.id === slotId ? { ...s, [field]: value } : s) },
+        [date]: { ...dayData, timeSlots: updatedSlots },
       };
     });
 
@@ -892,8 +897,9 @@ export function useSupabaseCalendar() {
   );
 
   const timeToMinutes = (time: string) => {
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
+    const normalized = parseTimeTo24h(time);
+    const [h, m] = normalized.split(':').map(Number);
+    return h * 60 + (m || 0);
   };
 
   // Helper to calculate the sorting weight of a time string 'HH:mm'
