@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star, Layers } from 'lucide-react';
-import { QuickTask, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
+import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
@@ -114,6 +114,7 @@ function DraggableSlotTask({
 
   const textColor = getContrastColor(task.color);
   const bgColor = getColorValue(task.color);
+  const slotDurationMinutes = getSlotDurationMinutes(slot.startTime, slot.endTime);
   const subtasks = task.subtasks || [];
   const subtotal = subtasks.reduce((sum, st) => sum + Math.max(0, Math.min(100, st.percentage || 0)), 0);
   const parentPercentage = Math.max(0, 100 - Math.min(100, subtotal));
@@ -215,7 +216,9 @@ function DraggableSlotTask({
               task.completed && 'line-through opacity-60'
             )}
           >
-            {task.subtasks && task.subtasks.length > 0 ? `${task.name} / ${task.subtasks[0].name}` : task.name}
+            {task.subtasks && task.subtasks.length > 0
+              ? `${task.name} / ${task.subtasks.map(st => st.name).join(' / ')}`
+              : task.name}
           </span>
         )}
 
@@ -303,6 +306,7 @@ function DraggableSlotTask({
         <TaskDetailsModal
           task={task}
           slotId={slot.id}
+          slotDurationMinutes={slotDurationMinutes}
           onRemoveSubtask={onRemoveSubtask}
           onUpdateSubtaskPercentages={onUpdateSubtaskPercentages}
           onClose={() => setDetailsOpen(false)}

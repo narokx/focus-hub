@@ -5,14 +5,26 @@ import { SubtaskData, TimeSlotTask } from '@/types';
 interface TaskDetailsModalProps {
   task: TimeSlotTask;
   slotId: string;
+  slotDurationMinutes: number;
   onClose: () => void;
   onRemoveSubtask: (slotId: string, subtaskIdToRemove: string) => Promise<void> | void;
   onUpdateSubtaskPercentages: (slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
 }
 
+function formatMinutes(minutes: number): string {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const remainingMinutes = safeMinutes % 60;
+
+  if (hours === 0) return `${remainingMinutes}m`;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}m`;
+}
+
 export function TaskDetailsModal({
   task,
   slotId,
+  slotDurationMinutes,
   onClose,
   onRemoveSubtask,
   onUpdateSubtaskPercentages,
@@ -27,6 +39,9 @@ export function TaskDetailsModal({
     () => draftSubtasks.reduce((sum, subtask) => sum + (subtask.percentage || 0), 0),
     [draftSubtasks]
   );
+  const mainTaskPercentage = Math.max(0, 100 - totalPercentage);
+
+  const getPercentageMinutes = (percentage: number) => (slotDurationMinutes * Math.max(0, percentage)) / 100;
 
   const updatePercentage = (subtaskId: string, nextValue: number) => {
     setDraftSubtasks((prev) => {
@@ -64,6 +79,15 @@ export function TaskDetailsModal({
         </div>
 
         <div className="px-4 py-3 max-h-[420px] overflow-y-auto space-y-3">
+          <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/30">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium truncate">Main Task</p>
+              <span className="text-xs text-muted-foreground">
+                {task.name} - {mainTaskPercentage}% ({formatMinutes(getPercentageMinutes(mainTaskPercentage))})
+              </span>
+            </div>
+          </div>
+
           {draftSubtasks.length === 0 ? (
             <p className="text-sm text-muted-foreground">No subtasks available for this task.</p>
           ) : (
@@ -86,12 +110,12 @@ export function TaskDetailsModal({
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>Percentage</span>
-                    <span>{subtask.percentage}%</span>
+                    <span>{subtask.percentage}% ({formatMinutes(getPercentageMinutes(subtask.percentage || 0))})</span>
                   </div>
                   <input
                     type="range"
                     min={0}
-                    max={100}
+                    max={Math.max(0, 100 - (totalPercentage - (subtask.percentage || 0)))}
                     step={1}
                     value={subtask.percentage}
                     onChange={(e) => updatePercentage(subtask.taskId, Number(e.target.value))}
