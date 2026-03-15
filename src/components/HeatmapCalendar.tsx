@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
-import { DayData, QuickTask, Routine, generateDefaultTimeSlots } from '@/types';
+import { DayData, QuickTask, Routine, SubtaskData, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
 import { RoutinePickerModal } from './RoutinePickerModal';
@@ -29,6 +29,8 @@ interface HeatmapCalendarProps {
   availableTasks?: QuickTask[];
   onAssignTaskToSlot?: (date: string, slotId: string, task: { name: string; color: string; taskId: string }) => void;
   onAddSubtaskToSlot?: (date: string, slotId: string, task: QuickTask) => void;
+  onRemoveSubtaskFromSlot?: (date: string, slotId: string, subtaskIdToRemove: string) => Promise<void> | void;
+  onUpdateSubtaskPercentagesForSlot?: (date: string, slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
   onUpdateDayColor?: (date: string, color: string) => void;
@@ -141,6 +143,8 @@ export function HeatmapCalendar({
   availableTasks,
   onAssignTaskToSlot,
   onAddSubtaskToSlot,
+  onRemoveSubtaskFromSlot,
+  onUpdateSubtaskPercentagesForSlot,
   onApplyRoutine,
   onClearDayTimeline,
   onUpdateDayColor,
@@ -256,6 +260,8 @@ export function HeatmapCalendar({
                 onEmptySlotClick={availableTasks && onAssignTaskToSlot ? (slotId) => setPickerSlotId(slotId) : undefined}
                 availableTasks={availableTasks}
                 onAddSubtask={onAddSubtaskToSlot && selectedDate ? (slotId, task) => onAddSubtaskToSlot(selectedDate, slotId, task) : undefined}
+                onRemoveSubtask={onRemoveSubtaskFromSlot && selectedDate ? (slotId, subtaskIdToRemove) => onRemoveSubtaskFromSlot(selectedDate, slotId, subtaskIdToRemove) : undefined}
+                onUpdateSubtaskPercentages={onUpdateSubtaskPercentagesForSlot && selectedDate ? (slotId, updatedSubtasks) => onUpdateSubtaskPercentagesForSlot(selectedDate, slotId, updatedSubtasks) : undefined}
               />
             </div>
 

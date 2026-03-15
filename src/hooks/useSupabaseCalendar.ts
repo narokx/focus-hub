@@ -379,6 +379,108 @@ export function useSupabaseCalendar() {
     }
   }, [user, calendar]);
 
+  const removeSubtask = useCallback(async (date: string, slotId: string, subtaskIdToRemove: string) => {
+    if (!user || !date || !slotId || !subtaskIdToRemove) return;
+
+    const dayData = calendar[date];
+    const slot = dayData?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const originalSubtasks = slot.task.subtasks || [];
+    const updatedSubtasks = originalSubtasks.filter(st => st.taskId !== subtaskIdToRemove);
+
+    setCalendar(prev => {
+      const currentDay = prev[date];
+      if (!currentDay) return prev;
+      return {
+        ...prev,
+        [date]: {
+          ...currentDay,
+          timeSlots: currentDay.timeSlots.map(s =>
+            s.id === slotId && s.task
+              ? { ...s, task: { ...s.task, subtasks: updatedSubtasks } }
+              : s
+          ),
+        },
+      };
+    });
+
+    const { error } = await supabase
+      .from('calendar_events')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
+
+    if (error) {
+      console.error('Failed to remove subtask from day slot:', error);
+      setCalendar(prev => {
+        const currentDay = prev[date];
+        if (!currentDay) return prev;
+        return {
+          ...prev,
+          [date]: {
+            ...currentDay,
+            timeSlots: currentDay.timeSlots.map(s =>
+              s.id === slotId && s.task
+                ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
+                : s
+            ),
+          },
+        };
+      });
+    }
+  }, [user, calendar]);
+
+  const updateSubtaskPercentages = useCallback(async (date: string, slotId: string, updatedSubtasks: SubtaskData[]) => {
+    if (!user || !date || !slotId) return;
+
+    const dayData = calendar[date];
+    const slot = dayData?.timeSlots.find(s => s.id === slotId);
+    if (!slot?.task) return;
+
+    const originalSubtasks = slot.task.subtasks || [];
+
+    setCalendar(prev => {
+      const currentDay = prev[date];
+      if (!currentDay) return prev;
+      return {
+        ...prev,
+        [date]: {
+          ...currentDay,
+          timeSlots: currentDay.timeSlots.map(s =>
+            s.id === slotId && s.task
+              ? { ...s, task: { ...s.task, subtasks: updatedSubtasks } }
+              : s
+          ),
+        },
+      };
+    });
+
+    const { error } = await supabase
+      .from('calendar_events')
+      .update({ subtasks: updatedSubtasks as any })
+      .eq('id', slotId);
+
+    if (error) {
+      console.error('Failed to update subtask percentages for day slot:', error);
+      setCalendar(prev => {
+        const currentDay = prev[date];
+        if (!currentDay) return prev;
+        return {
+          ...prev,
+          [date]: {
+            ...currentDay,
+            timeSlots: currentDay.timeSlots.map(s =>
+              s.id === slotId && s.task
+                ? { ...s, task: { ...s.task, subtasks: originalSubtasks } }
+                : s
+            ),
+          },
+        };
+      });
+    }
+  }, [user, calendar]);
+
+
   const assignTaskToDaySlot = useCallback(async (date: string, slotId: string, task: { name: string; color: string; taskId?: string }) => {
     if (!user) return;
 
@@ -1184,6 +1286,8 @@ export function useSupabaseCalendar() {
     removeDayTask,
     assignTaskToDaySlot,
     addSubtaskToDaySlot,
+    removeSubtask,
+    updateSubtaskPercentages,
     toggleDaySlotTask,
     moveDaySlotToUnassigned,
     addDayTimeSlot,
