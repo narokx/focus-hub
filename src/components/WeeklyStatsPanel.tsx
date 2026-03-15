@@ -46,22 +46,37 @@ interface TaskStat {
 function computeStats(calendar: Record<string, DayData>, dateRange: string[]): TaskStat[] {
   const map = new Map<string, TaskStat>();
 
+  const addStat = (name: string, color: string, hours: number, doneHours: number) => {
+    const existing = map.get(name);
+    if (existing) {
+      existing.hours += hours;
+      existing.doneHours += doneHours;
+      existing.count += 1;
+    } else {
+      map.set(name, { name, color: getColorValue(color), hours, doneHours, count: 1 });
+    }
+  };
+
   for (const date of dateRange) {
     const day = calendar[date];
     if (!day) continue;
 
     for (const slot of day.timeSlots || []) {
       if (!slot.task) continue;
-      const key = slot.task.name;
       const dur = slotDuration(slot);
-      const doneDur = slot.task.completed ? dur : 0;
-      const existing = map.get(key);
-      if (existing) {
-        existing.hours += dur;
-        existing.doneHours += doneDur;
-        existing.count += 1;
-      } else {
-        map.set(key, { name: slot.task.name, color: getColorValue(slot.task.color), hours: dur, doneHours: doneDur, count: 1 });
+
+      const subtasks = slot.task.subtasks || [];
+      const subtotalPct = subtasks.reduce((sum, subtask) => sum + subtask.percentage, 0);
+      const mainPct = 100 - subtotalPct;
+      const mainDur = dur * (mainPct / 100);
+      const mainDoneDur = slot.task.completed ? mainDur : 0;
+
+      addStat(slot.task.name, slot.task.color, mainDur, mainDoneDur);
+
+      for (const subtask of subtasks) {
+        const subDur = dur * (subtask.percentage / 100);
+        const subDoneDur = slot.task.completed ? subDur : 0;
+        addStat(subtask.name, subtask.color, subDur, subDoneDur);
       }
     }
 
@@ -104,8 +119,9 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
         const s = parseISO(customStart);
         const e = parseISO(customEnd);
         if (s <= e) return eachDayOfInterval({ start: s, end: e }).map(fmt);
-      } catch {}
-      return [];
+      } catch {
+        return [];
+      }
     } else {
       return Object.keys(calendar).sort();
     }

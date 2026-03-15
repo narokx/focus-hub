@@ -46,22 +46,36 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
     const map = new Map<string, TaskMetric>();
     const selected = routines.filter(r => selectedIds.has(r.id));
 
+    const addMetric = (name: string, color: string, hours: number) => {
+      const existing = map.get(name);
+      if (existing) {
+        existing.totalHours += hours;
+        existing.frequency += 1;
+      } else {
+        map.set(name, {
+          name,
+          color: getColorValue(color),
+          totalHours: hours,
+          frequency: 1,
+        });
+      }
+    };
+
     for (const routine of selected) {
       for (const slot of routine.timeSlots) {
         if (!slot.task) continue;
         const dur = slotDurationHours(slot);
-        const key = slot.task.name;
-        const existing = map.get(key);
-        if (existing) {
-          existing.totalHours += dur;
-          existing.frequency += 1;
-        } else {
-          map.set(key, {
-            name: slot.task.name,
-            color: getColorValue(slot.task.color),
-            totalHours: dur,
-            frequency: 1,
-          });
+
+        const subtasks = slot.task.subtasks || [];
+        const subtotalPct = subtasks.reduce((sum, subtask) => sum + subtask.percentage, 0);
+        const mainPct = 100 - subtotalPct;
+        const mainDur = dur * (mainPct / 100);
+
+        addMetric(slot.task.name, slot.task.color, mainDur);
+
+        for (const subtask of subtasks) {
+          const subDur = dur * (subtask.percentage / 100);
+          addMetric(subtask.name, subtask.color, subDur);
         }
       }
     }
