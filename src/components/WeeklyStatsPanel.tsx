@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
 import { DayData } from '@/types';
 import { getColorValue, Routine } from '@/types';
 import { BarChart2, Calendar } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { RoutineAnalyticsPanel } from '@/components/RoutineAnalyticsPanel';
 
 type Range = 'this-week' | 'last-week' | 'this-month' | 'last-30' | 'all-time' | 'custom';
@@ -41,19 +40,30 @@ interface TaskStat {
   hours: number;
   doneHours: number;
   count: number;
+  occurrences: { source: string; hours: number }[];
 }
 
 function computeStats(calendar: Record<string, DayData>, dateRange: string[]): TaskStat[] {
   const map = new Map<string, TaskStat>();
 
-  const addStat = (name: string, color: string, hours: number, doneHours: number) => {
+  const addStat = (name: string, color: string, hours: number, doneHours: number, source: string) => {
     const existing = map.get(name);
     if (existing) {
       existing.hours += hours;
       existing.doneHours += doneHours;
       existing.count += 1;
+      const occurrence = existing.occurrences.find((entry) => entry.source === source);
+      if (occurrence) occurrence.hours += hours;
+      else existing.occurrences.push({ source, hours });
     } else {
-      map.set(name, { name, color: getColorValue(color), hours, doneHours, count: 1 });
+      map.set(name, {
+        name,
+        color: getColorValue(color),
+        hours,
+        doneHours,
+        count: 1,
+        occurrences: [{ source, hours }],
+      });
     }
   };
 
@@ -71,12 +81,12 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
       const mainDur = dur * (mainPct / 100);
       const mainDoneDur = slot.task.completed ? mainDur : 0;
 
-      addStat(slot.task.name, slot.task.color, mainDur, mainDoneDur);
+      addStat(slot.task.name, slot.task.color, mainDur, mainDoneDur, date);
 
       for (const subtask of subtasks) {
         const subDur = dur * (subtask.percentage / 100);
         const subDoneDur = slot.task.completed ? subDur : 0;
-        addStat(subtask.name, subtask.color, subDur, subDoneDur);
+        addStat(subtask.name, subtask.color, subDur, subDoneDur, date);
       }
     }
 
@@ -86,7 +96,7 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
       if (existing) {
         existing.count += 1;
       } else {
-        map.set(key, { name: task.name, color: getColorValue(task.color), hours: 0, doneHours: 0, count: 1 });
+        map.set(key, { name: task.name, color: getColorValue(task.color), hours: 0, doneHours: 0, count: 1, occurrences: [] });
       }
     }
   }
@@ -100,6 +110,16 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
   const [customEnd, setCustomEnd] = useState('');
   const [sortKey, setSortKey] = useState<'hours' | 'name' | 'color'>('hours');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [expandedTask, setExpandedTask] = useState<string | null>(null);
+
+  const formatMinutesToReadable = (hours: number) => {
+    const totalMinutes = Math.round(hours * 60);
+    const hrs = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (hrs === 0) return `${mins}m`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins}m`;
+  };
 
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -251,48 +271,66 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
               const failedHours = stat.hours - stat.doneHours;
               const failedPct = stat.hours > 0 ? (failedHours / stat.hours) * 100 : 0;
               return (
-                <div key={i} className="flex items-center gap-2 group">
+                <div key={i} className="group">
                   <div
-                    className="w-3 h-3 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: stat.color }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-medium truncate">{stat.name}</span>
-                      <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
-                        {stat.hours > 0 ? `${stat.doneHours.toFixed(1)}/${stat.hours.toFixed(1)}h` : `${stat.count}×`}
-                      </span>
-                    </div>
-                    {stat.hours > 0 && (
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
-                        {/* Success bar */}
-                        <div
-                          className="h-full transition-all duration-500"
-                          style={{
-                            width: `${(successPct / 100) * (stat.hours / maxHours) * 100}%`,
-                            backgroundColor: stat.color,
-                          }}
-                        />
-                        {/* Failure bar */}
-                        {failedPct > 0 && (
+                    className="flex items-center gap-2 cursor-pointer rounded-sm px-1 py-0.5 hover:bg-secondary/40 transition-colors"
+                    onClick={() => setExpandedTask(expandedTask === stat.name ? null : stat.name)}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: stat.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-medium truncate">{stat.name}</span>
+                        <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+                          {stat.hours > 0 ? `${stat.doneHours.toFixed(1)}/${stat.hours.toFixed(1)}h` : `${stat.count}×`}
+                        </span>
+                      </div>
+                      {stat.hours > 0 && (
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
+                          {/* Success bar */}
                           <div
-                            className="h-full bg-destructive transition-all duration-500 opacity-70"
+                            className="h-full transition-all duration-500"
                             style={{
-                              width: `${(failedPct / 100) * (stat.hours / maxHours) * 100}%`,
+                              width: `${(successPct / 100) * (stat.hours / maxHours) * 100}%`,
+                              backgroundColor: stat.color,
                             }}
                           />
-                        )}
-                      </div>
-                    )}
-                    {stat.hours > 0 && (
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[9px] text-muted-foreground">✓ {stat.doneHours.toFixed(1)}h done</span>
-                        {failedHours > 0.01 && (
-                          <span className="text-[9px] text-destructive">✗ {failedHours.toFixed(1)}h missed</span>
-                        )}
-                      </div>
-                    )}
+                          {/* Failure bar */}
+                          {failedPct > 0 && (
+                            <div
+                              className="h-full bg-destructive transition-all duration-500 opacity-70"
+                              style={{
+                                width: `${(failedPct / 100) * (stat.hours / maxHours) * 100}%`,
+                              }}
+                            />
+                          )}
+                        </div>
+                      )}
+                      {stat.hours > 0 && (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[9px] text-muted-foreground">✓ {stat.doneHours.toFixed(1)}h done</span>
+                          {failedHours > 0.01 && (
+                            <span className="text-[9px] text-destructive">✗ {failedHours.toFixed(1)}h missed</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {expandedTask === stat.name && stat.occurrences.length > 0 && (
+                    <div
+                      className="bg-background/50 rounded-md p-2 mt-1 ml-5 border-l-2 space-y-1"
+                      style={{ borderLeftColor: stat.color }}
+                    >
+                      {stat.occurrences.map((occurrence) => (
+                        <div key={`${stat.name}-${occurrence.source}`} className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{occurrence.source}</span>
+                          <span>{formatMinutesToReadable(occurrence.hours)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
               })}
