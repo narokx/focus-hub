@@ -8,17 +8,6 @@ import { TaskDetailsModal } from './TaskDetailsModal';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn, getContrastColor } from '@/lib/utils';
 
-function formatTimeDisplay(time24: string): string {
-  const normalized = parseTimeTo24h(time24);
-  const [hStr, mStr] = normalized.split(':');
-  let h = parseInt(hStr, 10);
-  const m = mStr || '00';
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  if (h === 0) h = 12;
-  else if (h > 12) h -= 12;
-  return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
-}
-
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
   const s = parseTimeTo24h(startTime);
   const e = parseTimeTo24h(endTime);
@@ -378,14 +367,14 @@ function TimeSlotRow({
       >
         <div className="flex flex-col min-w-0">
           <input
-            type="text"
-            value={formatTimeDisplay(slot.startTime)}
+            type="time"
+            value={parseTimeTo24h(slot.startTime)}
             onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <input
-            type="text"
-            value={formatTimeDisplay(slot.endTime)}
+            type="time"
+            value={parseTimeTo24h(slot.endTime)}
             onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />

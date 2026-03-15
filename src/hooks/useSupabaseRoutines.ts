@@ -1,10 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
+
+const timeToMinutes = (time: string) => {
+  const normalized = parseTimeTo24h(time);
+  const [hours, minutes] = normalized.split(':').map(Number);
+  return (hours * 60) + (minutes || 0);
+};
 
 export function useSupabaseRoutines() {
   const { user } = useAuth();
@@ -602,11 +608,15 @@ export function useSupabaseRoutines() {
   }, [fetchRoutines]);
 
   const updateRoutineSlotTime = useCallback(async (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => {
-    setRoutines(prev => prev.map(r =>
-      r.id === routineId
-        ? { ...r, timeSlots: r.timeSlots.map(s => s.id === slotId ? { ...s, [field]: value } : s) }
-        : r
-    ));
+    setRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+
+      const updatedSlots = r.timeSlots
+        .map(s => s.id === slotId ? { ...s, [field]: value } : s)
+        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+      return { ...r, timeSlots: updatedSlots };
+    }));
 
     const dbField = field === 'startTime' ? 'start_time' : 'end_time';
     const { error } = await supabase.from('routine_time_slots').update({ [dbField]: value }).eq('id', slotId);
