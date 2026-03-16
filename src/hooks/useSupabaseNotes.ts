@@ -16,7 +16,7 @@ export function useSupabaseNotes() {
 
     const { error } = await supabase
       .from('user_notes')
-      .update({ content: nextContent, updated_at: new Date().toISOString() })
+      .update({ content: nextContent })
       .eq('id', noteId)
       .eq('user_id', user.id);
 
@@ -45,47 +45,54 @@ export function useSupabaseNotes() {
       return;
     }
 
-    let mounted = true;
+    const controller = new AbortController();
 
     const fetchOrCreateNote = async () => {
-      setLoading(true);
+      try {
+        setLoading(true);
 
-      const { data: existing, error: fetchError } = await supabase
-        .from('user_notes')
-        .select('id, content')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        const { data: existing, error: fetchError } = await supabase
+          .from('user_notes')
+          .select('id, content')
+          .eq('user_id', user.id)
+          .maybeSingle()
+          .abortSignal(controller.signal);
 
-      if (fetchError) {
-        console.error('Failed to fetch note:', fetchError);
-        if (mounted) setLoading(false);
-        return;
-      }
+        if (fetchError) {
+          console.error('Failed to fetch note:', fetchError);
+          setLoading(false);
+          return;
+        }
 
-      if (existing) {
-        if (mounted) {
+        if (existing) {
           setNoteId(existing.id);
           setContent(existing.content ?? '');
           setLoading(false);
+          return;
         }
-        return;
-      }
 
-      const { data: created, error: createError } = await supabase
-        .from('user_notes')
-        .insert({ user_id: user.id, content: '' })
-        .select('id, content')
-        .maybeSingle();
+        const { data: created, error: createError } = await supabase
+          .from('user_notes')
+          .insert({ user_id: user.id, content: '' })
+          .select('id, content')
+          .maybeSingle()
+          .abortSignal(controller.signal);
 
-      if (createError) {
-        console.error('Failed to create note:', createError);
-        if (mounted) setLoading(false);
-        return;
-      }
+        if (createError) {
+          console.error('Failed to create note:', createError);
+          setLoading(false);
+          return;
+        }
 
-      if (mounted) {
         setNoteId(created?.id ?? null);
         setContent(created?.content ?? '');
+        setLoading(false);
+      } catch (error) {
+        if ((error as { name?: string }).name === 'AbortError') {
+          return;
+        }
+
+        console.error('Failed to fetch or create note:', error);
         setLoading(false);
       }
     };
@@ -93,7 +100,7 @@ export function useSupabaseNotes() {
     fetchOrCreateNote();
 
     return () => {
-      mounted = false;
+      controller.abort();
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
