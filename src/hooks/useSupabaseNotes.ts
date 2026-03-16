@@ -38,6 +38,8 @@ export function useSupabaseNotes() {
   }, [persistNote]);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (!user) {
       setNoteId(null);
       setContent('');
@@ -49,6 +51,7 @@ export function useSupabaseNotes() {
 
     const fetchOrCreateNote = async () => {
       try {
+        if (!isMounted) return;
         setLoading(true);
 
         const { data: existing, error: fetchError } = await supabase
@@ -60,11 +63,13 @@ export function useSupabaseNotes() {
 
         if (fetchError) {
           console.error('Failed to fetch note:', fetchError);
+          if (!isMounted) return;
           setLoading(false);
           return;
         }
 
         if (existing) {
+          if (!isMounted) return;
           setNoteId(existing.id);
           setContent(existing.content ?? '');
           setLoading(false);
@@ -80,10 +85,12 @@ export function useSupabaseNotes() {
 
         if (createError) {
           console.error('Failed to create note:', createError);
+          if (!isMounted) return;
           setLoading(false);
           return;
         }
 
+        if (!isMounted) return;
         setNoteId(created?.id ?? null);
         setContent(created?.content ?? '');
         setLoading(false);
@@ -93,6 +100,7 @@ export function useSupabaseNotes() {
         }
 
         console.error('Failed to fetch or create note:', error);
+        if (!isMounted) return;
         setLoading(false);
       }
     };
@@ -100,6 +108,7 @@ export function useSupabaseNotes() {
     fetchOrCreateNote();
 
     return () => {
+      isMounted = false;
       controller.abort();
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
