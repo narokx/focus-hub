@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { SubtaskData, TimeSlotTask } from '@/types';
+import { formatMinutes } from '@/lib/utils';
 
 interface TaskDetailsModalProps {
   task: TimeSlotTask;
@@ -11,15 +12,6 @@ interface TaskDetailsModalProps {
   onUpdateSubtaskPercentages: (slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
 }
 
-function formatMinutes(minutes: number): string {
-  const safeMinutes = Math.max(0, Math.round(minutes));
-  const hours = Math.floor(safeMinutes / 60);
-  const remainingMinutes = safeMinutes % 60;
-
-  if (hours === 0) return `${remainingMinutes}m`;
-  if (remainingMinutes === 0) return `${hours}h`;
-  return `${hours}h ${remainingMinutes}m`;
-}
 
 export function TaskDetailsModal({
   task,
@@ -84,7 +76,7 @@ export function TaskDetailsModal({
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium truncate">Main Task</p>
               <span className="text-xs text-muted-foreground">
-                {task.name} - {mainTaskPercentage}% ({formatMinutes(getPercentageMinutes(mainTaskPercentage))})
+                {task.name} - {mainTaskPercentage}% ({formatMinutes(getPercentageMinutes(mainTaskPercentage) / 60)})
               </span>
             </div>
           </div>
@@ -112,7 +104,7 @@ export function TaskDetailsModal({
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Percentage</span>
-                      <span>{subtask.percentage}% ({formatMinutes(getPercentageMinutes(subtask.percentage || 0))})</span>
+                      <span>{subtask.percentage}% ({formatMinutes(getPercentageMinutes(subtask.percentage || 0) / 60)})</span>
                     </div>
                     <input
                       type="range"

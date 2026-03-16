@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
+import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
+import { timeToMinutes } from '@/lib/utils';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 export function useSupabaseCalendar() {
@@ -896,11 +897,6 @@ export function useSupabaseCalendar() {
     [user]
   );
 
-  const timeToMinutes = (time: string) => {
-    const normalized = parseTimeTo24h(time);
-    const [h, m] = normalized.split(':').map(Number);
-    return h * 60 + (m || 0);
-  };
 
   // Helper to calculate the sorting weight of a time string 'HH:mm'
   const getTimeWeight = (timeStr: string) => {

@@ -4,6 +4,7 @@ import { DayData } from '@/types';
 import { getColorValue, Routine } from '@/types';
 import { BarChart2, Calendar } from 'lucide-react';
 import { RoutineAnalyticsPanel } from '@/components/RoutineAnalyticsPanel';
+import { formatMinutes } from '@/lib/utils';
 
 type Range = 'this-week' | 'last-week' | 'this-month' | 'last-30' | 'all-time' | 'custom';
 
@@ -77,7 +78,7 @@ function computeStats(calendar: Record<string, DayData>, dateRange: string[]): T
 
       const subtasks = slot.task.subtasks || [];
       const subtotalPct = subtasks.reduce((sum, subtask) => sum + subtask.percentage, 0);
-      const mainPct = 100 - subtotalPct;
+      const mainPct = Math.max(0, 100 - subtotalPct);
       const mainDur = dur * (mainPct / 100);
       const mainDoneDur = slot.task.completed ? mainDur : 0;
 
@@ -112,14 +113,6 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
 
-  const formatMinutesToReadable = (hours: number) => {
-    const totalMinutes = Math.round(hours * 60);
-    const hrs = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    if (hrs === 0) return `${mins}m`;
-    if (mins === 0) return `${hrs}h`;
-    return `${hrs}h ${mins}m`;
-  };
 
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -266,12 +259,12 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
               </div>
             </div>
             <div className="space-y-3">
-              {sortedTaskStats.map((stat, i) => {
+              {sortedTaskStats.map((stat) => {
               const successPct = stat.hours > 0 ? (stat.doneHours / stat.hours) * 100 : 0;
               const failedHours = stat.hours - stat.doneHours;
               const failedPct = stat.hours > 0 ? (failedHours / stat.hours) * 100 : 0;
               return (
-                <div key={i} className="group">
+                <div key={stat.name} className="group">
                   <div
                     className="flex items-center gap-2 cursor-pointer rounded-sm px-1 py-0.5 hover:bg-secondary/40 transition-colors"
                     onClick={() => setExpandedTask(expandedTask === stat.name ? null : stat.name)}
@@ -326,7 +319,7 @@ export function WeeklyStatsPanel({ calendar, routines = [] }: WeeklyStatsPanelPr
                       {stat.occurrences.map((occurrence) => (
                         <div key={`${stat.name}-${occurrence.source}`} className="flex items-center justify-between text-[11px] text-muted-foreground">
                           <span>{occurrence.source}</span>
-                          <span>{formatMinutesToReadable(occurrence.hours)}</span>
+                          <span>{formatMinutes(occurrence.hours)}</span>
                         </div>
                       ))}
                     </div>

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Routine, parseTimeTo24h } from '@/types';
 import { getColorValue } from '@/types';
 import { Layers } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatMinutes } from '@/lib/utils';
 
 interface RoutineAnalyticsPanelProps {
   routines: Routine[];
@@ -35,14 +35,6 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
 
-  const formatMinutesToReadable = (hours: number) => {
-    const totalMinutes = Math.round(hours * 60);
-    const hrs = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    if (hrs === 0) return `${mins}m`;
-    if (mins === 0) return `${hrs}h`;
-    return `${hrs}h ${mins}m`;
-  };
 
   const toggleRoutine = (id: string) => {
     setSelectedIds(prev => {
@@ -83,7 +75,7 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
 
         const subtasks = slot.task.subtasks || [];
         const subtotalPct = subtasks.reduce((sum, subtask) => sum + subtask.percentage, 0);
-        const mainPct = 100 - subtotalPct;
+        const mainPct = Math.max(0, 100 - subtotalPct);
         const mainDur = dur * (mainPct / 100);
 
         addMetric(slot.task.name, slot.task.color, mainDur, routine.name);
@@ -196,10 +188,10 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
           </div>
 
           <div className="space-y-3">
-            {sortedMetrics.map((m, i) => {
+            {sortedMetrics.map((m) => {
               const dailyAvg = m.totalHours / selectedCount;
               return (
-                <div key={i}>
+                <div key={m.name}>
                   <div
                     className="flex items-center gap-2 cursor-pointer rounded-sm px-1 py-0.5 hover:bg-secondary/40 transition-colors"
                     onClick={() => setExpandedTask(expandedTask === m.name ? null : m.name)}
@@ -242,7 +234,7 @@ export function RoutineAnalyticsPanel({ routines }: RoutineAnalyticsPanelProps) 
                           className="flex items-center justify-between text-[11px] text-muted-foreground"
                         >
                           <span>{occurrence.source}</span>
-                          <span>{formatMinutesToReadable(occurrence.hours)}</span>
+                          <span>{formatMinutes(occurrence.hours)}</span>
                         </div>
                       ))}
                     </div>

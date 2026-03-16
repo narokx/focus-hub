@@ -1,16 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
+import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
+import { timeToMinutes } from '@/lib/utils';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 
-const timeToMinutes = (time: string) => {
-  const normalized = parseTimeTo24h(time);
-  const [hours, minutes] = normalized.split(':').map(Number);
-  return (hours * 60) + (minutes || 0);
-};
 
 export function useSupabaseRoutines() {
   const { user } = useAuth();
