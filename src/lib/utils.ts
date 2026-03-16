@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { parseTimeTo24h } from '@/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -29,3 +30,19 @@ export function getContrastColor(color: string): '#000000' | '#ffffff' {
 
   return '#ffffff';
 }
+
+export function timeToMinutes(time: string): number {
+  const normalized = parseTimeTo24h(time);
+  const [hours, minutes] = normalized.split(':').map(Number);
+  return (hours * 60) + (minutes || 0);
+}
+
+export function formatMinutes(hours: number): string {
+  const totalMinutes = Math.max(0, Math.round(hours * 60));
+  const hrs = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  if (hrs === 0) return `${mins}m`;
+  if (mins === 0) return `${hrs}h`;
+  return `${hrs}h ${mins}m`;
+}
+
