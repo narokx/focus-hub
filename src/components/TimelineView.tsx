@@ -5,7 +5,7 @@ import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { TaskPickerModal } from './TaskPickerModal';
 import { cn, getContrastColor } from '@/lib/utils';
 
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
@@ -74,7 +74,7 @@ function DraggableSlotTask({
   const [editName, setEditName] = React.useState(task.name);
   const [notesOpen, setNotesOpen] = React.useState(false);
   const [hovered, setHovered] = React.useState(false);
-  const [subtaskMenuOpen, setSubtaskMenuOpen] = React.useState(false);
+  const [isPickerOpen, setIsPickerOpen] = React.useState(false);
   const [detailsOpen, setDetailsOpen] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
@@ -127,7 +127,7 @@ function DraggableSlotTask({
 
   const slotBackground = gradientSegments.length > 0 ? `linear-gradient(90deg, ${gradientSegments.join(', ')})` : bgColor;
   const isTempSlot = typeof slot.id === 'string' && slot.id.startsWith('ts-');
-  const showActions = !isEditing && (hovered || isTouchDevice || subtaskMenuOpen) && !isTempSlot;
+  const showActions = !isEditing && (hovered || isTouchDevice || isPickerOpen) && !isTempSlot;
 
   React.useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -251,34 +251,17 @@ function DraggableSlotTask({
         )}
 
         {showActions && onAddSubtask && (
-          <DropdownMenu onOpenChange={setSubtaskMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <button
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                className={cn(
-                  'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
-                  textColor === '#ffffff' ? 'hover:bg-white/20' : 'hover:bg-black/10'
-                )}
-                title="Add subtask"
-              >
-                <Layers className="w-2.5 h-2.5" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-[300px] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-              {availableTasks.map((availableTask) => (
-                <DropdownMenuItem
-                  key={availableTask.id}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    onAddSubtask(slot.id, availableTask);
-                  }}
-                >
-                  {availableTask.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsPickerOpen(true); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={cn(
+              'w-4 h-4 flex items-center justify-center rounded-full opacity-70 hover:opacity-100 transition-opacity flex-shrink-0',
+              textColor === '#ffffff' ? 'hover:bg-white/20' : 'hover:bg-black/10'
+            )}
+            title="Add subtask"
+          >
+            <Layers className="w-2.5 h-2.5" />
+          </button>
         )}
 
         {!isTempSlot && (
@@ -303,6 +286,17 @@ function DraggableSlotTask({
           onRemoveSubtask={onRemoveSubtask}
           onUpdateSubtaskPercentages={onUpdateSubtaskPercentages}
           onClose={() => setDetailsOpen(false)}
+        />
+      )}
+
+      {isPickerOpen && availableTasks && onAddSubtask && (
+        <TaskPickerModal
+          tasks={availableTasks}
+          onSelect={(task) => {
+            onAddSubtask(slot.id, task);
+            setIsPickerOpen(false);
+          }}
+          onClose={() => setIsPickerOpen(false)}
         />
       )}
 
