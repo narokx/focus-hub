@@ -12,7 +12,7 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Calendar, Layers, List, Wrench, Undo2, Redo2 } from 'lucide-react';
+import { Calendar, Layers, List, NotebookPen, Wrench, Undo2, Redo2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
@@ -20,11 +20,13 @@ import { RoutinesPanel } from '@/components/RoutinesPanel';
 import { RoutineApplicationModal } from '@/components/RoutineApplicationModal';
 import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
+import { WeeklyNotesPanel } from '@/components/WeeklyNotesPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppState } from '@/hooks/useAppState';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSupabaseRoutines } from '@/hooks/useSupabaseRoutines';
 import { useSupabaseCalendar } from '@/hooks/useSupabaseCalendar';
+import { useSupabaseNotes } from '@/hooks/useSupabaseNotes';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
@@ -34,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type MobileTab = 'calendar' | 'routines' | 'tasks';
-type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
+type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'weeklyNotes' | 'stats';
 
 export default function Index() {
   const { user } = useAuth();
@@ -96,6 +98,11 @@ export default function Index() {
     fetchCalendar,
     updateDayColor,
   } = useSupabaseCalendar();
+
+  const {
+    content: weeklyNoteContent,
+    updateNote,
+  } = useSupabaseNotes();
 
   const {
     state,
@@ -231,6 +238,7 @@ export default function Index() {
     calendar: false,
     routines: false,
     quickTasks: false,
+    weeklyNotes: true,
     stats: true, // Stats starts minimized
   });
 
@@ -686,6 +694,13 @@ export default function Index() {
               <Undo2 className="w-4 h-4" />
             </button>
             <button
+              onClick={() => toggleMinimize('weeklyNotes')}
+              className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground"
+              title="Toggle Weekly Notes"
+            >
+              <NotebookPen className="w-4 h-4" />
+            </button>
+            <button
               onClick={handleRedo}
               disabled={!history.canRedo}
               className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
@@ -794,6 +809,25 @@ export default function Index() {
             }}
             onClearDayTimeline={clearDayTimeline}
             onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
+          />
+        </FloatingWindow>
+
+        <FloatingWindow
+          title={state.windowTitles.weeklyNotes}
+          icon={<NotebookPen className="w-4 h-4 text-muted-foreground" />}
+          defaultPosition={{ x: state.windowPositions.weeklyNotes.x, y: state.windowPositions.weeklyNotes.y }}
+          defaultSize={{ width: state.windowPositions.weeklyNotes.width, height: state.windowPositions.weeklyNotes.height }}
+          minWidth={250}
+          minHeight={220}
+          onPositionChange={(pos) => updateWindowPosition('weeklyNotes', pos)}
+          onSizeChange={(size) => updateWindowPosition('weeklyNotes', size)}
+          onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
+          minimized={minimized.weeklyNotes}
+          onMinimizeChange={() => toggleMinimize('weeklyNotes')}
+        >
+          <WeeklyNotesPanel
+            content={weeklyNoteContent}
+            onUpdateNote={updateNote}
           />
         </FloatingWindow>
 

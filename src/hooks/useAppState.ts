@@ -16,12 +16,14 @@ const defaultWindowPositions = {
   calendar: { x: 340, y: 40, width: 700, height: 600 },
   routines: { x: 20, y: 40, width: 300, height: 350 },
   quickTasks: { x: 20, y: 410, width: 300, height: 350 },
+  weeklyNotes: { x: 50, y: 50, width: 300, height: 400 },
 };
 
 const defaultWindowTitles = {
   calendar: 'Calendar',
   routines: 'Routines',
   quickTasks: 'Quick Tasks',
+  weeklyNotes: 'Weekly Notes',
 };
 
 const getDefaultState = (): AppState => ({

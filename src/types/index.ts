@@ -74,11 +74,13 @@ export interface AppState {
     calendar: WindowPosition;
     routines: WindowPosition;
     quickTasks: WindowPosition;
+    weeklyNotes: WindowPosition;
   };
   windowTitles: {
     calendar: string;
     routines: string;
     quickTasks: string;
+    weeklyNotes: string;
   };
 }
 
