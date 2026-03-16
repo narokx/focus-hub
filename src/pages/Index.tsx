@@ -12,7 +12,7 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Calendar, Layers, List, NotebookPen, Wrench, Undo2, Redo2 } from 'lucide-react';
+import { Calendar, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
@@ -694,19 +694,19 @@ export default function Index() {
               <Undo2 className="w-4 h-4" />
             </button>
             <button
-              onClick={() => toggleMinimize('weeklyNotes')}
-              className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground"
-              title="Toggle Weekly Notes"
-            >
-              <NotebookPen className="w-4 h-4" />
-            </button>
-            <button
               onClick={handleRedo}
               disabled={!history.canRedo}
               className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
               title="Redo (Ctrl+Shift+Z)"
             >
               <Redo2 className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => toggleMinimize('weeklyNotes')}
+              className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground"
+              title="Toggle Weekly Notes"
+            >
+              <StickyNote className="w-4 h-4" />
             </button>
           </div>
           <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />

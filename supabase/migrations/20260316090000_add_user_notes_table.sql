@@ -19,3 +19,19 @@ CREATE POLICY "Users can update own notes"
 ON public.user_notes FOR UPDATE
 USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
+
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_user_notes_updated
+BEFORE UPDATE ON public.user_notes
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_updated_at();
+
