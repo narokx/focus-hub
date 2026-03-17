@@ -3,6 +3,8 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TaskItem from '@tiptap/extension-task-item';
 import TaskList from '@tiptap/extension-task-list';
+import Underline from '@tiptap/extension-underline';
+import Highlight from '@tiptap/extension-highlight';
 import {
   Bold,
   CheckSquare,
@@ -10,7 +12,11 @@ import {
   Heading2,
   Italic,
   List,
+  Underline as UnderlineIcon,
 } from 'lucide-react';
+
+
+const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
 
 interface WeeklyNotesPanelProps {
   content: string;
@@ -23,6 +29,8 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
       StarterKit,
       TaskList,
       TaskItem.configure({ nested: true }),
+      Underline,
+      Highlight.configure({ multicolor: true }),
     ],
     content,
     immediatelyRender: false,
@@ -114,6 +122,18 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
         </button>
         <button
           type="button"
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={`rounded-md p-2 transition hover:bg-muted ${
+            editor.isActive('underline')
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          aria-label="Toggle underline"
+        >
+          <UnderlineIcon className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
           onClick={() => editor.chain().focus().toggleTaskList().run()}
           className={`rounded-md p-2 transition hover:bg-muted ${
             editor.isActive('taskList')
@@ -124,6 +144,22 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
         >
           <CheckSquare className="h-4 w-4" />
         </button>
+        <div className="ml-2 flex items-center gap-1">
+          {highlightColors.map((color) => (
+            <button
+              key={color}
+              type="button"
+              onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
+              className={`h-4 w-4 rounded-full border border-border transition ${
+                editor.isActive('highlight', { color })
+                  ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                  : 'hover:scale-110'
+              }`}
+              style={{ backgroundColor: color }}
+              aria-label={`Toggle ${color} highlight`}
+            />
+          ))}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">

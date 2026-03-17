@@ -244,3 +244,14 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 }
+
+.ProseMirror:focus { outline: none; }
+.ProseMirror h1 { font-size: 1.5rem; font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; }
+.ProseMirror h2 { font-size: 1.25rem; font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.25rem; }
+.ProseMirror ul { list-style-type: disc; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.ProseMirror ol { list-style-type: decimal; padding-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+.ProseMirror ul[data-type="taskList"] { list-style: none; padding: 0; }
+.ProseMirror li[data-type="taskItem"] { display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.25rem; }
+.ProseMirror li[data-type="taskItem"] > label { margin-top: 0.25rem; user-select: none; }
+.ProseMirror li[data-type="taskItem"] > div { flex: 1 1 auto; }
+.ProseMirror mark { padding: 0.125rem 0; border-radius: 0.25rem; }
