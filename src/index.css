@@ -255,3 +255,25 @@
 .ProseMirror li[data-type="taskItem"] > label { margin-top: 0.25rem; user-select: none; }
 .ProseMirror li[data-type="taskItem"] > div { flex: 1 1 auto; }
 .ProseMirror mark { padding: 0.125rem 0; border-radius: 0.25rem; }
+.ProseMirror ul[data-type="taskList"] {
+  list-style: none !important;
+  padding-left: 0 !important;
+}
+.ProseMirror li[data-type="taskItem"] {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 0.5rem !important;
+}
+.ProseMirror li[data-type="taskItem"] > label {
+  margin-top: 0.25rem !important;
+  flex-shrink: 0;
+}
+.ProseMirror li[data-type="taskItem"] > div {
+  flex: 1 1 auto !important;
+  margin: 0 !important;
+}
+.ProseMirror li[data-type="taskItem"][data-checked="true"] > div {
+  text-decoration: line-through !important;
+  color: #9ca3af !important;
+}
