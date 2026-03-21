@@ -385,30 +385,32 @@ export function RoutinesPanel({
         </div>
       )}
 
-      <div className="flex-1 flex flex-col gap-3 overflow-auto scrollbar-thin">
+      <div className="flex-1 overflow-auto scrollbar-thin pb-20">
         {routines.length === 0 ? (
           <p className="text-sm text-muted-foreground italic text-center py-4">No routines yet. Create a day template!</p>
         ) : isMobile ? (
-          routines.map(routine => (
-            <DraggableRoutineItem
-              key={routine.id}
-              routine={routine}
-              onUpdateRoutine={onUpdateRoutine}
-              onDeleteRoutine={onDeleteRoutine}
-              onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
-              onAddRoutineTimeSlot={onAddRoutineTimeSlot}
-              onDeleteRoutineTimeSlot={onDeleteRoutineTimeSlot}
-              onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
-              onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
-              onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
-              availableTasks={availableTasks}
-              onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
-              onAddSubtaskToRoutineSlot={onAddSubtaskToRoutineSlot}
-              onRemoveSubtaskFromRoutineSlot={onRemoveSubtaskFromRoutineSlot}
-              onUpdateRoutineSubtaskPercentages={onUpdateRoutineSubtaskPercentages}
-              onClearRoutineTimeline={onClearRoutineTimeline}
-            />
-          ))
+          <div className="space-y-4 pb-4">
+            {routines.map(routine => (
+              <DraggableRoutineItem
+                key={routine.id}
+                routine={routine}
+                onUpdateRoutine={onUpdateRoutine}
+                onDeleteRoutine={onDeleteRoutine}
+                onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
+                onAddRoutineTimeSlot={onAddRoutineTimeSlot}
+                onDeleteRoutineTimeSlot={onDeleteRoutineTimeSlot}
+                onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
+                onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
+                onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
+                availableTasks={availableTasks}
+                onAssignTaskToRoutineSlot={onAssignTaskToRoutineSlot}
+                onAddSubtaskToRoutineSlot={onAddSubtaskToRoutineSlot}
+                onRemoveSubtaskFromRoutineSlot={onRemoveSubtaskFromRoutineSlot}
+                onUpdateRoutineSubtaskPercentages={onUpdateRoutineSubtaskPercentages}
+                onClearRoutineTimeline={onClearRoutineTimeline}
+              />
+            ))}
+          </div>
         ) : (
           <SortableContext items={routines.map(r => `sortable-routine-${r.id}`)} strategy={verticalListSortingStrategy}>
             {routines.map(routine => (
@@ -429,7 +431,7 @@ export function RoutinesPanel({
                 onRemoveSubtaskFromRoutineSlot={onRemoveSubtaskFromRoutineSlot}
                 onUpdateRoutineSubtaskPercentages={onUpdateRoutineSubtaskPercentages}
                 onClearRoutineTimeline={onClearRoutineTimeline}
-              />
+                />
             ))}
           </SortableContext>
         )}
