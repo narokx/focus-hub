@@ -12,7 +12,7 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { Calendar, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2 } from 'lucide-react';
+import { BarChart3, Calendar, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2 } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
@@ -35,7 +35,7 @@ import { QuickTask, TaskColor, getColorValue, getContrastColor, Routine } from '
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
-type MobileTab = 'calendar' | 'routines' | 'tasks';
+type MobileTab = 'calendar' | 'routines' | 'tasks' | 'stats';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
 
 export default function Index() {
@@ -601,6 +601,9 @@ export default function Index() {
                 onDeleteTask={deleteQuickTask}
               />
             )}
+            {mobileTab === 'stats' && (
+              <WeeklyStatsPanel calendar={state.calendar} routines={state.routines} />
+            )}
           </div>
 
           {/* Mobile bottom nav */}
@@ -609,6 +612,7 @@ export default function Index() {
               { key: 'calendar', icon: <Calendar className="w-5 h-5" />, label: 'Calendar' },
               { key: 'routines', icon: <Layers className="w-5 h-5" />, label: 'Routines' },
               { key: 'tasks', icon: <List className="w-5 h-5" />, label: 'Tasks' },
+              { key: 'stats', icon: <BarChart3 className="w-5 h-5" />, label: 'Stats' },
             ] as { key: MobileTab; icon: React.ReactNode; label: string }[]).map(tab => (
               <button
                 key={tab.key}

@@ -93,8 +93,17 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
   const editor = useEditor({
     extensions: [
       StarterKit,
-      TaskList,
-      TaskItem.configure({ nested: true }),
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'list-none p-0 m-0',
+        },
+      }),
+      TaskItem.configure({
+        nested: true,
+        HTMLAttributes: {
+          class: 'flex items-start gap-3 mb-1.5',
+        },
+      }),
       TextStyle,
       FontSize,
       Underline,
