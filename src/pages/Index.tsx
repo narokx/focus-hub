@@ -682,13 +682,13 @@ export default function Index() {
       onDragEnd={handleDragEnd}
     >
       <div className={cn("min-h-screen bg-background p-4 overflow-hidden relative", isApplyingRoutine && "pointer-events-none")}>
-        <div className="absolute top-4 left-4 z-0 flex items-center gap-3">
+        <div className="absolute top-4 left-4 z-0 flex items-center gap-2">
           <div>
             <h1 className="text-xl font-bold text-foreground/80 tracking-tight">Productivity Heatmap</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Track your daily habits</p>
           </div>
           {/* Undo/Redo */}
-          <div className="flex items-center gap-1 ml-2">
+          <div className="ml-2 flex items-center gap-2">
             <button
               onClick={handleUndo}
               disabled={!history.canUndo}
@@ -712,8 +712,8 @@ export default function Index() {
             >
               <StickyNote className="w-4 h-4" />
             </button>
+            <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
           </div>
-          <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
         </div>
 
         {/* Routines Window */}
