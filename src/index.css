@@ -273,10 +273,6 @@
   flex: 1 1 auto !important;
   margin: 0 !important;
 }
-.ProseMirror li[data-type="taskItem"][data-checked="true"] > div {
-  text-decoration: line-through !important;
-  color: #9ca3af !important;
-}
 .ProseMirror li[data-type="taskItem"][data-checked="true"] > div > p {
   text-decoration: line-through !important;
   color: #9ca3af !important;

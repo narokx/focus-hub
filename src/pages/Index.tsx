@@ -12,7 +12,7 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { BarChart3, Calendar, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2 } from 'lucide-react';
+import { BarChart3, Calendar, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2, X } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
@@ -538,6 +538,7 @@ export default function Index() {
               >
                 <Redo2 className="w-4 h-4" />
               </button>
+              <button onClick={() => setIsNotesOpen(!isNotesOpen)} className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"><StickyNote className="w-4 h-4" /></button>
               <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
             </div>
           </div>
@@ -664,6 +665,18 @@ export default function Index() {
               <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               <p className="text-sm font-medium text-foreground">Syncing routine data...</p>
               <p className="text-xs text-muted-foreground">Please wait while we apply your routine</p>
+            </div>
+          </div>
+        )}
+
+        {isNotesOpen && (
+          <div className="fixed inset-0 z-[999] bg-card flex flex-col animate-in slide-in-from-bottom-full duration-200">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/30">
+              <div className="flex items-center gap-2"><NotebookPen className="w-4 h-4 text-muted-foreground"/><span className="font-semibold text-sm">Weekly Notes</span></div>
+              <button onClick={() => setIsNotesOpen(false)} className="p-1 rounded-md hover:bg-secondary text-muted-foreground"><X className="w-5 h-5"/></button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} />
             </div>
           </div>
         )}
