@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type MobileTab = 'calendar' | 'routines' | 'tasks' | 'stats';
-type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats';
+type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats' | 'weeklyNotes';
 
 export default function Index() {
   const { user } = useAuth();
@@ -240,6 +240,7 @@ export default function Index() {
     routines: false,
     quickTasks: false,
     stats: true, // Stats starts minimized
+    weeklyNotes: false,
   });
 
   const toggleMinimize = (key: WindowKey) => {
@@ -840,6 +841,18 @@ export default function Index() {
             onPositionChange={(pos) => updateWindowPosition('weeklyNotes', pos)}
             onSizeChange={(size) => updateWindowPosition('weeklyNotes', size)}
             onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
+            minimized={minimized.weeklyNotes}
+            onMinimizeChange={() => toggleMinimize('weeklyNotes')}
+            headerActions={
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); setIsNotesOpen(false); }}
+                className="no-drag p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                title="Close"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            }
           >
             <WeeklyNotesPanel
               content={weeklyNoteContent}
