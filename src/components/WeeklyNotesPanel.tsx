@@ -114,7 +114,7 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
     editorProps: {
       attributes: {
         class:
-          'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4',
+          'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4 [&_ul[data-type="taskList"]]:list-none [&_ul[data-type="taskList"]]:p-0 [&_li[data-type="taskItem"]]:flex [&_li[data-type="taskItem"]_label]:mt-0.5 [&_li[data-type="taskItem"]_label]:mr-2 [&_li[data-type="taskItem"]>div]:flex-1 [&_li[data-type="taskItem"]>div>p]:m-0 [&_li[data-type="taskItem"][data-checked="true"]>div>p]:line-through [&_li[data-type="taskItem"][data-checked="true"]>div>p]:text-muted-foreground',
       },
     },
     onUpdate: ({ editor: tiptapEditor }) => {
