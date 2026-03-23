@@ -273,7 +273,9 @@
   flex: 1 1 auto !important;
   margin: 0 !important;
 }
-.ProseMirror li[data-type="taskItem"][data-checked="true"] > div > p {
+.ProseMirror li[data-type="taskItem"][data-checked="true"] > div,
+.ProseMirror li[data-type="taskItem"][data-checked="true"] p,
+.ProseMirror li[data-type="taskItem"][data-checked="true"] span {
   text-decoration: line-through !important;
   color: #9ca3af !important;
 }
