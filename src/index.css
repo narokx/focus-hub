@@ -255,12 +255,10 @@
 .ProseMirror li[data-type="taskItem"] > label { margin-top: 0.25rem; user-select: none; }
 .ProseMirror li[data-type="taskItem"] > div { flex: 1 1 auto; }
 .ProseMirror mark { padding: 0.125rem 0; border-radius: 0.25rem; }
-.prose .tiptap ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div > p {
+.tiptap li[data-type="taskItem"][data-checked="true"] p,
+.tiptap li[data-type="taskItem"][data-checked="true"] div {
   text-decoration: line-through !important;
-  opacity: 0.5 !important;
+  color: #9ca3af !important;
+  opacity: 0.6 !important;
   transition: all 0.2s ease-in-out;
-}
-
-.prose .tiptap ul[data-type="taskList"] li[data-type="taskItem"][data-checked="true"] > div > p * {
-  text-decoration: line-through !important;
 }
