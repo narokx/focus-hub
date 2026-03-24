@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { SubtaskData, TimeSlotTask } from '@/types';
 import { formatMinutes } from '@/lib/utils';
+import { FloatingWindow } from '@/components/FloatingWindow';
 
 interface TaskDetailsModalProps {
   task: TimeSlotTask;
@@ -22,6 +23,10 @@ export function TaskDetailsModal({
   onUpdateSubtaskPercentages,
 }: TaskDetailsModalProps) {
   const [draftSubtasks, setDraftSubtasks] = useState<SubtaskData[]>(task.subtasks || []);
+  const defaultPosition = {
+    x: Math.max(40, window.innerWidth / 2 - 250),
+    y: Math.max(40, window.innerHeight / 2 - 250),
+  };
 
   useEffect(() => {
     setDraftSubtasks(task.subtasks || []);
@@ -53,26 +58,28 @@ export function TaskDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[999] bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-lg rounded-xl border border-border bg-card shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div>
-            <h3 className="text-sm font-semibold">Task Details</h3>
-            <p className="text-xs text-muted-foreground truncate">{task.name}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-4 h-4" />
-          </button>
+    <FloatingWindow
+      title="Task Details"
+      defaultPosition={defaultPosition}
+      defaultSize={{ width: 500, height: 500 }}
+      className="z-[1000]"
+      headerActions={
+        <button
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={onClose}
+          className="no-drag p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      }
+    >
+      <div className="flex h-full flex-col">
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-xs text-muted-foreground truncate">{task.name}</p>
         </div>
 
-        <div className="px-4 py-3 max-h-[420px] overflow-y-auto space-y-3">
-          <div className="rounded-lg border border-border p-3 space-y-2 bg-muted/30">
+        <div className="flex-1 space-y-3 px-4 py-3">
+          <div className="border border-border p-3 space-y-2 bg-muted/30">
             <div className="flex items-center justify-between gap-2">
               <p className="text-sm font-medium truncate">Main Task</p>
               <span className="text-xs text-muted-foreground">
@@ -86,7 +93,7 @@ export function TaskDetailsModal({
           ) : (
             draftSubtasks.map((subtask) => {
               return (
-                <div key={subtask.taskId} className="rounded-lg border border-border p-3 space-y-2">
+                <div key={subtask.taskId} className="border border-border p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate">{subtask.name}</p>
                     <button
@@ -133,6 +140,6 @@ export function TaskDetailsModal({
           </button>
         </div>
       </div>
-    </div>
+    </FloatingWindow>
   );
 }

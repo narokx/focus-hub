@@ -84,6 +84,18 @@ const FontSize = Extension.create({
 
 const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
 
+const EDITOR_CLASSES = [
+  'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4',
+  '[&_ul[data-type="taskList"]]:list-none [&_ul[data-type="taskList"]]:p-0',
+  '[&_li[data-type="taskItem"]]:flex',
+  '[&_li[data-type="taskItem"]_label]:mt-0.5 [&_li[data-type="taskItem"]_label]:mr-2',
+  '[&_li[data-type="taskItem"]_label]:select-none',
+  '[&_li[data-type="taskItem"]>div]:flex-1',
+  '[&_li[data-type="taskItem"]>div>p]:m-0',
+  '[&_li[data-type="taskItem"][data-checked="true"]>div>p]:line-through',
+  '[&_li[data-type="taskItem"][data-checked="true"]>div>p]:text-muted-foreground',
+].join(' ');
+
 interface WeeklyNotesPanelProps {
   content: string;
   onUpdateNote: (content: string) => void;
@@ -113,8 +125,7 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class:
-          'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4',
+        class: EDITOR_CLASSES,
       },
     },
     onUpdate: ({ editor: tiptapEditor }) => {
