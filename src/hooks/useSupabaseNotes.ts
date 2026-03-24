@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-const SAVE_DEBOUNCE_MS = 500;
 const LOCAL_NOTES_KEY = 'productivity-weekly-notes';
 
 export function useSupabaseNotes() {
@@ -27,6 +26,8 @@ export function useSupabaseNotes() {
   }, [noteId, user]);
 
   const updateNote = useCallback((nextContent: string) => {
+    if (loading || !noteId || !user) return;
+
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
 
@@ -36,8 +37,8 @@ export function useSupabaseNotes() {
 
     saveTimeoutRef.current = setTimeout(() => {
       persistNote(nextContent);
-    }, SAVE_DEBOUNCE_MS);
-  }, [persistNote]);
+    }, 1000);
+  }, [persistNote, loading, noteId, user]);
 
   const fetchNote = useCallback(async () => {
     if (!user) {
