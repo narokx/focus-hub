@@ -31,20 +31,23 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
       // Fallback to localStorage for non-authenticated users
       const data = localStorage.getItem(STORAGE_KEY);
       if (!data) return;
-      downloadJson(data);
+      const parsed = JSON.parse(data);
+      const weeklyNotes = localStorage.getItem('productivity-weekly-notes') || '';
+      downloadJson(JSON.stringify({ ...parsed, weeklyNotes }));
       return;
     }
 
     setIsExporting(true);
     try {
       // Fetch all data from Supabase in parallel
-      const [tasksRes, routinesRes, routineTasksRes, routineSlotsRes, bufferRes, eventsRes] = await Promise.all([
+      const [tasksRes, routinesRes, routineTasksRes, routineSlotsRes, bufferRes, eventsRes, notesRes] = await Promise.all([
         supabase.from('tasks').select('id, name, color').eq('user_id', user.id).order('created_at', { ascending: true }),
         supabase.from('routines').select('id, name, color').eq('user_id', user.id).order('created_at', { ascending: true }),
         supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
         supabase.from('routine_time_slots').select('id, routine_id, start_time, end_time, task_id, tasks(id, name, color)').order('start_time', { ascending: true }),
         supabase.from('daily_task_buffer').select('id, date, task_id, completed, order_index, tasks(id, name, color)').eq('user_id', user.id).order('order_index', { ascending: true }),
         supabase.from('calendar_events').select('id, date, start_time, end_time, task_id, completed, tasks(id, name, color)').eq('user_id', user.id).order('start_time', { ascending: true }),
+        supabase.from('user_notes').select('content').eq('user_id', user.id).maybeSingle(),
       ]);
 
       // Build quickTasks array
@@ -165,6 +168,7 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
         quickTasks,
         routines,
         calendar,
+        weeklyNotes: notesRes.data?.content || '',
         ...(windowPositions && { windowPositions }),
         ...(windowTitles && { windowTitles }),
       };
@@ -379,6 +383,7 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
 
         // Save to localStorage for backward compatibility
         localStorage.setItem(STORAGE_KEY, data);
+        localStorage.setItem('productivity-weekly-notes', parsed.weeklyNotes || '');
 
         if (user) {
           setIsImporting(true);
@@ -446,6 +451,35 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
           // ── Import calendar ──
           if (parsed.calendar && typeof parsed.calendar === 'object') {
             await importCalendar(parsed.calendar, user.id, taskNameMap);
+          }
+
+          const weeklyNotesContent = parsed.weeklyNotes || '';
+          const { data: existingNote, error: noteFetchError } = await supabase
+            .from('user_notes')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (noteFetchError) {
+            console.error('Failed to fetch user note during import:', noteFetchError);
+          } else if (existingNote?.id) {
+            const { error: noteUpdateError } = await supabase
+              .from('user_notes')
+              .update({ content: weeklyNotesContent })
+              .eq('id', existingNote.id)
+              .eq('user_id', user.id);
+
+            if (noteUpdateError) {
+              console.error('Failed to update user note during import:', noteUpdateError);
+            }
+          } else {
+            const { error: noteInsertError } = await supabase
+              .from('user_notes')
+              .insert({ user_id: user.id, content: weeklyNotesContent });
+
+            if (noteInsertError) {
+              console.error('Failed to insert user note during import:', noteInsertError);
+            }
           }
 
           // Refresh UI state: await so routines/tasks/calendar are re-fetched before success
