@@ -15,7 +15,13 @@ import { Routine, generateDefaultTimeSlots } from '@/types';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
-export function SettingsModal({ onImportComplete }: { onImportComplete?: () => void | Promise<void> }) {
+export function SettingsModal({
+  onImportComplete,
+  refreshNotes,
+}: {
+  onImportComplete?: () => void | Promise<void>;
+  refreshNotes?: () => Promise<void>;
+}) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -471,6 +477,8 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
 
             if (noteUpdateError) {
               console.error('Failed to update user note during import:', noteUpdateError);
+            } else if (refreshNotes) {
+              await refreshNotes();
             }
           } else {
             const { error: noteInsertError } = await supabase
@@ -479,6 +487,8 @@ export function SettingsModal({ onImportComplete }: { onImportComplete?: () => v
 
             if (noteInsertError) {
               console.error('Failed to insert user note during import:', noteInsertError);
+            } else if (refreshNotes) {
+              await refreshNotes();
             }
           }
 

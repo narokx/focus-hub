@@ -103,6 +103,7 @@ export default function Index() {
     content: weeklyNoteContent,
     loading: notesLoading,
     updateNote,
+    refresh: refreshNotes,
   } = useSupabaseNotes();
 
   const {
@@ -541,7 +542,10 @@ export default function Index() {
                 <Redo2 className="w-4 h-4" />
               </button>
               <button onClick={() => setIsNotesOpen(!isNotesOpen)} className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"><StickyNote className="w-4 h-4" /></button>
-              <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
+              <SettingsModal
+                onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }}
+                refreshNotes={refreshNotes}
+              />
             </div>
           </div>
 
@@ -731,7 +735,10 @@ export default function Index() {
             >
               <StickyNote className="w-4 h-4" />
             </button>
-            <SettingsModal onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }} />
+            <SettingsModal
+              onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }}
+              refreshNotes={refreshNotes}
+            />
           </div>
         </div>
 
