@@ -148,133 +148,143 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
   }
 
   return (
-    <div className="h-full -m-4 flex flex-col">
-      <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <select
-          value={editor.getAttributes('textStyle').fontSize || '1rem'}
-          onChange={(event) => {
-            const nextSize = event.target.value;
-            if (nextSize === '1rem') {
-              editor.chain().focus().unsetFontSize().run();
-              return;
-            }
+    <>
+      <style>
+        {`
+          .prose ul[data-type="taskList"] li[data-checked="true"] > div > p {
+            text-decoration: line-through;
+            color: #6b7280;
+          }
+        `}
+      </style>
+      <div className="h-full -m-4 flex flex-col">
+        <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <select
+            value={editor.getAttributes('textStyle').fontSize || '1rem'}
+            onChange={(event) => {
+              const nextSize = event.target.value;
+              if (nextSize === '1rem') {
+                editor.chain().focus().unsetFontSize().run();
+                return;
+              }
 
-            editor.chain().focus().setFontSize(nextSize).run();
-          }}
-          className="h-8 rounded-md border bg-background px-2 text-xs text-foreground"
-          aria-label="Text size"
-        >
-          {textSizeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('bold')
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle bold"
-        >
-          <Bold className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('italic')
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle italic"
-        >
-          <Italic className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('underline')
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle underline"
-        >
-          <UnderlineIcon className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('heading', { level: 1 })
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle heading 1"
-        >
-          <Heading1 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('heading', { level: 2 })
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle heading 2"
-        >
-          <Heading2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('bulletList')
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle bullet list"
-        >
-          <List className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().toggleTaskList().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
-            editor.isActive('taskList')
-              ? 'bg-muted text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-          aria-label="Toggle task list"
-        >
-          <CheckSquare className="h-4 w-4" />
-        </button>
-        <div className="ml-2 flex items-center gap-1">
-          {highlightColors.map((color) => (
-            <button
-              key={color}
-              type="button"
-              onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-              className={`h-4 w-4 rounded-full border border-border transition ${
-                editor.isActive('highlight', { color })
-                  ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
-                  : 'hover:scale-110'
-              }`}
-              style={{ backgroundColor: color }}
-              aria-label={`Toggle ${color} highlight`}
-            />
-          ))}
+              editor.chain().focus().setFontSize(nextSize).run();
+            }}
+            className="h-8 rounded-md border bg-background px-2 text-xs text-foreground"
+            aria-label="Text size"
+          >
+            {textSizeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('bold')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle bold"
+          >
+            <Bold className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleItalic().run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('italic')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle italic"
+          >
+            <Italic className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleUnderline().run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('underline')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle underline"
+          >
+            <UnderlineIcon className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('heading', { level: 1 })
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle heading 1"
+          >
+            <Heading1 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('heading', { level: 2 })
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle heading 2"
+          >
+            <Heading2 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleBulletList().run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('bulletList')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle bullet list"
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().toggleTaskList().run()}
+            className={`rounded-md p-2 transition hover:bg-muted ${
+              editor.isActive('taskList')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle task list"
+          >
+            <CheckSquare className="h-4 w-4" />
+          </button>
+          <div className="ml-2 flex items-center gap-1">
+            {highlightColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
+                className={`h-4 w-4 rounded-full border border-border transition ${
+                  editor.isActive('highlight', { color })
+                    ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                    : 'hover:scale-110'
+                }`}
+                style={{ backgroundColor: color }}
+                aria-label={`Toggle ${color} highlight`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={(event) => event.stopPropagation()}>
+          <EditorContent editor={editor} className="h-full border-0" />
         </div>
       </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={(event) => event.stopPropagation()}>
-        <EditorContent editor={editor} className="h-full border-0" />
-      </div>
-    </div>
+    </>
   );
 }
