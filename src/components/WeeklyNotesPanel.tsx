@@ -129,7 +129,10 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
       },
     },
     onUpdate: ({ editor: tiptapEditor }) => {
-      onUpdateNote(tiptapEditor.getHTML());
+      const html = tiptapEditor.getHTML();
+      if (html !== content) {
+        onUpdateNote(html);
+      }
     },
   });
 
