@@ -128,10 +128,9 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
         class: EDITOR_CLASSES,
       },
     },
-    onUpdate: ({ editor: tiptapEditor }) => {
-      const html = tiptapEditor.getHTML();
-      if (html !== content) {
-        onUpdateNote(html);
+    onUpdate: ({ editor: tiptapEditor, transaction }) => {
+      if (transaction.docChanged) {
+        onUpdateNote(tiptapEditor.getHTML());
       }
     },
   });
