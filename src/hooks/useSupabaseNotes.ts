@@ -39,9 +39,7 @@ export function useSupabaseNotes() {
     }, SAVE_DEBOUNCE_MS);
   }, [persistNote]);
 
-  useEffect(() => {
-    let isMounted = true;
-
+  const fetchNote = useCallback(async () => {
     if (!user) {
       setNoteId(null);
       setContent(localStorage.getItem(LOCAL_NOTES_KEY) || '');
@@ -49,75 +47,59 @@ export function useSupabaseNotes() {
       return;
     }
 
-    const controller = new AbortController();
+    try {
+      setLoading(true);
 
-    const fetchOrCreateNote = async () => {
-      try {
-        if (!isMounted) return;
-        setLoading(true);
+      const { data: existing, error: fetchError } = await supabase
+        .from('user_notes')
+        .select('id, content')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-        const { data: existing, error: fetchError } = await supabase
-          .from('user_notes')
-          .select('id, content')
-          .eq('user_id', user.id)
-          .maybeSingle()
-          .abortSignal(controller.signal);
-
-        if (fetchError) {
-          console.error('Failed to fetch note:', fetchError);
-          if (!isMounted) return;
-          setLoading(false);
-          return;
-        }
-
-        if (existing) {
-          localStorage.setItem(LOCAL_NOTES_KEY, existing.content ?? '');
-          if (!isMounted) return;
-          setNoteId(existing.id);
-          setContent(existing.content ?? '');
-          setLoading(false);
-          return;
-        }
-
-        const { data: created, error: createError } = await supabase
-          .from('user_notes')
-          .insert({ user_id: user.id, content: '' })
-          .select('id, content')
-          .maybeSingle()
-          .abortSignal(controller.signal);
-
-        if (createError) {
-          console.error('Failed to create note:', createError);
-          if (!isMounted) return;
-          setLoading(false);
-          return;
-        }
-
-        if (!isMounted) return;
-        setNoteId(created?.id ?? null);
-        setContent(created?.content ?? '');
+      if (fetchError) {
+        console.error('Failed to fetch note:', fetchError);
         setLoading(false);
-      } catch (error) {
-        if ((error as { name?: string }).name === 'AbortError') {
-          return;
-        }
-
-        console.error('Failed to fetch or create note:', error);
-        if (!isMounted) return;
-        setLoading(false);
+        return;
       }
-    };
 
-    fetchOrCreateNote();
+      if (existing) {
+        localStorage.setItem(LOCAL_NOTES_KEY, existing.content ?? '');
+        setNoteId(existing.id);
+        setContent(existing.content ?? '');
+        setLoading(false);
+        return;
+      }
+
+      const { data: created, error: createError } = await supabase
+        .from('user_notes')
+        .insert({ user_id: user.id, content: '' })
+        .select('id, content')
+        .maybeSingle();
+
+      if (createError) {
+        console.error('Failed to create note:', createError);
+        setLoading(false);
+        return;
+      }
+
+      setNoteId(created?.id ?? null);
+      setContent(created?.content ?? '');
+      setLoading(false);
+    } catch (error) {
+      console.error('Failed to fetch or create note:', error);
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchNote();
 
     return () => {
-      isMounted = false;
-      controller.abort();
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [user]);
+  }, [fetchNote]);
 
   useEffect(() => {
     return () => {
@@ -131,5 +113,6 @@ export function useSupabaseNotes() {
     content,
     loading,
     updateNote,
+    refresh: fetchNote,
   };
 }
