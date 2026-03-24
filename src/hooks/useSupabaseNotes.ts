@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 const SAVE_DEBOUNCE_MS = 500;
+const LOCAL_NOTES_KEY = 'productivity-weekly-notes';
 
 export function useSupabaseNotes() {
   const { user } = useAuth();
@@ -27,6 +28,7 @@ export function useSupabaseNotes() {
 
   const updateNote = useCallback((nextContent: string) => {
     setContent(nextContent);
+    localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -42,7 +44,7 @@ export function useSupabaseNotes() {
 
     if (!user) {
       setNoteId(null);
-      setContent('');
+      setContent(localStorage.getItem(LOCAL_NOTES_KEY) || '');
       setLoading(false);
       return;
     }
@@ -69,6 +71,7 @@ export function useSupabaseNotes() {
         }
 
         if (existing) {
+          localStorage.setItem(LOCAL_NOTES_KEY, existing.content ?? '');
           if (!isMounted) return;
           setNoteId(existing.id);
           setContent(existing.content ?? '');
