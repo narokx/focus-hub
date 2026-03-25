@@ -1,11 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star, Layers } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { TaskPickerModal } from './TaskPickerModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn, getContrastColor } from '@/lib/utils';
 
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
@@ -21,6 +22,63 @@ function getSlotDurationMinutes(startTime: string, endTime: string): number {
 function getDurationScale(minutes: number): number {
   const heightPercent = Math.max(100, Math.min(250, 100 + ((minutes - 30) / 150) * 150));
   return heightPercent / 100;
+}
+
+const PICKER_HOURS = Array.from({ length: 24 }, (_, idx) => idx.toString().padStart(2, '0'));
+const PICKER_MINUTES = Array.from({ length: 60 }, (_, idx) => idx.toString().padStart(2, '0'));
+
+function TimePickerField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const normalized = parseTimeTo24h(value);
+  const [hour, minute] = normalized.split(':');
+
+  const updatePart = (nextHour: string, nextMinute: string) => {
+    onChange(`${nextHour}:${nextMinute}`);
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center justify-start gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Open time picker"
+        >
+          <span>{normalized}</span>
+          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-2">
+        <div className="flex gap-2">
+          <select
+            className="h-28 w-14 bg-background border border-input rounded text-xs"
+            value={hour}
+            onChange={(e) => updatePart(e.target.value, minute)}
+            size={6}
+          >
+            {PICKER_HOURS.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
+          <select
+            className="h-28 w-14 bg-background border border-input rounded text-xs"
+            value={minute}
+            onChange={(e) => updatePart(hour, e.target.value)}
+            size={6}
+          >
+            {PICKER_MINUTES.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 interface TimelineViewProps {
@@ -360,17 +418,13 @@ function TimeSlotRow({
         style={{ width: timeColumnWidth }}
       >
         <div className="flex flex-col min-w-0">
-          <input
-            type="time"
-            value={parseTimeTo24h(slot.startTime)}
-            onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
-            className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          <TimePickerField
+            value={slot.startTime}
+            onChange={(value) => onUpdateSlotTime(slot.id, 'startTime', value)}
           />
-          <input
-            type="time"
-            value={parseTimeTo24h(slot.endTime)}
-            onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
-            className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          <TimePickerField
+            value={slot.endTime}
+            onChange={(value) => onUpdateSlotTime(slot.id, 'endTime', value)}
           />
         </div>
       </div>
@@ -481,7 +535,7 @@ function UnassignedZone({
   );
 }
 
-const DEFAULT_TIME_COL = 148;
+const DEFAULT_TIME_COL = 64;
 
 export function TimelineView({
   timeSlots,
