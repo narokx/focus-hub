@@ -3,10 +3,12 @@ import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
-import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
+import { TaskNotesModal } from './TaskNotesModal';
+import { useTaskNote } from '@/hooks/useTaskNote';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { TaskPickerModal } from './TaskPickerModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { toTaskNoteKey } from '@/lib/taskNoteKey';
 import { cn, getContrastColor } from '@/lib/utils';
 
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
@@ -137,7 +139,7 @@ function DraggableSlotTask({
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
-  const noteId = `${slot.id}-${task.taskId || task.id}`;
+  const noteId = toTaskNoteKey(task.taskId || task.id) || `${slot.id}-${task.taskId || task.id}`;
   const { note } = useTaskNote(noteId);
   const hasNotes = !!note?.trim();
 
@@ -553,7 +555,7 @@ function UnassignedZone({
                 onToggleComplete={showCompleted && onToggle ? () => onToggle(task.id) : undefined}
                 onDelete={() => onRemove(task.id)}
                 showDelete
-                noteId={`unassigned-${task.id}`}
+                noteId={toTaskNoteKey(task.id) || `task-${task.id}`}
               />
             </div>
           ))

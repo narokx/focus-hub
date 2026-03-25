@@ -2,40 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-
-const NOTES_KEY = 'task-notes';
-
-function loadNotes(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}');
-  } catch {
-    return {};
-  }
-}
-
-function saveNote(taskId: string, note: string) {
-  const notes = loadNotes();
-  notes[taskId] = note;
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
-}
-
-export function useTaskNote(taskId: string | null) {
-  const [note, setNote] = useState('');
-
-  useEffect(() => {
-    if (!taskId) return;
-    const notes = loadNotes();
-    setNote(notes[taskId] || '');
-  }, [taskId]);
-
-  const save = (text: string) => {
-    if (!taskId) return;
-    setNote(text);
-    saveNote(taskId, text);
-  };
-
-  return { note, save };
-}
+import { useTaskNote } from '@/hooks/useTaskNote';
 
 interface TaskNotesModalProps {
   taskId: string;
