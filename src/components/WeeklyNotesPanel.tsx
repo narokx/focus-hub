@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Extension, Mark, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -99,9 +99,12 @@ const EDITOR_CLASSES = [
 interface WeeklyNotesPanelProps {
   content: string;
   onUpdateNote: (content: string) => void;
+  isLoading: boolean;
 }
 
-export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProps) {
+export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNotesPanelProps) {
+  const userIsInteracting = useRef(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -129,9 +132,12 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
       },
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
-      if (transaction.docChanged) {
+      if (transaction.docChanged && userIsInteracting.current) {
         onUpdateNote(tiptapEditor.getHTML());
       }
+    },
+    onFocus: () => {
+      userIsInteracting.current = true;
     },
   });
 
@@ -150,6 +156,11 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
   return (
     <div className="h-full -m-4 flex flex-col">
       <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        {isLoading && (
+          <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Syncing…
+          </span>
+        )}
         <select
           value={editor.getAttributes('textStyle').fontSize || '1rem'}
           onChange={(event) => {
@@ -275,6 +286,14 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
       <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={(event) => event.stopPropagation()}>
         <EditorContent editor={editor} className="h-full border-0" />
       </div>
+
+      <style>{`
+        .prose ul[data-type="taskList"] li[data-checked="true"] > div > p {
+          text-decoration: line-through !important;
+          color: #9ca3af !important;
+          opacity: 0.6;
+        }
+      `}</style>
     </div>
   );
 }
