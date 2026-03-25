@@ -136,8 +136,10 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML() && !editor.isFocused) {
-      editor.commands.setContent(content, false);
+    if (!editor) return;
+
+    if (editor.getHTML() !== content) {
+      editor.commands.setContent(content, { emitUpdate: false });
     }
   }, [content, editor]);
 
@@ -147,14 +149,6 @@ export function WeeklyNotesPanel({ content, onUpdateNote }: WeeklyNotesPanelProp
 
   return (
     <div className="h-full -m-4 flex flex-col">
-      <style>
-        {`
-          .prose ul[data-type="taskList"] li[data-checked="true"] > div > p {
-            text-decoration: line-through !important;
-            color: #9ca3af !important;
-          }
-        `}
-      </style>
       <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <select
           value={editor.getAttributes('textStyle').fontSize || '1rem'}

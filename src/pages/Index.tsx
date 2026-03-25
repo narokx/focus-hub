@@ -100,7 +100,6 @@ export default function Index() {
   } = useSupabaseCalendar();
 
   const {
-    noteId,
     content: weeklyNoteContent,
     loading: notesLoading,
     updateNote,
@@ -686,7 +685,7 @@ export default function Index() {
               {notesLoading ? (
                 <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading notes...</div>
               ) : (
-                <WeeklyNotesPanel key={noteId || 'loading'} content={weeklyNoteContent} onUpdateNote={updateNote} />
+                <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} />
               )}
             </div>
           </div>
@@ -871,7 +870,6 @@ export default function Index() {
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading notes...</div>
             ) : (
               <WeeklyNotesPanel
-                key={noteId || 'loading'}
                 content={weeklyNoteContent}
                 onUpdateNote={updateNote}
               />
