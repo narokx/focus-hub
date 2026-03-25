@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 const NOTES_KEY = 'task-notes';
+const NOTES_UPDATED_KEY = 'task-notes-updated-at';
 let taskNotesRemoteAvailable = true;
 
 function loadLocalNotes(): Record<string, string> {
@@ -17,6 +18,20 @@ function saveLocalNote(taskId: string, note: string) {
   const notes = loadLocalNotes();
   notes[taskId] = note;
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+}
+
+function loadLocalUpdatedMap(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(NOTES_UPDATED_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveLocalUpdatedAt(taskId: string, timestamp: number) {
+  const map = loadLocalUpdatedMap();
+  map[taskId] = timestamp;
+  localStorage.setItem(NOTES_UPDATED_KEY, JSON.stringify(map));
 }
 
 export function useTaskNote(taskId: string | null) {
@@ -42,6 +57,7 @@ export function useTaskNote(taskId: string | null) {
 
       const localNotes = loadLocalNotes();
       const localValue = localNotes[taskId] || '';
+      const localUpdatedAt = loadLocalUpdatedMap()[taskId] || 0;
       if (!isCancelled) {
         setNote(localValue);
       }
@@ -52,12 +68,11 @@ export function useTaskNote(taskId: string | null) {
 
       const { data, error } = await supabase
         .from('task_notes')
-        .select('content')
+        .select('content, updated_at')
         .eq('user_id', user.id)
         .eq('note_key', taskId)
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
       if (error) {
         console.error('Failed to fetch task note:', error);
@@ -67,8 +82,25 @@ export function useTaskNote(taskId: string | null) {
         return;
       }
 
+      const remote = data?.[0];
+      const remoteUpdatedAt = remote?.updated_at ? Date.parse(remote.updated_at) : 0;
+      const resolved = localUpdatedAt > remoteUpdatedAt ? localValue : remote?.content || localValue;
+
       if (!isCancelled) {
-        setNote(data?.content || localValue);
+        setNote(resolved);
+      }
+
+      if (localUpdatedAt > remoteUpdatedAt && localValue) {
+        const { error: backfillError } = await supabase
+          .from('task_notes')
+          .insert({
+            user_id: user.id,
+            note_key: taskId,
+            content: localValue,
+          });
+        if (backfillError && backfillError.code !== '23505') {
+          console.error('Failed to backfill newer local task note:', backfillError);
+        }
       }
     };
 
@@ -84,6 +116,7 @@ export function useTaskNote(taskId: string | null) {
 
     setNote(text);
     saveLocalNote(taskId, text);
+    saveLocalUpdatedAt(taskId, Date.now());
 
     if (!user) return;
     if (!taskNotesRemoteAvailable) return;
@@ -94,8 +127,7 @@ export function useTaskNote(taskId: string | null) {
       .eq('user_id', user.id)
       .eq('note_key', taskId)
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (fetchError) {
       console.error('Failed to fetch existing task note:', fetchError);
@@ -105,11 +137,12 @@ export function useTaskNote(taskId: string | null) {
       return;
     }
 
-    if (existing?.id) {
+    const existingRow = existing?.[0];
+    if (existingRow?.id) {
       const { error } = await supabase
         .from('task_notes')
         .update({ content: text })
-        .eq('id', existing.id)
+        .eq('id', existingRow.id)
         .eq('user_id', user.id);
       if (error) {
         console.error('Failed to update task note:', error);

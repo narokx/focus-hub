@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
 const LOCAL_NOTES_KEY = 'productivity-weekly-notes';
+const LOCAL_NOTES_UPDATED_KEY = 'productivity-weekly-notes-updated-at';
 
 export function useSupabaseNotes() {
   const { user } = useAuth();
@@ -16,6 +17,12 @@ export function useSupabaseNotes() {
   useEffect(() => {
     latestContentRef.current = content;
   }, [content]);
+
+  const readLocalUpdatedAt = useCallback(() => {
+    const raw = localStorage.getItem(LOCAL_NOTES_UPDATED_KEY);
+    const parsed = raw ? Number(raw) : 0;
+    return Number.isFinite(parsed) ? parsed : 0;
+  }, []);
 
   const persistNote = useCallback(async (nextContent: string) => {
     if (!user) return;
@@ -31,19 +38,19 @@ export function useSupabaseNotes() {
       console.error('Failed to update note by id, retrying create flow:', error);
     }
 
-    const { data: existing, error: fetchError } = await supabase
+    const { data: existingRows, error: fetchError } = await supabase
       .from('user_notes')
       .select('id')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
     if (fetchError) {
       console.error('Failed to fetch note while persisting:', fetchError);
       return;
     }
 
+    const existing = existingRows?.[0];
     if (existing?.id) {
       setNoteId(existing.id);
       const { error } = await supabase
@@ -77,6 +84,7 @@ export function useSupabaseNotes() {
 
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
+    localStorage.setItem(LOCAL_NOTES_UPDATED_KEY, String(Date.now()));
 
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -100,28 +108,36 @@ export function useSupabaseNotes() {
     try {
       setLoading(true);
 
-      const { data: existing, error: fetchError } = await supabase
+      const { data: existingRows, error: fetchError } = await supabase
         .from('user_notes')
-        .select('id, content')
+        .select('id, content, updated_at')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
       if (fetchError) {
         console.error('Failed to fetch note:', fetchError);
+        setContent(localStorage.getItem(LOCAL_NOTES_KEY) || '');
+        isReady.current = true;
         setLoading(false);
         return;
       }
 
+      const existing = existingRows?.[0];
       if (existing) {
         const local = localStorage.getItem(LOCAL_NOTES_KEY) || '';
+        const localUpdatedAt = readLocalUpdatedAt();
+        const remoteUpdatedAt = existing.updated_at ? Date.parse(existing.updated_at) : 0;
         const remote = existing.content ?? '';
-        const resolved = remote || local;
+        const resolved = localUpdatedAt > remoteUpdatedAt ? local : remote || local;
         localStorage.setItem(LOCAL_NOTES_KEY, resolved);
+        localStorage.setItem(
+          LOCAL_NOTES_UPDATED_KEY,
+          String(Math.max(localUpdatedAt, remoteUpdatedAt, Date.now()))
+        );
         setNoteId(existing.id);
         setContent(resolved);
-        if (!remote && local) {
+        if (localUpdatedAt > remoteUpdatedAt && local) {
           void persistNote(local);
         }
         isReady.current = true;
@@ -138,7 +154,7 @@ export function useSupabaseNotes() {
       console.error('Failed to fetch or create note:', error);
       setLoading(false);
     }
-  }, [user]);
+  }, [user, persistNote, readLocalUpdatedAt]);
 
   useEffect(() => {
     fetchOrCreateNote();
@@ -168,8 +184,15 @@ export function useSupabaseNotes() {
         },
         (payload) => {
           const nextContent = (payload.new as { content?: string }).content ?? '';
+          const nextUpdatedAtRaw = (payload.new as { updated_at?: string }).updated_at;
+          const nextUpdatedAt = nextUpdatedAtRaw ? Date.parse(nextUpdatedAtRaw) : Date.now();
+          const localUpdatedAt = readLocalUpdatedAt();
+          if (localUpdatedAt > nextUpdatedAt) {
+            return;
+          }
           setContent(nextContent);
           localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
+          localStorage.setItem(LOCAL_NOTES_UPDATED_KEY, String(nextUpdatedAt));
         }
       )
       .subscribe();
@@ -177,7 +200,7 @@ export function useSupabaseNotes() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, readLocalUpdatedAt]);
 
   useEffect(() => {
     return () => {
