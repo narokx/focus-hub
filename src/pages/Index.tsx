@@ -683,7 +683,7 @@ export default function Index() {
             </div>
             <div className="flex-1 overflow-auto">
               {notesLoading ? (
-                <div className="p-4 text-xs opacity-50">Loading...</div>
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading notes...</div>
               ) : (
                 <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} />
               )}
@@ -867,7 +867,7 @@ export default function Index() {
             }
           >
             {notesLoading ? (
-              <div className="p-4 text-xs opacity-50">Loading...</div>
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading notes...</div>
             ) : (
               <WeeklyNotesPanel
                 content={weeklyNoteContent}

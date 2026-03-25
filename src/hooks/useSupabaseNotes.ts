@@ -94,24 +94,21 @@ export function useSupabaseNotes() {
 
   useEffect(() => {
     fetchNote();
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [fetchNote]);
 
-  // Flush pending debounced save on unmount/tab close.
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
-        const currentContent = localStorage.getItem(LOCAL_NOTES_KEY);
-        if (currentContent && noteId) {
-          supabase
-            .from('user_notes')
-            .update({ content: currentContent })
-            .eq('id', noteId)
-            .maybeSingle();
-        }
       }
     };
-  }, [noteId]);
+  }, []);
 
   return {
     content,
