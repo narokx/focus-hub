@@ -23,6 +23,15 @@ function getDurationScale(minutes: number): number {
   return heightPercent / 100;
 }
 
+const TIME_24H_REGEX = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+
+function normalizeTimeInput(value: string): string | null {
+  const parsed = parseTimeTo24h(value.trim());
+  const match = parsed.match(TIME_24H_REGEX);
+  if (!match) return null;
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+}
+
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
   unassignedTasks: Array<{ id: string; taskId?: string; name: string; color: TaskColor; completed?: boolean }>;
@@ -352,6 +361,34 @@ function TimeSlotRow({
   const scale = slot.task ? getDurationScale(durationMin) : 1;
   const baseHeight = 32; // px, standard min-height
   const scaledHeight = Math.round(baseHeight * scale);
+  const [startInput, setStartInput] = useState(parseTimeTo24h(slot.startTime));
+  const [endInput, setEndInput] = useState(parseTimeTo24h(slot.endTime));
+
+  React.useEffect(() => {
+    setStartInput(parseTimeTo24h(slot.startTime));
+  }, [slot.startTime]);
+
+  React.useEffect(() => {
+    setEndInput(parseTimeTo24h(slot.endTime));
+  }, [slot.endTime]);
+
+  const commitTimeChange = (
+    field: 'startTime' | 'endTime',
+    inputValue: string,
+    setInput: React.Dispatch<React.SetStateAction<string>>,
+    fallbackValue: string,
+  ) => {
+    const normalized = normalizeTimeInput(inputValue);
+    const fallback = parseTimeTo24h(fallbackValue);
+    if (!normalized) {
+      setInput(fallback);
+      return;
+    }
+    setInput(normalized);
+    if (normalized !== fallback) {
+      onUpdateSlotTime(slot.id, field, normalized);
+    }
+  };
 
   return (
     <div className="flex items-stretch gap-1 group">
