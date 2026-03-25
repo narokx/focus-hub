@@ -1,11 +1,12 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star, Layers } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { TaskPickerModal } from './TaskPickerModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn, getContrastColor } from '@/lib/utils';
 
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
@@ -520,7 +521,7 @@ function UnassignedZone({
   );
 }
 
-const DEFAULT_TIME_COL = 148;
+const DEFAULT_TIME_COL = 86;
 
 export function TimelineView({
   timeSlots,

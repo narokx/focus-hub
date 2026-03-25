@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { timeToMinutes } from '@/lib/utils';
 
@@ -77,8 +77,8 @@ export function useSupabaseRoutines() {
           const task = s.tasks as any;
           return {
             id: s.id,
-            startTime: s.start_time,
-            endTime: s.end_time,
+            startTime: parseTimeTo24h(s.start_time),
+            endTime: parseTimeTo24h(s.end_time),
             task: s.task_id && task ? {
               id: `rst-${s.id}`,
               taskId: task.id,
@@ -187,8 +187,8 @@ export function useSupabaseRoutines() {
       }
       slotRows.push({
         routine_id: routineId,
-        start_time: slot.startTime,
-        end_time: slot.endTime,
+        start_time: parseTimeTo24h(slot.startTime),
+        end_time: parseTimeTo24h(slot.endTime),
         task_id: taskId,
       });
     }
@@ -268,8 +268,8 @@ export function useSupabaseRoutines() {
     const defaultSlots = generateDefaultTimeSlots();
     const slotRows = defaultSlots.map(s => ({
       routine_id: data.id,
-      start_time: s.startTime,
-      end_time: s.endTime,
+      start_time: parseTimeTo24h(s.startTime),
+      end_time: parseTimeTo24h(s.endTime),
       task_id: null,
     }));
     await supabase.from('routine_time_slots').insert(slotRows);
@@ -602,14 +602,14 @@ export function useSupabaseRoutines() {
       if (r.id !== routineId) return r;
 
       const updatedSlots = r.timeSlots
-        .map(s => s.id === slotId ? { ...s, [field]: value } : s)
+        .map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
         .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
       return { ...r, timeSlots: updatedSlots };
     }));
 
     const dbField = field === 'startTime' ? 'start_time' : 'end_time';
-    const { error } = await supabase.from('routine_time_slots').update({ [dbField]: value }).eq('id', slotId);
+    const { error } = await supabase.from('routine_time_slots').update({ [dbField]: parseTimeTo24h(value) }).eq('id', slotId);
     if (error) {
       console.error('Failed to update routine slot time:', error);
       fetchRoutines();

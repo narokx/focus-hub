@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { timeToMinutes } from '@/lib/utils';
 
@@ -79,8 +79,8 @@ export function useSupabaseCalendar() {
           const task = e.tasks as any;
           return {
             id: e.id,
-            startTime: e.start_time,
-            endTime: e.end_time,
+            startTime: parseTimeTo24h(e.start_time),
+            endTime: parseTimeTo24h(e.end_time),
             task: task ? {
               id: `dst-${e.id}`,
               taskId: task.id,
@@ -172,8 +172,8 @@ export function useSupabaseCalendar() {
               user_id: user.id,
               date,
               task_id: resolvedTaskId,
-              start_time: slot.startTime,
-              end_time: slot.endTime,
+              start_time: parseTimeTo24h(slot.startTime),
+              end_time: parseTimeTo24h(slot.endTime),
               completed: slot.task.completed || false,
             });
           }
@@ -524,8 +524,8 @@ export function useSupabaseCalendar() {
         user_id: user.id,
         date,
         task_id: task.taskId || null,
-        start_time: slot.startTime,
-        end_time: slot.endTime,
+        start_time: parseTimeTo24h(slot.startTime),
+        end_time: parseTimeTo24h(slot.endTime),
         completed: false,
       }).select('id').maybeSingle();
 
@@ -668,7 +668,7 @@ export function useSupabaseCalendar() {
       if (!dayData) return prev;
 
       const updatedSlots = dayData.timeSlots
-        .map(s => s.id === slotId ? { ...s, [field]: value } : s)
+        .map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
         .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
       return {
@@ -680,7 +680,7 @@ export function useSupabaseCalendar() {
     const isDbSlot = !slotId.startsWith('ts-');
     if (isDbSlot) {
       const dbField = field === 'startTime' ? 'start_time' : 'end_time';
-      const { error } = await supabase.from('calendar_events').update({ [dbField]: value }).eq('id', slotId);
+      const { error } = await supabase.from('calendar_events').update({ [dbField]: parseTimeTo24h(value) }).eq('id', slotId);
       if (error) {
         console.error('Failed to update slot time:', error);
         fetchCalendar();
@@ -801,8 +801,8 @@ export function useSupabaseCalendar() {
           user_id: user.id,
           date: targetDate,
           task_id: task.taskId,
-          start_time: targetSlot.startTime,
-          end_time: targetSlot.endTime,
+          start_time: parseTimeTo24h(targetSlot.startTime),
+          end_time: parseTimeTo24h(targetSlot.endTime),
           completed: task.completed || false,
         });
       }
@@ -1155,8 +1155,8 @@ export function useSupabaseCalendar() {
           user_id: user.id,
           date,
           task_id: rSlot.task.taskId,
-          start_time: rSlot.startTime,
-          end_time: rSlot.endTime,
+          start_time: parseTimeTo24h(rSlot.startTime),
+          end_time: parseTimeTo24h(rSlot.endTime),
           completed: false,
         });
       }
