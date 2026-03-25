@@ -45,12 +45,11 @@ function TimePickerField({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full grid grid-cols-[1fr_auto_1fr] items-center text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-full flex items-center justify-start gap-1 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           aria-label="Open time picker"
         >
-          <span className="justify-self-start">{normalized}</span>
-          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70 justify-self-center" />
-          <span />
+          <span>{normalized}</span>
+          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
@@ -535,7 +534,7 @@ function UnassignedZone({
   );
 }
 
-const DEFAULT_TIME_COL = 148;
+const DEFAULT_TIME_COL = 86;
 
 export function TimelineView({
   timeSlots,
