@@ -4,7 +4,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { Pencil, FileText, Star } from 'lucide-react';
 import { TaskColor, getColorValue, getContrastColor } from '@/types';
 import { cn } from '@/lib/utils';
-import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
+import { TaskNotesModal } from './TaskNotesModal';
+import { useTaskNote } from '@/hooks/useTaskNote';
 
 interface TaskChipProps {
   id: string;
