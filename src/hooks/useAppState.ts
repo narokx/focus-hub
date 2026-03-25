@@ -63,13 +63,7 @@ function ensureDayData(date: string, existing?: Partial<DayData>): DayData {
 }
 
 function ensureRoutine(r: any): Routine {
-  return {
-    id: typeof r?.id === 'string' && r.id.trim() ? r.id : `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name: typeof r?.name === 'string' && r.name.trim() ? r.name : 'Untitled Routine',
-    color: r?.color,
-    tasks: Array.isArray(r?.tasks) ? r.tasks : [],
-    timeSlots: normalizeTimeSlots(r?.timeSlots),
-  };
+  return { ...r, timeSlots: normalizeTimeSlots(r.timeSlots) };
 }
 
 export function useAppState(
