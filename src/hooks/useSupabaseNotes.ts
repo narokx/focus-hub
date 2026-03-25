@@ -9,6 +9,7 @@ export function useSupabaseNotes() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const isReady = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistNote = useCallback(async (nextContent: string) => {
@@ -26,7 +27,8 @@ export function useSupabaseNotes() {
   }, [noteId, user]);
 
   const updateNote = useCallback((nextContent: string) => {
-    if (loading || !noteId || !user) return;
+    if (!isReady.current || loading || !noteId) return;
+    if (!user) return;
 
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
@@ -40,7 +42,9 @@ export function useSupabaseNotes() {
     }, 1000);
   }, [persistNote, loading, noteId, user]);
 
-  const fetchNote = useCallback(async () => {
+  const fetchOrCreateNote = useCallback(async () => {
+    isReady.current = false;
+
     if (!user) {
       setNoteId(null);
       setContent(localStorage.getItem(LOCAL_NOTES_KEY) || '');
@@ -67,6 +71,7 @@ export function useSupabaseNotes() {
         localStorage.setItem(LOCAL_NOTES_KEY, existing.content ?? '');
         setNoteId(existing.id);
         setContent(existing.content ?? '');
+        isReady.current = true;
         setLoading(false);
         return;
       }
@@ -85,6 +90,7 @@ export function useSupabaseNotes() {
 
       setNoteId(created?.id ?? null);
       setContent(created?.content ?? '');
+      isReady.current = true;
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch or create note:', error);
@@ -93,14 +99,14 @@ export function useSupabaseNotes() {
   }, [user]);
 
   useEffect(() => {
-    fetchNote();
+    fetchOrCreateNote();
 
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [fetchNote]);
+  }, [fetchOrCreateNote]);
 
   useEffect(() => {
     return () => {
@@ -114,6 +120,6 @@ export function useSupabaseNotes() {
     content,
     loading,
     updateNote,
-    refresh: fetchNote,
+    refresh: fetchOrCreateNote,
   };
 }
