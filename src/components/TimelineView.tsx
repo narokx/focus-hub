@@ -410,6 +410,34 @@ function TimeSlotRow({
   const scale = slot.task ? getDurationScale(durationMin) : 1;
   const baseHeight = 32; // px, standard min-height
   const scaledHeight = Math.round(baseHeight * scale);
+  const [startInput, setStartInput] = useState(parseTimeTo24h(slot.startTime));
+  const [endInput, setEndInput] = useState(parseTimeTo24h(slot.endTime));
+
+  React.useEffect(() => {
+    setStartInput(parseTimeTo24h(slot.startTime));
+  }, [slot.startTime]);
+
+  React.useEffect(() => {
+    setEndInput(parseTimeTo24h(slot.endTime));
+  }, [slot.endTime]);
+
+  const commitTimeChange = (
+    field: 'startTime' | 'endTime',
+    inputValue: string,
+    setInput: React.Dispatch<React.SetStateAction<string>>,
+    fallbackValue: string,
+  ) => {
+    const normalized = normalizeTimeInput(inputValue);
+    const fallback = parseTimeTo24h(fallbackValue);
+    if (!normalized) {
+      setInput(fallback);
+      return;
+    }
+    setInput(normalized);
+    if (normalized !== fallback) {
+      onUpdateSlotTime(slot.id, field, normalized);
+    }
+  };
 
   return (
     <div className="flex items-stretch gap-1 group">
