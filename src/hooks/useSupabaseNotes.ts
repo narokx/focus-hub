@@ -27,8 +27,15 @@ export function useSupabaseNotes() {
   }, [noteId, user]);
 
   const updateNote = useCallback((nextContent: string) => {
-    if (!isReady.current || loading || !noteId) return;
-    if (!user) return;
+    if (!isReady.current || loading || !noteId || !user) return;
+
+    const isIncomingEmpty = !nextContent || nextContent === '<p></p>' || nextContent.trim() === '';
+    const hasExistingText = content && content !== '<p></p>' && content.trim() !== '';
+
+    if (isIncomingEmpty && hasExistingText) {
+      console.warn("Blocked an accidental note wipe attempt.");
+      return;
+    }
 
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
@@ -40,7 +47,7 @@ export function useSupabaseNotes() {
     saveTimeoutRef.current = setTimeout(() => {
       persistNote(nextContent);
     }, 1000);
-  }, [persistNote, loading, noteId, user]);
+  }, [persistNote, loading, noteId, user, content]);
 
   const fetchOrCreateNote = useCallback(async () => {
     isReady.current = false;
