@@ -1224,8 +1224,8 @@ export function useSupabaseCalendar() {
             user_id: user.id,
             date,
             task_id: rSlot.task.taskId,
-            start_time: rSlot.startTime,
-            end_time: rSlot.endTime,
+            start_time: parseTimeTo24h(rSlot.startTime),
+            end_time: parseTimeTo24h(rSlot.endTime),
             completed: false,
           });
         }
