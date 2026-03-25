@@ -150,7 +150,7 @@ export function HeatmapCalendar({
   onUpdateDayColor,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [timeListWidth, setTimeListWidth] = useState(220);
+  const [timeListWidth, setTimeListWidth] = useState(280);
   const [showRoutinePicker, setShowRoutinePicker] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
@@ -173,7 +173,7 @@ export function HeatmapCalendar({
     const move = (e: MouseEvent) => {
       if (!resizingRef.current) return;
       const delta = e.clientX - resizingRef.current.startX;
-      setTimeListWidth(Math.max(140, Math.min(420, resizingRef.current.startW + delta)));
+      setTimeListWidth(Math.max(200, Math.min(500, resizingRef.current.startW + delta)));
     };
     const up = () => {
       resizingRef.current = null;
