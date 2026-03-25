@@ -216,6 +216,30 @@ export type Database = {
         }
         Relationships: []
       }
+      task_notes: {
+        Row: {
+          content: string
+          id: string
+          note_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          id?: string
+          note_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          id?: string
+          note_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_notes: {
         Row: {
           content: string

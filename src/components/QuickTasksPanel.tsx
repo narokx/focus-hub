@@ -5,7 +5,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { Plus, Trash2, List, Pencil, FileText, Star } from 'lucide-react';
 import { QuickTask, TaskColor, getColorValue, getContrastColor, PRESET_COLORS } from '@/types';
 import { AutocompleteInput } from './AutocompleteInput';
-import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
+import { TaskNotesModal } from './TaskNotesModal';
+import { useTaskNote } from '@/hooks/useTaskNote';
 import { cn } from '@/lib/utils';
 
 interface QuickTasksPanelProps {

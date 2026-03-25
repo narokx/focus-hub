@@ -13,29 +13,27 @@ export function useSupabaseNotes() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistNote = useCallback(async (nextContent: string) => {
-    if (!user || !noteId) return;
+    if (!user) return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('user_notes')
-      .update({ content: nextContent })
-      .eq('id', noteId)
-      .eq('user_id', user.id);
+      .upsert(
+        { user_id: user.id, content: nextContent },
+        { onConflict: 'user_id' }
+      )
+      .select('id')
+      .single();
 
     if (error) {
       console.error('Failed to update note:', error);
-    }
-  }, [noteId, user]);
-
-  const updateNote = useCallback((nextContent: string) => {
-    if (!isReady.current || loading || !noteId || !user) return;
-
-    const isIncomingEmpty = !nextContent || nextContent === '<p></p>' || nextContent.trim() === '';
-    const hasExistingText = content && content !== '<p></p>' && content.trim() !== '';
-
-    if (isIncomingEmpty && hasExistingText) {
-      console.warn("Blocked an accidental note wipe attempt.");
       return;
     }
+
+    setNoteId(data.id);
+  }, [user]);
+
+  const updateNote = useCallback((nextContent: string) => {
+    if (!isReady.current || loading) return;
 
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
@@ -47,7 +45,7 @@ export function useSupabaseNotes() {
     saveTimeoutRef.current = setTimeout(() => {
       persistNote(nextContent);
     }, 1000);
-  }, [persistNote, loading, noteId, user, content]);
+  }, [persistNote, loading]);
 
   const fetchOrCreateNote = useCallback(async () => {
     isReady.current = false;
@@ -66,6 +64,8 @@ export function useSupabaseNotes() {
         .from('user_notes')
         .select('id, content')
         .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) {
@@ -85,9 +85,9 @@ export function useSupabaseNotes() {
 
       const { data: created, error: createError } = await supabase
         .from('user_notes')
-        .insert({ user_id: user.id, content: '' })
+        .upsert({ user_id: user.id, content: '' }, { onConflict: 'user_id' })
         .select('id, content')
-        .maybeSingle();
+        .single();
 
       if (createError) {
         console.error('Failed to create note:', createError);
@@ -114,6 +114,32 @@ export function useSupabaseNotes() {
       }
     };
   }, [fetchOrCreateNote]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`user-notes-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_notes',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const nextContent = (payload.new as { content?: string }).content ?? '';
+          setContent(nextContent);
+          localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   useEffect(() => {
     return () => {
