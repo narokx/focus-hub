@@ -23,15 +23,6 @@ function getDurationScale(minutes: number): number {
   return heightPercent / 100;
 }
 
-const TIME_24H_REGEX = /^([01]?\d|2[0-3]):([0-5]\d)$/;
-
-function normalizeTimeInput(value: string): string | null {
-  const parsed = parseTimeTo24h(value.trim());
-  const match = parsed.match(TIME_24H_REGEX);
-  if (!match) return null;
-  return `${match[1].padStart(2, '0')}:${match[2]}`;
-}
-
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
   unassignedTasks: Array<{ id: string; taskId?: string; name: string; color: TaskColor; completed?: boolean }>;
@@ -361,34 +352,6 @@ function TimeSlotRow({
   const scale = slot.task ? getDurationScale(durationMin) : 1;
   const baseHeight = 32; // px, standard min-height
   const scaledHeight = Math.round(baseHeight * scale);
-  const [startInput, setStartInput] = useState(parseTimeTo24h(slot.startTime));
-  const [endInput, setEndInput] = useState(parseTimeTo24h(slot.endTime));
-
-  React.useEffect(() => {
-    setStartInput(parseTimeTo24h(slot.startTime));
-  }, [slot.startTime]);
-
-  React.useEffect(() => {
-    setEndInput(parseTimeTo24h(slot.endTime));
-  }, [slot.endTime]);
-
-  const commitTimeChange = (
-    field: 'startTime' | 'endTime',
-    inputValue: string,
-    setInput: React.Dispatch<React.SetStateAction<string>>,
-    fallbackValue: string,
-  ) => {
-    const normalized = normalizeTimeInput(inputValue);
-    const fallback = parseTimeTo24h(fallbackValue);
-    if (!normalized) {
-      setInput(fallback);
-      return;
-    }
-    setInput(normalized);
-    if (normalized !== fallback) {
-      onUpdateSlotTime(slot.id, field, normalized);
-    }
-  };
 
   return (
     <div className="flex items-stretch gap-1 group">
@@ -398,31 +361,19 @@ function TimeSlotRow({
       >
         <div className="flex flex-col min-w-0">
           <input
-            type="text"
-            inputMode="numeric"
-            placeholder="HH:mm"
-            value={startInput}
-            onChange={(e) => setStartInput(e.target.value)}
-            onBlur={() => commitTimeChange('startTime', startInput, setStartInput, slot.startTime)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur();
-              }
-            }}
+            type="time"
+            lang="en-GB"
+            step={60}
+            value={parseTimeTo24h(slot.startTime)}
+            onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <input
-            type="text"
-            inputMode="numeric"
-            placeholder="HH:mm"
-            value={endInput}
-            onChange={(e) => setEndInput(e.target.value)}
-            onBlur={() => commitTimeChange('endTime', endInput, setEndInput, slot.endTime)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.currentTarget.blur();
-              }
-            }}
+            type="time"
+            lang="en-GB"
+            step={60}
+            value={parseTimeTo24h(slot.endTime)}
+            onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
