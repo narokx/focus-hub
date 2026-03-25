@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star, Layers } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
@@ -21,6 +21,58 @@ function getSlotDurationMinutes(startTime: string, endTime: string): number {
 function getDurationScale(minutes: number): number {
   const heightPercent = Math.max(100, Math.min(250, 100 + ((minutes - 30) / 150) * 150));
   return heightPercent / 100;
+}
+
+function TimePickerField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const pickerRef = React.useRef<HTMLInputElement>(null);
+  const normalized = parseTimeTo24h(value);
+
+  const openPicker = () => {
+    if (!pickerRef.current) return;
+    if (typeof pickerRef.current.showPicker === 'function') {
+      pickerRef.current.showPicker();
+      return;
+    }
+    pickerRef.current.focus();
+    pickerRef.current.click();
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={normalized}
+        readOnly
+        className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 pr-5 py-0 focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+        onClick={openPicker}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        className="absolute inset-y-0 right-0 flex items-center pr-1 text-muted-foreground/70 hover:text-muted-foreground"
+        aria-label="Open time picker"
+      >
+        <Clock3 className="w-2.5 h-2.5" />
+      </button>
+      <input
+        ref={pickerRef}
+        type="time"
+        lang="en-GB"
+        step={60}
+        value={normalized}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 opacity-0 pointer-events-none"
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+    </div>
+  );
 }
 
 interface TimelineViewProps {
@@ -360,21 +412,13 @@ function TimeSlotRow({
         style={{ width: timeColumnWidth }}
       >
         <div className="flex flex-col min-w-0">
-          <input
-            type="time"
-            lang="en-GB"
-            step={60}
-            value={parseTimeTo24h(slot.startTime)}
-            onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
-            className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          <TimePickerField
+            value={slot.startTime}
+            onChange={(value) => onUpdateSlotTime(slot.id, 'startTime', value)}
           />
-          <input
-            type="time"
-            lang="en-GB"
-            step={60}
-            value={parseTimeTo24h(slot.endTime)}
-            onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
-            className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          <TimePickerField
+            value={slot.endTime}
+            onChange={(value) => onUpdateSlotTime(slot.id, 'endTime', value)}
           />
         </div>
       </div>
