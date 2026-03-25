@@ -171,13 +171,9 @@ function formatHour(hour: number): string {
 
 export function parseTimeTo24h(time: string): string {
   const normalized = time.trim();
-  const cleaned = normalized
-    .replace(/\u202F/g, ' ') // narrow no-break space
-    .replace(/\u00A0/g, ' ') // no-break space
-    .replace(/\./g, ''); // a.m. / p.m.
 
   // 24h format with optional seconds (e.g. "07:00" or "07:00:00")
-  const match24 = cleaned.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  const match24 = normalized.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (match24) {
     const h = parseInt(match24[1]);
     const m = parseInt(match24[2]);
@@ -186,7 +182,7 @@ export function parseTimeTo24h(time: string): string {
   }
 
   // 12h format with optional seconds (e.g. "07:00 AM" or "07:00:00 PM")
-  const match12 = cleaned.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)$/i);
+  const match12 = normalized.match(/(\d+):(\d+)(?::\d+)?\s*(AM|PM)/i);
   if (!match12) return time;
   let h = parseInt(match12[1]);
   const m = parseInt(match12[2]);
