@@ -11,26 +11,66 @@ export function useSupabaseNotes() {
   const [loading, setLoading] = useState(true);
   const isReady = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestContentRef = useRef('');
+
+  useEffect(() => {
+    latestContentRef.current = content;
+  }, [content]);
 
   const persistNote = useCallback(async (nextContent: string) => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('user_notes')
-      .upsert(
-        { user_id: user.id, content: nextContent },
-        { onConflict: 'user_id' }
-      )
-      .select('id')
-      .single();
+    if (noteId) {
+      const { error } = await supabase
+        .from('user_notes')
+        .update({ content: nextContent })
+        .eq('id', noteId)
+        .eq('user_id', user.id);
 
-    if (error) {
-      console.error('Failed to update note:', error);
+      if (!error) return;
+      console.error('Failed to update note by id, retrying create flow:', error);
+    }
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('user_notes')
+      .select('id')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.error('Failed to fetch note while persisting:', fetchError);
       return;
     }
 
-    setNoteId(data.id);
-  }, [user]);
+    if (existing?.id) {
+      setNoteId(existing.id);
+      const { error } = await supabase
+        .from('user_notes')
+        .update({ content: nextContent })
+        .eq('id', existing.id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Failed to update fetched note:', error);
+      }
+      return;
+    }
+
+    const { data: created, error: createError } = await supabase
+      .from('user_notes')
+      .insert({ user_id: user.id, content: nextContent })
+      .select('id')
+      .maybeSingle();
+
+    if (createError) {
+      console.error('Failed to create note while persisting:', createError);
+      return;
+    }
+
+    setNoteId(created?.id ?? null);
+  }, [user, noteId]);
 
   const updateNote = useCallback((nextContent: string) => {
     if (!isReady.current || loading) return;
@@ -75,28 +115,23 @@ export function useSupabaseNotes() {
       }
 
       if (existing) {
-        localStorage.setItem(LOCAL_NOTES_KEY, existing.content ?? '');
+        const local = localStorage.getItem(LOCAL_NOTES_KEY) || '';
+        const remote = existing.content ?? '';
+        const resolved = remote || local;
+        localStorage.setItem(LOCAL_NOTES_KEY, resolved);
         setNoteId(existing.id);
-        setContent(existing.content ?? '');
+        setContent(resolved);
+        if (!remote && local) {
+          void persistNote(local);
+        }
         isReady.current = true;
         setLoading(false);
         return;
       }
 
-      const { data: created, error: createError } = await supabase
-        .from('user_notes')
-        .upsert({ user_id: user.id, content: '' }, { onConflict: 'user_id' })
-        .select('id, content')
-        .single();
-
-      if (createError) {
-        console.error('Failed to create note:', createError);
-        setLoading(false);
-        return;
-      }
-
-      setNoteId(created?.id ?? null);
-      setContent(created?.content ?? '');
+      const local = localStorage.getItem(LOCAL_NOTES_KEY) || '';
+      setNoteId(null);
+      setContent(local);
       isReady.current = true;
       setLoading(false);
     } catch (error) {
@@ -110,10 +145,13 @@ export function useSupabaseNotes() {
 
     return () => {
       if (saveTimeoutRef.current) {
+        if (user && latestContentRef.current) {
+          void persistNote(latestContentRef.current);
+        }
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [fetchOrCreateNote]);
+  }, [fetchOrCreateNote, persistNote, user]);
 
   useEffect(() => {
     if (!user) return;
