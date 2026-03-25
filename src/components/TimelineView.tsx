@@ -6,6 +6,7 @@ import { TaskChip } from './TaskChip';
 import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { TaskPickerModal } from './TaskPickerModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn, getContrastColor } from '@/lib/utils';
 
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
@@ -30,48 +31,52 @@ function TimePickerField({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const pickerRef = React.useRef<HTMLInputElement>(null);
   const normalized = parseTimeTo24h(value);
+  const [hour, minute] = normalized.split(':');
+  const hours = Array.from({ length: 24 }, (_, idx) => idx.toString().padStart(2, '0'));
+  const minutes = Array.from({ length: 60 }, (_, idx) => idx.toString().padStart(2, '0'));
 
-  const openPicker = () => {
-    if (!pickerRef.current) return;
-    if (typeof pickerRef.current.showPicker === 'function') {
-      pickerRef.current.showPicker();
-      return;
-    }
-    pickerRef.current.focus();
-    pickerRef.current.click();
+  const updatePart = (nextHour: string, nextMinute: string) => {
+    onChange(`${nextHour}:${nextMinute}`);
   };
 
   return (
-    <div className="relative">
-      <input
-        type="text"
-        value={normalized}
-        readOnly
-        className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 pr-5 py-0 focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-        onClick={openPicker}
-      />
-      <button
-        type="button"
-        onClick={openPicker}
-        className="absolute inset-y-0 right-0 flex items-center pr-1 text-muted-foreground/70 hover:text-muted-foreground"
-        aria-label="Open time picker"
-      >
-        <Clock3 className="w-2.5 h-2.5" />
-      </button>
-      <input
-        ref={pickerRef}
-        type="time"
-        lang="en-GB"
-        step={60}
-        value={normalized}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 pointer-events-none"
-        tabIndex={-1}
-        aria-hidden="true"
-      />
-    </div>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center justify-between text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Open time picker"
+        >
+          <span>{normalized}</span>
+          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-2">
+        <div className="flex gap-2">
+          <select
+            className="h-28 w-14 bg-background border border-input rounded text-xs"
+            value={hour}
+            onChange={(e) => updatePart(e.target.value, minute)}
+            size={6}
+          >
+            {hours.map((h) => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
+          <select
+            className="h-28 w-14 bg-background border border-input rounded text-xs"
+            value={minute}
+            onChange={(e) => updatePart(hour, e.target.value)}
+            size={6}
+          >
+            {minutes.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -529,7 +534,7 @@ function UnassignedZone({
   );
 }
 
-const DEFAULT_TIME_COL = 148;
+const DEFAULT_TIME_COL = 104;
 
 export function TimelineView({
   timeSlots,
