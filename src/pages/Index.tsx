@@ -682,7 +682,11 @@ export default function Index() {
               <button onClick={() => setIsNotesOpen(false)} className="p-1 rounded-md hover:bg-secondary text-muted-foreground"><X className="w-5 h-5"/></button>
             </div>
             <div className="flex-1 overflow-auto">
-              <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} isLoading={notesLoading} />
+              {notesLoading ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground italic">Loading notes...</div>
+              ) : (
+                <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} isLoading={notesLoading} />
+              )}
             </div>
           </div>
         )}
@@ -862,11 +866,11 @@ export default function Index() {
               </button>
             }
           >
-            <WeeklyNotesPanel
-              content={weeklyNoteContent}
-              onUpdateNote={updateNote}
-              isLoading={notesLoading}
-            />
+            {notesLoading ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground italic">Loading notes...</div>
+            ) : (
+              <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} isLoading={notesLoading} />
+            )}
           </FloatingWindow>
         )}
 

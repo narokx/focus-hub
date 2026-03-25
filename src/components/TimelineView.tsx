@@ -362,12 +362,14 @@ function TimeSlotRow({
         <div className="flex flex-col min-w-0">
           <input
             type="time"
+            lang="en-GB"
             value={parseTimeTo24h(slot.startTime)}
             onChange={(e) => onUpdateSlotTime(slot.id, 'startTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <input
             type="time"
+            lang="en-GB"
             value={parseTimeTo24h(slot.endTime)}
             onChange={(e) => onUpdateSlotTime(slot.id, 'endTime', e.target.value)}
             className="w-full text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
