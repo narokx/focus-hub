@@ -9,6 +9,7 @@ export function useSupabaseNotes() {
   const [noteId, setNoteId] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const hasLoadedInitialData = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persistNote = useCallback(async (nextContent: string) => {
@@ -26,14 +27,11 @@ export function useSupabaseNotes() {
   }, [noteId, user]);
 
   const updateNote = useCallback((nextContent: string) => {
-    if (loading || !noteId || !user) return;
+    // BLOCK all saves if data hasn't finished loading for the first time
+    if (!hasLoadedInitialData.current || loading || !noteId || !user) return;
 
     setContent(nextContent);
-    localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(() => {
       persistNote(nextContent);
@@ -67,6 +65,7 @@ export function useSupabaseNotes() {
         localStorage.setItem(LOCAL_NOTES_KEY, existing.content ?? '');
         setNoteId(existing.id);
         setContent(existing.content ?? '');
+        hasLoadedInitialData.current = true;
         setLoading(false);
         return;
       }
@@ -85,6 +84,7 @@ export function useSupabaseNotes() {
 
       setNoteId(created?.id ?? null);
       setContent(created?.content ?? '');
+      hasLoadedInitialData.current = true;
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch or create note:', error);
@@ -111,6 +111,7 @@ export function useSupabaseNotes() {
   }, []);
 
   return {
+    noteId,
     content,
     loading,
     updateNote,
