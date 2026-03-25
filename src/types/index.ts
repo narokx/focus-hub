@@ -170,14 +170,32 @@ function formatHour(hour: number): string {
 }
 
 export function parseTimeTo24h(time: string): string {
-  // Already 24h (e.g. "07:00")
-  if (/^\d{2}:\d{2}$/.test(time)) return time;
-  // 12h format (e.g. "07:00 AM")
-  const match = time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-  if (!match) return time;
-  let h = parseInt(match[1]);
-  const m = parseInt(match[2]);
-  const ampm = match[3].toUpperCase();
+  const normalized = time.trim();
+  const cleaned = normalized
+    .replace(/\u202F/g, ' ') // narrow no-break space
+    .replace(/\u00A0/g, ' ') // no-break space
+    .replace(/\./g, '') // a.m. / p.m.
+    .replace(/[^\dA-Za-z:\s]/g, '') // strip locale symbols/markers
+    .replace(/\s+/g, ' ')
+    .trim();
+  const canonical = cleaned.toUpperCase();
+
+  // 24h format with optional seconds (e.g. "07:00" or "07:00:00")
+  const match24 = canonical.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match24) {
+    const h = parseInt(match24[1]);
+    const m = parseInt(match24[2]);
+    if (Number.isNaN(h) || Number.isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return time;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  }
+
+  // 12h format with optional seconds (e.g. "07:00 AM" or "07:00:00 PM")
+  const match12 = canonical.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)$/);
+  if (!match12) return time;
+  let h = parseInt(match12[1]);
+  const m = parseInt(match12[2]);
+  if (Number.isNaN(h) || Number.isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) return time;
+  const ampm = match12[3].toUpperCase();
   if (ampm === 'PM' && h !== 12) h += 12;
   if (ampm === 'AM' && h === 12) h = 0;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;

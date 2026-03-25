@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, QuickTask, Routine, DayData, DayTask, TimeSlot, generateDefaultTimeSlots } from '@/types';
+import { AppState, QuickTask, Routine, DayData, DayTask, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -45,16 +45,31 @@ const getDefaultState = (): AppState => ({
   windowTitles: defaultWindowTitles,
 });
 
+function normalizeTimeSlots(timeSlots?: TimeSlot[]): TimeSlot[] {
+  const source = timeSlots || generateDefaultTimeSlots();
+  return source.map(slot => ({
+    ...slot,
+    startTime: parseTimeTo24h(slot.startTime),
+    endTime: parseTimeTo24h(slot.endTime),
+  }));
+}
+
 function ensureDayData(date: string, existing?: Partial<DayData>): DayData {
   return {
     date,
     tasks: existing?.tasks || [],
-    timeSlots: existing?.timeSlots || generateDefaultTimeSlots(),
+    timeSlots: normalizeTimeSlots(existing?.timeSlots),
   };
 }
 
 function ensureRoutine(r: any): Routine {
-  return { ...r, timeSlots: r.timeSlots || generateDefaultTimeSlots() };
+  return {
+    id: typeof r?.id === 'string' && r.id.trim() ? r.id : `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: typeof r?.name === 'string' && r.name.trim() ? r.name : 'Untitled Routine',
+    color: r?.color,
+    tasks: Array.isArray(r?.tasks) ? r.tasks : [],
+    timeSlots: normalizeTimeSlots(r?.timeSlots),
+  };
 }
 
 export function useAppState(
