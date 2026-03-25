@@ -46,7 +46,7 @@ function TimePickerField({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full flex items-center justify-start gap-1 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          className="w-full flex items-center justify-start gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
           aria-label="Open time picker"
         >
           <span>{normalized}</span>
@@ -563,7 +563,7 @@ function UnassignedZone({
   );
 }
 
-const DEFAULT_TIME_COL = 86;
+const DEFAULT_TIME_COL = 64;
 
 export function TimelineView({
   timeSlots,
