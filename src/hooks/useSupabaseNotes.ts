@@ -27,41 +27,19 @@ export function useSupabaseNotes() {
   const persistNote = useCallback(async (nextContent: string) => {
     if (!user) return;
 
-    if (noteId) {
-      const { error } = await supabase
-        .from('user_notes')
-        .update({ content: nextContent })
-        .eq('id', noteId)
-        .eq('user_id', user.id);
-
-      if (!error) return;
-      console.error('Failed to update note by id, retrying create flow:', error);
-    }
-
-    const { data: existingRows, error: fetchError } = await supabase
+    const { data: updatedRows, error: updateError } = await supabase
       .from('user_notes')
-      .select('id')
+      .update({ content: nextContent })
       .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1);
+      .select('id');
 
-    if (fetchError) {
-      console.error('Failed to fetch note while persisting:', fetchError);
+    if (updateError) {
+      console.error('Failed to update weekly notes rows:', updateError);
       return;
     }
 
-    const existing = existingRows?.[0];
-    if (existing?.id) {
-      setNoteId(existing.id);
-      const { error } = await supabase
-        .from('user_notes')
-        .update({ content: nextContent })
-        .eq('id', existing.id)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Failed to update fetched note:', error);
-      }
+    if (updatedRows && updatedRows.length > 0) {
+      setNoteId(updatedRows[0].id);
       return;
     }
 
@@ -77,7 +55,7 @@ export function useSupabaseNotes() {
     }
 
     setNoteId(created?.id ?? null);
-  }, [user, noteId]);
+  }, [user]);
 
   const updateNote = useCallback((nextContent: string) => {
     if (!isReady.current || loading) return;
