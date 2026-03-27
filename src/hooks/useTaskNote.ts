@@ -11,7 +11,6 @@ type CachedNote = { content: string; updatedAt: number };
 let taskNotesRemoteAvailable = true;
 let taskNotesKeyColumn: RemoteKeyColumn = 'note_key';
 let taskNotesSchemaChecked = false;
-let taskNotesHasTaskIdColumn = false;
 const remoteNotesCache = new Map<string, Record<string, CachedNote>>();
 const inflightFetches = new Map<string, Promise<void>>();
 
@@ -54,12 +53,6 @@ async function ensureTaskNotesSchema(userId: string) {
 
   if (!probeNoteKey.error) {
     taskNotesKeyColumn = 'note_key';
-    const probeTaskId = await supabase
-      .from('task_notes')
-      .select('task_id')
-      .eq('user_id', userId)
-      .limit(1);
-    taskNotesHasTaskIdColumn = !probeTaskId.error;
     taskNotesSchemaChecked = true;
     return;
   }
@@ -79,7 +72,6 @@ async function ensureTaskNotesSchema(userId: string) {
 
     if (!probeTaskId.error) {
       taskNotesKeyColumn = 'task_id';
-      taskNotesHasTaskIdColumn = true;
       taskNotesSchemaChecked = true;
       return;
     }
@@ -92,25 +84,6 @@ async function ensureTaskNotesSchema(userId: string) {
   }
 
   console.error('Failed to probe task_notes schema:', probeNoteKey.error);
-}
-
-function buildTaskNotePayload(userId: string, taskId: string) {
-  const payload: Record<string, string> = {
-    user_id: userId,
-    content: '',
-  };
-
-  if (taskNotesKeyColumn === 'note_key') {
-    payload.note_key = taskId;
-    if (taskNotesHasTaskIdColumn) {
-      payload.task_id = taskId;
-    }
-    return payload;
-  }
-
-  payload.task_id = taskId;
-  payload.note_key = taskId;
-  return payload;
 }
 
 async function loadRemoteNotesForUser(userId: string) {
@@ -194,8 +167,11 @@ export function useTaskNote(taskId: string | null) {
 
       if (localUpdatedAt > remoteValue.updatedAt && localValue) {
         const keyColumn = taskNotesKeyColumn;
-        const payload = buildTaskNotePayload(user.id, taskId);
-        payload.content = localValue;
+        const payload = {
+          user_id: user.id,
+          [keyColumn]: taskId,
+          content: localValue,
+        } as Record<string, string>;
 
         const { error } = await supabase.from('task_notes').upsert(payload, {
           onConflict: `user_id,${keyColumn}`,
@@ -231,8 +207,11 @@ export function useTaskNote(taskId: string | null) {
     if (!taskNotesRemoteAvailable) return;
 
     const keyColumn = taskNotesKeyColumn;
-    const payload = buildTaskNotePayload(user.id, taskId);
-    payload.content = text;
+    const payload = {
+      user_id: user.id,
+      [keyColumn]: taskId,
+      content: text,
+    } as Record<string, string>;
 
     const { error } = await supabase.from('task_notes').upsert(payload, {
       onConflict: `user_id,${keyColumn}`,
