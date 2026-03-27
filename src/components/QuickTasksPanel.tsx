@@ -5,7 +5,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { Plus, Trash2, List, Pencil, FileText, Star } from 'lucide-react';
 import { QuickTask, TaskColor, getColorValue, getContrastColor, PRESET_COLORS } from '@/types';
 import { AutocompleteInput } from './AutocompleteInput';
-import { TaskNotesModal, useTaskNote } from './TaskNotesModal';
+import { TaskNotesModal } from './TaskNotesModal';
+import { useTaskNote } from '@/hooks/useTaskNote';
+import { toTaskNoteKey } from '@/lib/taskNoteKey';
 import { cn } from '@/lib/utils';
 
 interface QuickTasksPanelProps {
@@ -28,7 +30,7 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
 
-  const noteId = `quick-${task.id}`;
+  const noteId = toTaskNoteKey(task.id) || `task-${task.id}`;
   const { note } = useTaskNote(noteId);
   const hasNotes = !!note?.trim();
 
