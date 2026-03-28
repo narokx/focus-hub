@@ -218,23 +218,26 @@ export type Database = {
       }
       time_logs: {
         Row: {
-          end_time: string | null
+          accumulated_seconds: number
           id: string
-          start_time: string
+          is_running: boolean
+          last_started_at: string | null
           task_id: string | null
           user_id: string
         }
         Insert: {
-          end_time?: string | null
+          accumulated_seconds?: number
           id?: string
-          start_time: string
+          is_running?: boolean
+          last_started_at?: string | null
           task_id?: string | null
           user_id: string
         }
         Update: {
-          end_time?: string | null
+          accumulated_seconds?: number
           id?: string
-          start_time?: string
+          is_running?: boolean
+          last_started_at?: string | null
           task_id?: string | null
           user_id?: string
         }

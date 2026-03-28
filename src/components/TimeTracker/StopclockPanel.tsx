@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Play, Square, X } from 'lucide-react';
+import { useState } from 'react';
+import { Play, Plus, Square, X } from 'lucide-react';
 import { useTimeTracker } from '@/hooks/useTimeTracker';
+import { TaskPickerModal } from '@/components/TaskPickerModal';
+import type { QuickTask } from '@/types';
 
 type StopclockPanelProps = {
+  tasks?: QuickTask[];
   taskNameById?: Record<string, string>;
   onClose?: () => void;
 };
@@ -16,38 +19,9 @@ function formatDuration(totalSeconds: number): string {
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
 }
 
-export function StopclockPanel({ taskNameById = {}, onClose }: StopclockPanelProps) {
-  const { logs, activeLog, totalSecondsToday, loading, startTimer, stopTimer } = useTimeTracker();
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  useEffect(() => {
-    if (!activeLog) return;
-
-    const interval = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [activeLog]);
-
-  const logsWithDuration = useMemo(() => {
-    return logs.map((log) => {
-      const startMs = Date.parse(log.start_time);
-      const endMs = log.end_time ? Date.parse(log.end_time) : nowMs;
-
-      let durationSeconds = 0;
-      if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs > startMs) {
-        durationSeconds = Math.floor((endMs - startMs) / 1000);
-      }
-
-      return {
-        ...log,
-        durationSeconds,
-      };
-    });
-  }, [logs, nowMs]);
+export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: StopclockPanelProps) {
+  const { logsWithDuration, activeLog, mostRecentLog, totalSecondsToday, loading, toggleTimer, createNewBlock, assignTask } = useTimeTracker();
+  const [pickerLogId, setPickerLogId] = useState<string | null>(null);
 
   return (
     <div className="fixed right-6 top-20 z-[950] w-[min(92vw,440px)] rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-md">
@@ -76,7 +50,8 @@ export function StopclockPanel({ taskNameById = {}, onClose }: StopclockPanelPro
         </div>
 
         <button
-          onClick={activeLog ? () => void stopTimer() : () => void startTimer()}
+          onClick={mostRecentLog ? () => void toggleTimer(mostRecentLog.id) : undefined}
+          disabled={!mostRecentLog}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
         >
           {activeLog ? (
@@ -105,17 +80,45 @@ export function StopclockPanel({ taskNameById = {}, onClose }: StopclockPanelPro
                 className="rounded-lg border border-border/80 bg-background/70 px-3 py-2 text-sm"
               >
                 <span className="font-medium text-foreground">
-                  {taskNameById[log.task_id ?? ''] ?? 'Unassigned'}
+                  {(log.task_id && taskNameById[log.task_id]) || 'Unassigned'}
                 </span>{' '}
                 <span className="text-muted-foreground">-</span>{' '}
                 <span className="font-mono text-foreground">{formatDuration(log.durationSeconds)}</span>
                 {log.id === activeLog?.id && (
                   <span className="ml-2 text-xs font-medium uppercase text-primary">Live</span>
                 )}
+                {!log.task_id && (
+                  <button
+                    onClick={() => setPickerLogId(log.id)}
+                    className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    title="Assign task"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             ))}
         </div>
+
+        <button
+          onClick={() => void createNewBlock()}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
+        >
+          <Plus className="h-4 w-4" />
+          New Block
+        </button>
       </div>
+
+      {pickerLogId && (
+        <TaskPickerModal
+          tasks={tasks}
+          onClose={() => setPickerLogId(null)}
+          onSelect={(task) => {
+            void assignTask(pickerLogId, task.id);
+            setPickerLogId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
