@@ -27,35 +27,28 @@ export function useSupabaseNotes() {
   const persistNote = useCallback(async (nextContent: string) => {
   if (!user) return;
 
-  const { data: updatedRows, error: updateError } = await supabase
+  const { data, error } = await supabase
     .from('user_notes')
-    .update({ content: nextContent })
-    .eq('user_id', user.id)
-    .select('id');
-
-  if (updateError) {
-    console.error('Failed to update weekly notes rows:', updateError);
-    return;
-  }
-
-  if (updatedRows && updatedRows.length > 0) {
-    setNoteId(updatedRows[0].id);
-    return;
-  }
-
-  const { data: created, error: createError } = await supabase
-    .from('user_notes')
-    .insert({ user_id: user.id, content: nextContent })
+    .upsert(
+      { 
+        user_id: user.id, 
+        content: nextContent,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'user_id' }
+    )
     .select('id')
     .maybeSingle();
 
-  if (createError) {
-    console.error('Failed to create note while persisting:', createError);
+  if (error) {
+    console.error('Failed to persist weekly notes:', error);
     return;
   }
 
-  setNoteId(created?.id ?? null);
-}, [user]);
+  if (data?.id && data.id !== noteId) {
+    setNoteId(data.id);
+  }
+}, [user, noteId]);
   
   const updateNote = useCallback((nextContent: string) => {
     if (!isReady.current || loading) return;
