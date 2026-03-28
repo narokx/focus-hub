@@ -12,7 +12,7 @@ import {
   KeyboardSensor,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { BarChart3, Calendar, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2, X } from 'lucide-react';
+import { BarChart3, Calendar, Clock3, Layers, List, NotebookPen, StickyNote, Wrench, Undo2, Redo2, X } from 'lucide-react';
 import { FloatingWindow } from '@/components/FloatingWindow';
 import { HeatmapCalendar } from '@/components/HeatmapCalendar';
 import { QuickTasksPanel } from '@/components/QuickTasksPanel';
@@ -21,6 +21,7 @@ import { RoutineApplicationModal } from '@/components/RoutineApplicationModal';
 import { SettingsModal } from '@/components/SettingsModal';
 import { WeeklyStatsPanel } from '@/components/WeeklyStatsPanel';
 import { WeeklyNotesPanel } from '@/components/WeeklyNotesPanel';
+import { StopclockPanel } from '@/components/TimeTracker/StopclockPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppState } from '@/hooks/useAppState';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -159,6 +160,7 @@ export default function Index() {
     source?: { type: 'timeslot'; sourcePrefix: string; sourceSlotId: string };
   } | null>(null);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isStopclockOpen, setIsStopclockOpen] = useState(false);
 
   // History for undo/redo
   const history = useHistory(state);
@@ -542,6 +544,7 @@ export default function Index() {
                 <Redo2 className="w-4 h-4" />
               </button>
               <button onClick={() => setIsNotesOpen(!isNotesOpen)} className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"><StickyNote className="w-4 h-4" /></button>
+              <button onClick={() => setIsStopclockOpen(!isStopclockOpen)} className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground" title="Toggle Stopclock"><Clock3 className="w-4 h-4" /></button>
               <SettingsModal
                 onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }}
                 refreshNotes={refreshNotes}
@@ -675,6 +678,13 @@ export default function Index() {
           </div>
         )}
 
+        {isStopclockOpen && (
+          <StopclockPanel
+            onClose={() => setIsStopclockOpen(false)}
+            taskNameById={Object.fromEntries(state.quickTasks.map((task) => [task.id, task.name]))}
+          />
+        )}
+
         {isNotesOpen && (
           <div className="fixed inset-0 z-[999] bg-card flex flex-col animate-in slide-in-from-bottom-full duration-200">
             <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/30">
@@ -731,12 +741,26 @@ export default function Index() {
             >
               <StickyNote className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => setIsStopclockOpen(!isStopclockOpen)}
+              className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground"
+              title="Toggle Stopclock"
+            >
+              <Clock3 className="w-4 h-4" />
+            </button>
             <SettingsModal
               onImportComplete={async () => { await fetchTasks(); await fetchRoutines(); await fetchCalendar(); }}
               refreshNotes={refreshNotes}
             />
           </div>
         </div>
+
+        {isStopclockOpen && (
+          <StopclockPanel
+            onClose={() => setIsStopclockOpen(false)}
+            taskNameById={Object.fromEntries(state.quickTasks.map((task) => [task.id, task.name]))}
+          />
+        )}
 
         {/* Routines Window */}
         <FloatingWindow
