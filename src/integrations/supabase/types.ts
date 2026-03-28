@@ -216,6 +216,38 @@ export type Database = {
         }
         Relationships: []
       }
+      time_logs: {
+        Row: {
+          end_time: string | null
+          id: string
+          start_time: string
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          end_time?: string | null
+          id?: string
+          start_time: string
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          end_time?: string | null
+          id?: string
+          start_time?: string
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_notes: {
         Row: {
           content: string
