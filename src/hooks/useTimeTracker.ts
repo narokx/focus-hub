@@ -209,6 +209,5 @@ export function useTimeTracker() {
     toggleTimer,
     createNewBlock,
     assignTask,
-    refresh: fetchTodayLogs,
-  };
+    refresh: fetchAllLogs
 }
