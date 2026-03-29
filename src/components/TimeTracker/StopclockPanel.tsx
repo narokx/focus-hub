@@ -4,6 +4,7 @@ import { Eraser, Pause, PictureInPicture2, Play, Plus, X } from 'lucide-react';
 import { useTimeTracker } from '@/hooks/useTimeTracker';
 import { TaskPickerModal } from '@/components/TaskPickerModal';
 import { FloatingWindow } from '@/components/FloatingWindow';
+import { getStoredPosition, getStoredSize, savePosition, saveSize } from '@/lib/windowPersistence';
 import type { QuickTask } from '@/types';
 
 type StopclockPanelProps = {
@@ -14,9 +15,11 @@ type StopclockPanelProps = {
 
 type PickerMode = 'start' | 'next';
 
-const POSITION_KEY = 'stopclock-window-position';
-const SIZE_KEY = 'stopclock-window-size';
+const POSITION_KEY = 'stopclock-position';
+const SIZE_KEY = 'stopclock-size';
 const PIP_DEFAULT_SIZE = { width: 420, height: 360 };
+const DEFAULT_POSITION = { x: 24, y: 90 };
+const DEFAULT_SIZE = { width: 440, height: 700 };
 
 type DocumentPictureInPictureApi = {
   requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
@@ -35,36 +38,6 @@ function formatDuration(totalSeconds: number): string {
   const seconds = safeSeconds % 60;
 
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
-}
-
-function getStoredPosition() {
-  const fallback = { x: 24, y: 90 };
-  if (typeof window === 'undefined') return fallback;
-  const raw = window.localStorage.getItem(POSITION_KEY);
-  if (!raw) return fallback;
-
-  try {
-    const parsed = JSON.parse(raw) as { x: number; y: number };
-    if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) return parsed;
-    return fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function getStoredSize() {
-  const fallback = { width: 440, height: 700 };
-  if (typeof window === 'undefined') return fallback;
-  const raw = window.localStorage.getItem(SIZE_KEY);
-  if (!raw) return fallback;
-
-  try {
-    const parsed = JSON.parse(raw) as { width: number; height: number };
-    if (Number.isFinite(parsed.width) && Number.isFinite(parsed.height)) return parsed;
-    return fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: StopclockPanelProps) {
@@ -89,14 +62,15 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const [pipContainer, setPipContainer] = useState<HTMLElement | null>(null);
   const pipCloseListenerRef = useRef<(() => void) | null>(null);
 
-  const position = useMemo(() => getStoredPosition(), []);
-  const size = useMemo(() => getStoredSize(), []);
+  const position = useMemo(() => getStoredPosition(POSITION_KEY, DEFAULT_POSITION), []);
+  const size = useMemo(() => getStoredSize(SIZE_KEY, DEFAULT_SIZE), []);
   const supportsDocumentPiP = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
 
   useEffect(() => {
     return () => {
       if (pipCloseListenerRef.current && pipWindow) {
         pipWindow.removeEventListener('pagehide', pipCloseListenerRef.current);
+        pipCloseListenerRef.current = null;
       }
       pipWindow?.close();
     };
@@ -122,10 +96,6 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   };
 
   const closePiP = () => {
-    if (pipCloseListenerRef.current && pipWindow) {
-      pipWindow.removeEventListener('pagehide', pipCloseListenerRef.current);
-      pipCloseListenerRef.current = null;
-    }
     pipWindow?.close();
     setPipContainer(null);
     setPipWindow(null);
@@ -191,8 +161,8 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
 
   const panelBody = (
     <div className={`space-y-4 px-4 py-4 ${miniMode ? 'max-h-[220px]' : ''}`}>
-      <div className="@container rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
-        <p className="font-mono font-bold tracking-wider text-primary text-[clamp(1.5rem,15cqw,3.75rem)] leading-none">
+      <div className="@container overflow-hidden rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
+        <p className="flex-shrink whitespace-nowrap overflow-hidden font-mono font-bold tracking-wider text-primary text-[clamp(1.5rem,12cqw,4rem)] leading-none">
           {formatDuration(totalSecondsToday)}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">Total tracked today</p>
@@ -276,8 +246,8 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
       minHeight={miniMode ? 220 : 450}
       maxWidth={760}
       maxHeight={900}
-      onPositionChange={(next) => window.localStorage.setItem(POSITION_KEY, JSON.stringify(next))}
-      onSizeChange={(next) => window.localStorage.setItem(SIZE_KEY, JSON.stringify(next))}
+      onPositionChange={(next) => savePosition(POSITION_KEY, next)}
+      onSizeChange={(next) => saveSize(SIZE_KEY, next)}
       headerActions={
         <>
           <button

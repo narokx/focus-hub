@@ -1,5 +1,13 @@
 import type { Config } from "tailwindcss";
 
+const plugins = [require("tailwindcss-animate")];
+
+try {
+  plugins.push(require("@tailwindcss/container-queries"));
+} catch {
+  // Optional in restricted environments.
+}
+
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
@@ -120,5 +128,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins,
 } satisfies Config;
