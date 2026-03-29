@@ -27,6 +27,8 @@ export function TaskDetailsModal({
     x: Math.max(40, window.innerWidth / 2 - 250),
     y: Math.max(40, window.innerHeight / 2 - 250),
   };
+  const [position, setPosition] = useState(defaultPosition);
+  const [size, setSize] = useState({ width: 500, height: 500 });
 
   useEffect(() => {
     setDraftSubtasks(task.subtasks || []);
@@ -60,8 +62,10 @@ export function TaskDetailsModal({
   return (
     <FloatingWindow
       title="Task Details"
-      position={defaultPosition}
-      size={{ width: 500, height: 500 }}
+      position={position}
+      size={size}
+      onPositionChange={setPosition}
+      onSizeChange={setSize}
       className="z-[1000]"
       headerActions={
         <button

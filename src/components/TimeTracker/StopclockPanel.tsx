@@ -63,12 +63,11 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const pipCloseListenerRef = useRef<(() => void) | null>(null);
 
   const [position, setPosition] = useState(() => {
-    const stored = getStoredPosition(POSITION_KEY, DEFAULT_POSITION);
-    console.log('[StopclockPanel] Mount read:', stored);
-    return stored;
+    return getStoredPosition(POSITION_KEY, DEFAULT_POSITION);
   });
   const [size, setSize] = useState(() => getStoredSize(SIZE_KEY, DEFAULT_SIZE));
   const supportsDocumentPiP = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+  const formattedTime = formatDuration(totalSecondsToday);
 
   useEffect(() => {
     return () => {
@@ -166,17 +165,17 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const panelBody = (
     <div className={`space-y-4 px-4 py-4 ${miniMode ? 'max-h-[220px]' : ''}`}>
       <div className="overflow-hidden rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
-        <div className="flex min-h-[80px] w-full items-center justify-center overflow-hidden">
-          <svg viewBox="0 0 400 100" className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
+        <div className="flex min-h-[80px] h-full w-full items-center justify-center overflow-hidden">
+          <svg viewBox="0 0 220 50" className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
             <text
               x="50%"
               y="50%"
-              dominantBaseline="middle"
+              dominantBaseline="central"
               textAnchor="middle"
               className="fill-current font-mono font-bold text-primary"
-              fontSize="40"
+              fontSize="44"
             >
-              {formatDuration(totalSecondsToday)}
+              {formattedTime}
             </text>
           </svg>
         </div>
@@ -264,7 +263,6 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
       onPositionChange={(next) => {
         setPosition(next);
         savePosition(POSITION_KEY, next);
-        console.log('[StopclockPanel] Save write:', next);
       }}
       onSizeChange={(next) => {
         setSize(next);
