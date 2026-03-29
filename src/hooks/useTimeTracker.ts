@@ -119,8 +119,7 @@ export function useTimeTracker() {
 
       await fetchTodayLogs();
     },
-    [logs, fetchTodayLogs]
-  );
+    [fetchTodayLogs]
 
   const createNewBlock = useCallback(
     async (taskId?: string) => {
