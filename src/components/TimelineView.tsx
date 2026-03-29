@@ -353,6 +353,7 @@ function DraggableSlotTask({
         <TaskPickerModal
           tasks={availableTasks}
           onSelect={(task) => {
+            if (!task) return;
             onAddSubtask(slot.id, task);
             setIsPickerOpen(false);
           }}

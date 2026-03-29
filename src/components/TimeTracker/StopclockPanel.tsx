@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Play, Plus, Square, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Eraser, Pause, Play, Plus, X } from 'lucide-react';
 import { useTimeTracker } from '@/hooks/useTimeTracker';
 import { TaskPickerModal } from '@/components/TaskPickerModal';
+import { FloatingWindow } from '@/components/FloatingWindow';
 import type { QuickTask } from '@/types';
 
 type StopclockPanelProps = {
@@ -9,6 +10,11 @@ type StopclockPanelProps = {
   taskNameById?: Record<string, string>;
   onClose?: () => void;
 };
+
+type PickerMode = 'start' | 'next';
+
+const POSITION_KEY = 'stopclock-window-position';
+const SIZE_KEY = 'stopclock-window-size';
 
 function formatDuration(totalSeconds: number): string {
   const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0;
@@ -19,106 +25,189 @@ function formatDuration(totalSeconds: number): string {
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
 }
 
+function getStoredPosition() {
+  const fallback = { x: 24, y: 90 };
+  const raw = window.localStorage.getItem(POSITION_KEY);
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as { x: number; y: number };
+    if (Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) return parsed;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function getStoredSize() {
+  const fallback = { width: 440, height: 700 };
+  const raw = window.localStorage.getItem(SIZE_KEY);
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as { width: number; height: number };
+    if (Number.isFinite(parsed.width) && Number.isFinite(parsed.height)) return parsed;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: StopclockPanelProps) {
-  const { logsWithDuration, activeLog, mostRecentLog, totalSecondsToday, loading, toggleTimer, createNewBlock, assignTask } = useTimeTracker();
-  const [pickerLogId, setPickerLogId] = useState<string | null>(null);
+  const {
+    unfinishedLogs,
+    finishedLogs,
+    currentLog,
+    activeLog,
+    totalSecondsToday,
+    loading,
+    pauseLog,
+    resumeLog,
+    startNewLog,
+    finishLog,
+    resetAll,
+  } = useTimeTracker();
+
+  const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
+
+  const position = useMemo(() => getStoredPosition(), []);
+  const size = useMemo(() => getStoredSize(), []);
+
+  const handlePrimaryButton = async () => {
+    if (!currentLog) {
+      setPickerMode('start');
+      return;
+    }
+
+    if (currentLog.is_running) {
+      await pauseLog(currentLog.id);
+      return;
+    }
+
+    await resumeLog(currentLog.id);
+  };
+
+  const handleNext = async () => {
+    if (currentLog) {
+      await finishLog(currentLog.id);
+    }
+
+    setPickerMode('next');
+  };
 
   return (
-    <div className="fixed right-6 top-20 z-[950] w-[min(92vw,440px)] rounded-2xl border border-border bg-card/95 shadow-2xl backdrop-blur-md">
-      <div className="flex items-center justify-between border-b border-border/80 px-4 py-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Time Tracker</p>
-          <h2 className="text-sm font-semibold text-foreground">Stopclock</h2>
-        </div>
-        {onClose && (
+    <FloatingWindow
+      title="Stopclock"
+      defaultPosition={position}
+      defaultSize={size}
+      minWidth={360}
+      minHeight={450}
+      maxWidth={760}
+      maxHeight={900}
+      onPositionChange={(next) => window.localStorage.setItem(POSITION_KEY, JSON.stringify(next))}
+      onSizeChange={(next) => window.localStorage.setItem(SIZE_KEY, JSON.stringify(next))}
+      headerActions={
+        onClose ? (
           <button
-            onClick={onClose}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClose();
+            }}
+            className="no-drag rounded p-1 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
             title="Close Stopclock"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
-        )}
-      </div>
-
+        ) : null
+      }
+      className="bg-card/95 backdrop-blur-md"
+    >
       <div className="space-y-4 px-4 py-4">
-        <div className="rounded-xl border border-border bg-background/70 p-4 text-center">
-          <p className="font-mono text-4xl font-bold tracking-wider text-primary md:text-5xl">
+        <div className="rounded-xl border border-border bg-background/70 p-6 text-center">
+          <p className="font-mono text-5xl font-bold tracking-wider text-primary md:text-6xl">
             {formatDuration(totalSecondsToday)}
           </p>
-          <p className="mt-2 text-xs text-muted-foreground">Total tracked today</p>
+          <p className="mt-2 text-sm text-muted-foreground">Total tracked today</p>
         </div>
 
-        <button
-          onClick={mostRecentLog ? () => void toggleTimer(mostRecentLog.id) : () => void createNewBlock()}
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-        >
-          {activeLog ? (
-            <>
-              <Square className="h-4 w-4" />
-              Stop
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              Play
-            </>
-          )}
-        </button>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() => void handlePrimaryButton()}
+            disabled={loading}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-opacity hover:opacity-90 disabled:opacity-50"
+            title={activeLog ? 'Stop current task' : 'Play / resume current task'}
+          >
+            {activeLog ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+          </button>
 
-        <div className="max-h-[42vh] space-y-2 overflow-auto pr-1">
+          <button
+            onClick={() => void handleNext()}
+            disabled={loading}
+            className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-secondary/40 text-foreground transition-colors hover:bg-secondary"
+            title="Finish current task and start a new one"
+          >
+            <Plus className="h-6 w-6" />
+          </button>
+
+          <button
+            onClick={() => void resetAll()}
+            disabled={loading}
+            className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-secondary/40 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+            title="Erase all tracked tasks and time"
+          >
+            <Eraser className="h-6 w-6" />
+          </button>
+        </div>
+
+        <div className="max-h-[50vh] space-y-2 overflow-auto pr-1">
           {loading && <p className="text-sm text-muted-foreground">Loading logs...</p>}
-          {!loading && logsWithDuration.length === 0 && (
-            <p className="text-sm text-muted-foreground">No tracked sessions yet today.</p>
+          {!loading && unfinishedLogs.length === 0 && finishedLogs.length === 0 && (
+            <p className="text-sm text-muted-foreground">No tracked sessions yet.</p>
           )}
 
-          {!loading &&
-            logsWithDuration.map((log) => (
-              <div
-                key={log.id}
-                className="rounded-lg border border-border/80 bg-background/70 px-3 py-2 text-sm"
-              >
-                <span className="font-medium text-foreground">
-                  {(log.task_id && taskNameById[log.task_id]) || 'Unassigned'}
-                </span>{' '}
-                <span className="text-muted-foreground">-</span>{' '}
-                <span className="font-mono text-foreground">{formatDuration(log.durationSeconds)}</span>
-                {log.id === activeLog?.id && (
-                  <span className="ml-2 text-xs font-medium uppercase text-primary">Live</span>
-                )}
-                {!log.task_id && (
-                  <button
-                    onClick={() => setPickerLogId(log.id)}
-                    className="ml-2 inline-flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    title="Assign task"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
-        </div>
+          {currentLog && (
+            <div className="rounded-lg border border-primary/70 bg-background/70 px-3 py-2 text-sm shadow-[0_0_16px_rgba(255,255,255,0.2)]">
+              <span className="font-medium text-foreground">
+                {(currentLog.task_id && taskNameById[currentLog.task_id]) || 'Unassigned'}
+              </span>{' '}
+              <span className="text-muted-foreground">-</span>{' '}
+              <span className="font-mono text-foreground">{formatDuration(currentLog.durationSeconds)}</span>
+              {currentLog.is_running ? (
+                <span className="ml-2 text-xs font-medium uppercase text-primary">Live</span>
+              ) : (
+                <span className="ml-2 text-xs font-medium uppercase text-muted-foreground">Paused</span>
+              )}
+            </div>
+          )}
 
-        <button
-          onClick={() => void createNewBlock()}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-secondary/40 px-4 py-3 text-sm font-semibold text-foreground transition-colors hover:bg-secondary"
-        >
-          <Plus className="h-4 w-4" />
-          New Block
-        </button>
+          {finishedLogs.map((log) => (
+            <div
+              key={log.id}
+              className="rounded-lg border border-border/50 bg-background/40 px-3 py-2 text-sm opacity-65"
+            >
+              <span className="font-medium text-foreground">
+                {(log.task_id && taskNameById[log.task_id]) || 'Unassigned'}
+              </span>{' '}
+              <span className="text-muted-foreground">-</span>{' '}
+              <span className="font-mono text-foreground">{formatDuration(log.durationSeconds)}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {pickerLogId && (
+      {pickerMode && (
         <TaskPickerModal
           tasks={tasks}
-          onClose={() => setPickerLogId(null)}
+          includeUnassigned
+          title={pickerMode === 'start' ? 'Start timer for...' : 'Select next task'}
+          onClose={() => setPickerMode(null)}
           onSelect={(task) => {
-            void assignTask(pickerLogId, task.id);
-            setPickerLogId(null);
+            void startNewLog(task?.id ?? null);
+            setPickerMode(null);
           }}
         />
       )}
-    </div>
+    </FloatingWindow>
   );
 }

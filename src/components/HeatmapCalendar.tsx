@@ -269,6 +269,7 @@ export function HeatmapCalendar({
               <TaskPickerModal
                 tasks={availableTasks}
                 onSelect={(task) => {
+                  if (!task) return;
                   onAssignTaskToSlot(selectedDate!, pickerSlotId, { name: task.name, color: task.color, taskId: task.id });
                   setPickerSlotId(null);
                 }}

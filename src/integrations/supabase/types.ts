@@ -220,6 +220,7 @@ export type Database = {
         Row: {
           accumulated_seconds: number
           id: string
+          is_finished: boolean
           is_running: boolean
           last_started_at: string | null
           task_id: string | null
@@ -228,6 +229,7 @@ export type Database = {
         Insert: {
           accumulated_seconds?: number
           id?: string
+          is_finished?: boolean
           is_running?: boolean
           last_started_at?: string | null
           task_id?: string | null
@@ -236,6 +238,7 @@ export type Database = {
         Update: {
           accumulated_seconds?: number
           id?: string
+          is_finished?: boolean
           is_running?: boolean
           last_started_at?: string | null
           task_id?: string | null
