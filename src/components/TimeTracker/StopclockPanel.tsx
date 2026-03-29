@@ -4,7 +4,16 @@ import { Eraser, Pause, PictureInPicture2, Play, Plus, X } from 'lucide-react';
 import { useTimeTracker } from '@/hooks/useTimeTracker';
 import { TaskPickerModal } from '@/components/TaskPickerModal';
 import { FloatingWindow } from '@/components/FloatingWindow';
-import { getStoredPosition, getStoredSize, savePosition, saveSize } from '@/lib/windowPersistence';
+import {
+  getCloudWindowPositions,
+  getStoredPosition,
+  getStoredSize,
+  savePosition,
+  saveSize,
+  subscribeToCloudWindowPositions,
+  syncToCloud,
+} from '@/lib/windowPersistence';
+import { useAuth } from '@/contexts/AuthContext';
 import type { QuickTask } from '@/types';
 
 type StopclockPanelProps = {
@@ -41,6 +50,7 @@ function formatDuration(totalSeconds: number): string {
 }
 
 export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: StopclockPanelProps) {
+  const { user } = useAuth();
   const {
     unfinishedLogs,
     finishedLogs,
@@ -68,6 +78,31 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const [size, setSize] = useState(() => getStoredSize(SIZE_KEY, DEFAULT_SIZE));
   const supportsDocumentPiP = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
   const formattedTime = formatDuration(totalSecondsToday);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const applyStopclockLayout = (cloudPositions: Record<string, unknown>) => {
+      const positionValue = cloudPositions[POSITION_KEY] as { x?: number; y?: number } | undefined;
+      if (positionValue && Number.isFinite(positionValue.x) && Number.isFinite(positionValue.y)) {
+        const nextPosition = { x: Number(positionValue.x), y: Number(positionValue.y) };
+        savePosition(POSITION_KEY, nextPosition);
+        setPosition(nextPosition);
+      }
+
+      const sizeValue = cloudPositions[SIZE_KEY] as { width?: number; height?: number } | undefined;
+      if (sizeValue && Number.isFinite(sizeValue.width) && Number.isFinite(sizeValue.height)) {
+        const nextSize = { width: Number(sizeValue.width), height: Number(sizeValue.height) };
+        saveSize(SIZE_KEY, nextSize);
+        setSize(nextSize);
+      }
+    };
+
+    void getCloudWindowPositions(user.id).then(applyStopclockLayout);
+    const unsubscribe = subscribeToCloudWindowPositions(user.id, applyStopclockLayout);
+
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     return () => {
@@ -263,10 +298,12 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
       onPositionChange={(next) => {
         setPosition(next);
         savePosition(POSITION_KEY, next);
+        if (user) syncToCloud(user.id, POSITION_KEY, next);
       }}
       onSizeChange={(next) => {
         setSize(next);
         saveSize(SIZE_KEY, next);
+        if (user) syncToCloud(user.id, SIZE_KEY, next);
       }}
       headerActions={
         <>
