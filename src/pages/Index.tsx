@@ -36,6 +36,7 @@ import {
   getCloudWindowPositions,
   getStoredPosition,
   getStoredSize,
+  getStoredSizeWithLegacyKey,
   savePosition,
   saveSize,
   subscribeToCloudWindowPositions,
@@ -295,7 +296,7 @@ export default function Index() {
   });
   const [weeklyNotesSize, setWeeklyNotesSize] = useState(() => {
     const fallback = { width: state.windowPositions.weeklyNotes.width, height: state.windowPositions.weeklyNotes.height };
-    return getStoredSize('weeklyNotes-size', fallback);
+    return getStoredSizeWithLegacyKey('weekly-notes-size', 'weeklyNotes-size', fallback);
   });
   const [toolsPosition, setToolsPosition] = useState(() => {
     const fallback = { x: 100, y: 200 };
@@ -335,6 +336,7 @@ export default function Index() {
       applyPosition('calendar-position', setCalendarPosition);
       applySize('calendar-size', setCalendarSize);
       applyPosition('weekly-notes-position', setWeeklyNotesPosition);
+      applySize('weekly-notes-size', setWeeklyNotesSize);
       applySize('weeklyNotes-size', setWeeklyNotesSize);
       applyPosition('tools-position', setToolsPosition);
       applySize('tools-size', setToolsSize);
@@ -1008,8 +1010,8 @@ export default function Index() {
             }}
             onSizeChange={(size) => {
               setWeeklyNotesSize(size);
-              saveSize('weeklyNotes-size', size);
-              if (user) syncToCloud(user.id, 'weeklyNotes-size', size);
+              saveSize('weekly-notes-size', size);
+              if (user) syncToCloud(user.id, 'weekly-notes-size', size);
               updateWindowPosition('weeklyNotes', size);
             }}
             onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
