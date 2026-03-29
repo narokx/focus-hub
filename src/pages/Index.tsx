@@ -282,7 +282,7 @@ export default function Index() {
     [state.windowPositions.calendar.width, state.windowPositions.calendar.height],
   );
   const weeklyNotesPosition = useMemo(
-    () => getStoredPosition('weeklyNotes-position', { x: state.windowPositions.weeklyNotes.x, y: state.windowPositions.weeklyNotes.y }),
+    () => getStoredPosition('weekly-notes-position', { x: state.windowPositions.weeklyNotes.x, y: state.windowPositions.weeklyNotes.y }),
     [state.windowPositions.weeklyNotes.x, state.windowPositions.weeklyNotes.y],
   );
   const weeklyNotesSize = useMemo(
