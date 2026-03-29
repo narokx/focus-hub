@@ -172,7 +172,7 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
               y="50%"
               dominantBaseline="central"
               textAnchor="middle"
-              className="fill-current font-mono font-bold"
+              className="fill-current font-mono font-bold text-foreground"
               fontSize="44"
             >
               {formattedTime}
