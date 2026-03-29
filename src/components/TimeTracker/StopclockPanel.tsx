@@ -165,14 +165,14 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const panelBody = (
     <div className={`space-y-4 px-4 py-4 ${miniMode ? 'max-h-[220px]' : ''}`}>
       <div className="overflow-hidden rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
-        <div className="flex min-h-[80px] h-full w-full items-center justify-center overflow-hidden">
-          <svg viewBox="0 0 220 50" className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
+        <div className="w-full h-full flex items-center justify-center overflow-hidden">
+          <svg viewBox="0 0 220 50" className="w-full h-auto" preserveAspectRatio="xMidYMid meet">
             <text
               x="50%"
               y="50%"
               dominantBaseline="central"
               textAnchor="middle"
-              className="fill-current font-mono font-bold text-primary"
+              className="fill-current font-mono font-bold"
               fontSize="44"
             >
               {formattedTime}
