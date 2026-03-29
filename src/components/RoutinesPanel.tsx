@@ -181,6 +181,7 @@ function RoutineItemContent({
             <TaskPickerModal
               tasks={availableTasks}
               onSelect={(task) => {
+                if (!task) return;
                 onAssignTaskToRoutineSlot(routine.id, pickerSlotId, { name: task.name, color: task.color, taskId: task.id });
                 setPickerSlotId(null);
               }}
