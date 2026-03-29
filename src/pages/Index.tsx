@@ -32,7 +32,16 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
-import { getCloudWindowPositions, getStoredPosition, getStoredSize, savePosition, saveSize, syncToCloud } from '@/lib/windowPersistence';
+import {
+  getCloudWindowPositions,
+  getStoredPosition,
+  getStoredSize,
+  getStoredSizeWithLegacyKey,
+  savePosition,
+  saveSize,
+  subscribeToCloudWindowPositions,
+  syncToCloud,
+} from '@/lib/windowPersistence';
 import { QuickTask, TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -287,7 +296,7 @@ export default function Index() {
   });
   const [weeklyNotesSize, setWeeklyNotesSize] = useState(() => {
     const fallback = { width: state.windowPositions.weeklyNotes.width, height: state.windowPositions.weeklyNotes.height };
-    return getStoredSize('weeklyNotes-size', fallback);
+    return getStoredSizeWithLegacyKey('weekly-notes-size', 'weeklyNotes-size', fallback);
   });
   const [toolsPosition, setToolsPosition] = useState(() => {
     const fallback = { x: 100, y: 200 };
@@ -301,15 +310,11 @@ export default function Index() {
   useEffect(() => {
     if (!user) return;
 
-    const applyCloudWindowPositions = async () => {
-      const cloudPositions = await getCloudWindowPositions(user.id);
-      const applyPosition = (
-        storageKey: string,
-        setter: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>,
-      ) => {
-        const value = cloudPositions[storageKey];
-        if (!value || !Number.isFinite((value as any).x) || !Number.isFinite((value as any).y)) return;
-        const nextPosition = { x: Number((value as any).x), y: Number((value as any).y) };
+    const applyPositions = (cloudPositions: Record<string, unknown>) => {
+      const applyPosition = (storageKey: string, setter: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>) => {
+        const value = cloudPositions[storageKey] as { x?: number; y?: number } | undefined;
+        if (!value || !Number.isFinite(value.x) || !Number.isFinite(value.y)) return;
+        const nextPosition = { x: Number(value.x), y: Number(value.y) };
         savePosition(storageKey, nextPosition);
         setter(nextPosition);
       };
@@ -317,9 +322,9 @@ export default function Index() {
         storageKey: string,
         setter: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>,
       ) => {
-        const value = cloudPositions[storageKey];
-        if (!value || !Number.isFinite((value as any).width) || !Number.isFinite((value as any).height)) return;
-        const nextSize = { width: Number((value as any).width), height: Number((value as any).height) };
+        const value = cloudPositions[storageKey] as { width?: number; height?: number } | undefined;
+        if (!value || !Number.isFinite(value.width) || !Number.isFinite(value.height)) return;
+        const nextSize = { width: Number(value.width), height: Number(value.height) };
         saveSize(storageKey, nextSize);
         setter(nextSize);
       };
@@ -331,12 +336,21 @@ export default function Index() {
       applyPosition('calendar-position', setCalendarPosition);
       applySize('calendar-size', setCalendarSize);
       applyPosition('weekly-notes-position', setWeeklyNotesPosition);
+      applySize('weekly-notes-size', setWeeklyNotesSize);
       applySize('weeklyNotes-size', setWeeklyNotesSize);
       applyPosition('tools-position', setToolsPosition);
       applySize('tools-size', setToolsSize);
     };
 
+    const applyCloudWindowPositions = async () => {
+      const cloudPositions = await getCloudWindowPositions(user.id);
+      applyPositions(cloudPositions);
+    };
+
     void applyCloudWindowPositions();
+
+    const unsubscribe = subscribeToCloudWindowPositions(user.id, applyPositions);
+    return () => unsubscribe();
   }, [user]);
 
   const stopclockPanel = isStopclockOpen ? (
@@ -996,8 +1010,8 @@ export default function Index() {
             }}
             onSizeChange={(size) => {
               setWeeklyNotesSize(size);
-              saveSize('weeklyNotes-size', size);
-              if (user) syncToCloud(user.id, 'weeklyNotes-size', size);
+              saveSize('weekly-notes-size', size);
+              if (user) syncToCloud(user.id, 'weekly-notes-size', size);
               updateWindowPosition('weeklyNotes', size);
             }}
             onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
