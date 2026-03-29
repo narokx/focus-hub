@@ -145,6 +145,7 @@ export const syncToCloud = (userId: string, key: string, value: WindowPersistVal
 
   const pending = pendingByUser.get(userId) ?? {};
   pendingByUser.set(userId, { ...pending, [key]: value });
+  writeLocalLayoutUpdatedAt(Date.now());
 
   const existingTimer = timersByUser.get(userId);
   if (existingTimer) clearTimeout(existingTimer);
