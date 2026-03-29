@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -250,6 +250,19 @@ export default function Index() {
   const toggleMinimize = (key: WindowKey) => {
     setMinimized(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const taskNameById = useMemo(
+    () => Object.fromEntries(state.quickTasks.map((task) => [task.id, task.name])),
+    [state.quickTasks]
+  );
+
+  const stopclockPanel = isStopclockOpen ? (
+    <StopclockPanel
+      onClose={() => setIsStopclockOpen(false)}
+      taskNameById={taskNameById}
+      tasks={state.quickTasks}
+    />
+  ) : null;
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -678,12 +691,7 @@ export default function Index() {
           </div>
         )}
 
-        {isStopclockOpen && (
-          <StopclockPanel
-            onClose={() => setIsStopclockOpen(false)}
-            taskNameById={Object.fromEntries(state.quickTasks.map((task) => [task.id, task.name]))}
-          />
-        )}
+        {stopclockPanel}
 
         {isNotesOpen && (
           <div className="fixed inset-0 z-[999] bg-card flex flex-col animate-in slide-in-from-bottom-full duration-200">
@@ -755,12 +763,7 @@ export default function Index() {
           </div>
         </div>
 
-        {isStopclockOpen && (
-          <StopclockPanel
-            onClose={() => setIsStopclockOpen(false)}
-            taskNameById={Object.fromEntries(state.quickTasks.map((task) => [task.id, task.name]))}
-          />
-        )}
+        {stopclockPanel}
 
         {/* Routines Window */}
         <FloatingWindow

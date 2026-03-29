@@ -4,29 +4,21 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 
 type TimeLog = Tables<'time_logs'>;
-
-function getLocalDayBounds(now = new Date()): { start: string; end: string } {
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setDate(endOfDay.getDate() + 1);
-
-  return {
-    start: startOfDay.toISOString(),
-    end: endOfDay.toISOString(),
-  };
-}
+type TimeLogWithDuration = TimeLog & { durationSeconds: number };
 
 function getLogDurationSeconds(log: TimeLog, nowMs: number): number {
-  const startMs = Date.parse(log.start_time);
-  const endMs = log.end_time ? Date.parse(log.end_time) : nowMs;
+  const baseSeconds = Math.max(0, log.accumulated_seconds ?? 0);
 
-  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs <= startMs) {
-    return 0;
+  if (!log.is_running || !log.last_started_at) {
+    return baseSeconds;
   }
 
-  return Math.floor((endMs - startMs) / 1000);
+  const startedAtMs = Date.parse(log.last_started_at);
+  if (Number.isNaN(startedAtMs) || nowMs <= startedAtMs) {
+    return baseSeconds;
+  }
+
+  return baseSeconds + Math.floor((nowMs - startedAtMs) / 1000);
 }
 
 export function useTimeTracker() {
@@ -44,14 +36,11 @@ export function useTimeTracker() {
 
     setLoading(true);
 
-    const { start, end } = getLocalDayBounds();
     const { data, error } = await supabase
       .from('time_logs')
-      .select('id, user_id, task_id, start_time, end_time')
+      .select('id, user_id, task_id, last_started_at, accumulated_seconds, is_running')
       .eq('user_id', user.id)
-      .gte('start_time', start)
-      .lt('start_time', end)
-      .order('start_time', { ascending: true });
+      .order('last_started_at', { ascending: true, nullsFirst: true });
 
     if (error) {
       console.error('Failed to fetch time logs:', error);
@@ -64,59 +53,118 @@ export function useTimeTracker() {
   }, [user]);
 
   const activeLog = useMemo(
-    () => logs.find((log) => log.end_time === null) ?? null,
+    () => logs.find((log) => log.is_running) ?? null,
     [logs]
   );
 
-  const totalSecondsToday = useMemo(() => {
-    return logs.reduce((sum, log) => sum + getLogDurationSeconds(log, nowMs), 0);
+  const mostRecentLog = useMemo(() => {
+    if (logs.length === 0) return null;
+
+    return [...logs].sort((a, b) => {
+      const aMs = a.last_started_at ? Date.parse(a.last_started_at) : 0;
+      const bMs = b.last_started_at ? Date.parse(b.last_started_at) : 0;
+      return bMs - aMs;
+    })[0] ?? null;
+  }, [logs]);
+
+  const logsWithDuration = useMemo<TimeLogWithDuration[]>(() => {
+    return logs.map((log) => ({
+      ...log,
+      durationSeconds: getLogDurationSeconds(log, nowMs),
+    }));
   }, [logs, nowMs]);
 
-  const startTimer = useCallback(
+  const totalSecondsToday = useMemo(() => {
+    return logsWithDuration.reduce((sum, log) => sum + log.durationSeconds, 0);
+  }, [logsWithDuration]);
+
+  const toggleTimer = useCallback(
+    async (logId: string) => {
+      const log = logs.find((item) => item.id === logId);
+      if (!log) return;
+
+      if (log.is_running && log.last_started_at) {
+        const elapsedSeconds = Math.max(
+          0,
+          Math.floor((Date.now() - Date.parse(log.last_started_at)) / 1000)
+        );
+
+        const { error } = await supabase
+          .from('time_logs')
+          .update({
+            accumulated_seconds: Math.max(0, (log.accumulated_seconds ?? 0) + elapsedSeconds),
+            last_started_at: null,
+            is_running: false,
+          })
+          .eq('id', logId);
+
+        if (error) {
+          console.error('Failed to pause timer block:', error);
+          return;
+        }
+      } else {
+        const { error } = await supabase
+          .from('time_logs')
+          .update({
+            last_started_at: new Date().toISOString(),
+            is_running: true,
+          })
+          .eq('id', logId);
+
+        if (error) {
+          console.error('Failed to resume timer block:', error);
+          return;
+        }
+      }
+
+      await fetchTodayLogs();
+    },
+    [fetchTodayLogs]
+
+  const createNewBlock = useCallback(
     async (taskId?: string) => {
       if (!user) return;
-      if (activeLog) return;
 
       const { error } = await supabase.from('time_logs').insert({
         user_id: user.id,
         task_id: taskId ?? null,
-        start_time: new Date().toISOString(),
-        end_time: null,
+        last_started_at: null,
+        accumulated_seconds: 0,
+        is_running: false,
       });
 
       if (error) {
-        console.error('Failed to start timer:', error);
+        console.error('Failed to create time block:', error);
         return;
       }
 
       await fetchTodayLogs();
     },
-    [user, activeLog, fetchTodayLogs]
+    [user, fetchTodayLogs]
   );
 
-  const stopTimer = useCallback(async () => {
-    if (!activeLog) return;
+  const assignTask = useCallback(
+    async (logId: string, taskId: string) => {
+      const { error } = await supabase
+        .from('time_logs')
+        .update({ task_id: taskId })
+        .eq('id', logId);
 
-    const { error } = await supabase
-      .from('time_logs')
-      .update({ end_time: new Date().toISOString() })
-      .eq('id', activeLog.id);
+      if (error) {
+        console.error('Failed to assign task to time block:', error);
+        return;
+      }
 
-    if (error) {
-      console.error('Failed to stop timer:', error);
-      return;
-    }
-
-    await fetchTodayLogs();
-  }, [activeLog, fetchTodayLogs]);
+      await fetchTodayLogs();
+    },
+    [fetchTodayLogs]
+  );
 
   useEffect(() => {
     void fetchTodayLogs();
   }, [fetchTodayLogs]);
 
   useEffect(() => {
-    if (!activeLog) return;
-
     const interval = window.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
@@ -124,7 +172,7 @@ export function useTimeTracker() {
     return () => {
       window.clearInterval(interval);
     };
-  }, [activeLog]);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -152,11 +200,13 @@ export function useTimeTracker() {
 
   return {
     logs,
+    logsWithDuration,
     activeLog,
+    mostRecentLog,
     totalSecondsToday,
     loading,
-    startTimer,
-    stopTimer,
-    refresh: fetchTodayLogs,
-  };
+    toggleTimer,
+    createNewBlock,
+    assignTask,
+    refresh: fetchAllLogs
 }
