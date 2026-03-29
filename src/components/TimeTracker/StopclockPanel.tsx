@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Eraser, Pause, Play, Plus, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Eraser, Pause, PictureInPicture2, Play, Plus, X } from 'lucide-react';
 import { useTimeTracker } from '@/hooks/useTimeTracker';
 import { TaskPickerModal } from '@/components/TaskPickerModal';
 import { FloatingWindow } from '@/components/FloatingWindow';
@@ -15,6 +16,17 @@ type PickerMode = 'start' | 'next';
 
 const POSITION_KEY = 'stopclock-window-position';
 const SIZE_KEY = 'stopclock-window-size';
+const PIP_DEFAULT_SIZE = { width: 420, height: 360 };
+
+type DocumentPictureInPictureApi = {
+  requestWindow: (options?: { width?: number; height?: number }) => Promise<Window>;
+};
+
+declare global {
+  interface Window {
+    documentPictureInPicture?: DocumentPictureInPictureApi;
+  }
+}
 
 function formatDuration(totalSeconds: number): string {
   const safeSeconds = Number.isFinite(totalSeconds) ? Math.max(0, totalSeconds) : 0;
@@ -72,9 +84,86 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   } = useTimeTracker();
 
   const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
+  const [miniMode, setMiniMode] = useState(false);
+  const [pipWindow, setPipWindow] = useState<Window | null>(null);
+  const [pipContainer, setPipContainer] = useState<HTMLElement | null>(null);
+  const pipCloseListenerRef = useRef<(() => void) | null>(null);
 
   const position = useMemo(() => getStoredPosition(), []);
   const size = useMemo(() => getStoredSize(), []);
+  const supportsDocumentPiP = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
+
+  useEffect(() => {
+    return () => {
+      if (pipCloseListenerRef.current && pipWindow) {
+        pipWindow.removeEventListener('pagehide', pipCloseListenerRef.current);
+      }
+      pipWindow?.close();
+    };
+  }, [pipWindow]);
+
+  const copyStylesToWindow = (targetWindow: Window) => {
+    const targetDocument = targetWindow.document;
+    Array.from(document.styleSheets).forEach((styleSheet) => {
+      try {
+        const rules = styleSheet.cssRules;
+        const style = targetDocument.createElement('style');
+        style.textContent = Array.from(rules).map((rule) => rule.cssText).join('\n');
+        targetDocument.head.appendChild(style);
+      } catch {
+        if ((styleSheet as CSSStyleSheet).href) {
+          const link = targetDocument.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = (styleSheet as CSSStyleSheet).href as string;
+          targetDocument.head.appendChild(link);
+        }
+      }
+    });
+  };
+
+  const closePiP = () => {
+    if (pipCloseListenerRef.current && pipWindow) {
+      pipWindow.removeEventListener('pagehide', pipCloseListenerRef.current);
+      pipCloseListenerRef.current = null;
+    }
+    pipWindow?.close();
+    setPipContainer(null);
+    setPipWindow(null);
+  };
+
+  const handlePiPToggle = async () => {
+    if (!supportsDocumentPiP) {
+      setMiniMode((prev) => !prev);
+      return;
+    }
+
+    if (pipWindow) {
+      closePiP();
+      return;
+    }
+
+    const nextPiPWindow = await window.documentPictureInPicture?.requestWindow(PIP_DEFAULT_SIZE);
+    if (!nextPiPWindow) return;
+
+    nextPiPWindow.document.body.innerHTML = '';
+    nextPiPWindow.document.body.className = 'm-0 p-0 bg-background text-foreground';
+    copyStylesToWindow(nextPiPWindow);
+
+    const container = nextPiPWindow.document.createElement('div');
+    container.id = 'stopclock-pip-root';
+    nextPiPWindow.document.body.appendChild(container);
+
+    const handleClose = () => {
+      setPipContainer(null);
+      setPipWindow(null);
+    };
+
+    pipCloseListenerRef.current = handleClose;
+    nextPiPWindow.addEventListener('pagehide', handleClose, { once: true });
+
+    setPipWindow(nextPiPWindow);
+    setPipContainer(container);
+  };
 
   const handlePrimaryButton = async () => {
     if (!mostRecentLog) {
@@ -100,71 +189,45 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
     setPickerMode('next');
   };
 
-  return (
-    <FloatingWindow
-      title="Stopclock"
-      defaultPosition={position}
-      defaultSize={size}
-      minWidth={360}
-      minHeight={450}
-      maxWidth={760}
-      maxHeight={900}
-      onPositionChange={(next) => window.localStorage.setItem(POSITION_KEY, JSON.stringify(next))}
-      onSizeChange={(next) => window.localStorage.setItem(SIZE_KEY, JSON.stringify(next))}
-      headerActions={
-        onClose ? (
-          <button
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              onClose();
-            }}
-            className="no-drag rounded p-1 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
-            title="Close Stopclock"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        ) : null
-      }
-      className="bg-card/95 backdrop-blur-md"
-    >
-      <div className="space-y-4 px-4 py-4">
-        <div className="rounded-xl border border-border bg-background/70 p-6 text-center">
-          <p className="font-mono text-5xl font-bold tracking-wider text-primary md:text-6xl">
-            {formatDuration(totalSecondsToday)}
-          </p>
-          <p className="mt-2 text-sm text-muted-foreground">Total tracked today</p>
-        </div>
+  const panelBody = (
+    <div className={`space-y-4 px-4 py-4 ${miniMode ? 'max-h-[220px]' : ''}`}>
+      <div className="@container rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
+        <p className="font-mono font-bold tracking-wider text-primary text-[clamp(1.5rem,15cqw,3.75rem)] leading-none">
+          {formatDuration(totalSecondsToday)}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Total tracked today</p>
+      </div>
 
-        <div className="flex items-center justify-center gap-4">
-          <button
-            onClick={() => void handlePrimaryButton()}
-            disabled={loading}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-opacity hover:opacity-90 disabled:opacity-50"
-            title={activeLog ? 'Stop current task' : 'Play / resume current task'}
-          >
-            {activeLog ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
-          </button>
+      <div className="flex items-center justify-center gap-4">
+        <button
+          onClick={() => void handlePrimaryButton()}
+          disabled={loading}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-opacity hover:opacity-90 disabled:opacity-50"
+          title={activeLog ? 'Stop current task' : 'Play / resume current task'}
+        >
+          {activeLog ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+        </button>
 
-          <button
-            onClick={() => void handleNext()}
-            disabled={loading}
-            className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-secondary/40 text-foreground transition-colors hover:bg-secondary"
-            title="Finish current task and start a new one"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
+        <button
+          onClick={() => void handleNext()}
+          disabled={loading}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-secondary/40 text-foreground transition-colors hover:bg-secondary"
+          title="Finish current task and start a new one"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
 
-          <button
-            onClick={() => void resetAll()}
-            disabled={loading}
-            className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-secondary/40 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
-            title="Erase all tracked tasks and time"
-          >
-            <Eraser className="h-6 w-6" />
-          </button>
-        </div>
+        <button
+          onClick={() => void resetAll()}
+          disabled={loading}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-secondary/40 text-muted-foreground transition-colors hover:bg-destructive/20 hover:text-destructive"
+          title="Erase all tracked tasks and time"
+        >
+          <Eraser className="h-6 w-6" />
+        </button>
+      </div>
 
+      {!miniMode && (
         <div className="max-h-[50vh] space-y-2 overflow-auto pr-1">
           {loading && <p className="text-sm text-muted-foreground">Loading logs...</p>}
           {!loading && unfinishedLogs.length === 0 && finishedLogs.length === 0 && (
@@ -199,7 +262,63 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
             </div>
           ))}
         </div>
-      </div>
+      )}
+    </div>
+  );
+
+  const floatingPanel = (
+    <FloatingWindow
+      key={miniMode ? 'mini-mode' : 'full-mode'}
+      title="Stopclock"
+      defaultPosition={position}
+      defaultSize={miniMode ? { width: 320, height: 250 } : size}
+      minWidth={320}
+      minHeight={miniMode ? 220 : 450}
+      maxWidth={760}
+      maxHeight={900}
+      onPositionChange={(next) => window.localStorage.setItem(POSITION_KEY, JSON.stringify(next))}
+      onSizeChange={(next) => window.localStorage.setItem(SIZE_KEY, JSON.stringify(next))}
+      headerActions={
+        <>
+          <button
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              void handlePiPToggle();
+            }}
+            className="no-drag rounded p-1 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
+            title={
+              supportsDocumentPiP
+                ? pipWindow
+                  ? 'Exit Picture-in-Picture'
+                  : 'Open Picture-in-Picture'
+                : miniMode
+                  ? 'Exit Mini Mode'
+                  : 'Open Mini Mode'
+            }
+          >
+            <PictureInPicture2 className="h-3.5 w-3.5" />
+          </button>
+          {onClose ? (
+            <>
+            <button
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onClose();
+              }}
+              className="no-drag rounded p-1 text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
+              title="Close Stopclock"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </>
+          ) : null}
+        </>
+      }
+      className="bg-card/95 backdrop-blur-md"
+    >
+      {panelBody}
 
       {pickerMode && (
         <TaskPickerModal
@@ -214,5 +333,34 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
         />
       )}
     </FloatingWindow>
+  );
+
+  const pipPanel =
+    pipContainer && pipWindow
+      ? createPortal(
+          <div className="h-screen overflow-auto bg-card/95 backdrop-blur-md">
+            {panelBody}
+            {pickerMode && (
+              <TaskPickerModal
+                tasks={tasks}
+                includeUnassigned
+                title={pickerMode === 'start' ? 'Start timer for...' : 'Select next task'}
+                onClose={() => setPickerMode(null)}
+                onSelect={(task) => {
+                  void createNewBlock({ taskId: task?.id, isUnassigned: !task });
+                  setPickerMode(null);
+                }}
+              />
+            )}
+          </div>,
+          pipContainer,
+        )
+      : null;
+
+  return (
+    <>
+      {!pipWindow && floatingPanel}
+      {pipPanel}
+    </>
   );
 }
