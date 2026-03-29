@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Resizable, Enable } from 're-resizable';
 import { GripHorizontal, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,8 +7,8 @@ interface FloatingWindowProps {
   title: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
-  defaultPosition: { x: number; y: number };
-  defaultSize: { width: number; height: number };
+  position: { x: number; y: number };
+  size: { width: number; height: number };
   minWidth?: number;
   minHeight?: number;
   maxWidth?: number;
@@ -27,8 +27,8 @@ export function FloatingWindow({
   title,
   icon,
   children,
-  defaultPosition,
-  defaultSize,
+  position,
+  size,
   minWidth = 250,
   minHeight = 200,
   maxWidth = 1200,
@@ -41,8 +41,6 @@ export function FloatingWindow({
   minimized = false,
   onMinimizeChange,
 }: FloatingWindowProps) {
-  const [position, setPosition] = useState(defaultPosition);
-  const [size, setSize] = useState(defaultSize);
   const [isDragging, setIsDragging] = useState(false);
   const [zIndex, setZIndex] = useState(10);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -61,24 +59,18 @@ export function FloatingWindow({
       initialY: position.y,
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!dragRef.current) return;
-      const dx = e.clientX - dragRef.current.startX;
-      const dy = e.clientY - dragRef.current.startY;
+      const dx = moveEvent.clientX - dragRef.current.startX;
+      const dy = moveEvent.clientY - dragRef.current.startY;
       const newX = Math.max(0, dragRef.current.initialX + dx);
       const newY = Math.max(0, dragRef.current.initialY + dy);
-      setPosition({ x: newX, y: newY });
+      onPositionChange?.({ x: newX, y: newY });
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
       setZIndex(10);
-      if (dragRef.current) {
-        const moved = position.x !== dragRef.current.initialX || position.y !== dragRef.current.initialY;
-        if (moved && onPositionChange) {
-          onPositionChange(position);
-        }
-      }
       dragRef.current = null;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
@@ -86,11 +78,10 @@ export function FloatingWindow({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [position, onPositionChange]);
+  }, [onPositionChange, position.x, position.y]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
-    setSize(newSize);
     onSizeChange?.(newSize);
   }, [onSizeChange]);
 
