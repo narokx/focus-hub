@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Resizable, Enable } from 're-resizable';
 import { GripHorizontal, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -58,6 +58,10 @@ export function FloatingWindow({
       initialX: position.x,
       initialY: position.y,
     };
+  }, [position.x, position.y]);
+
+  useEffect(() => {
+    if (!isDragging) return;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!dragRef.current) return;
@@ -72,13 +76,16 @@ export function FloatingWindow({
       setIsDragging(false);
       setZIndex(10);
       dragRef.current = null;
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [onPositionChange, position.x, position.y]);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, onPositionChange]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };

@@ -259,9 +259,7 @@ export default function Index() {
 
   const [routinesPosition, setRoutinesPosition] = useState(() => {
     const fallback = { x: state.windowPositions.routines.x, y: state.windowPositions.routines.y };
-    const stored = getStoredPosition('routines-position', fallback);
-    console.log('[RoutinesPanel] Mount read:', stored);
-    return stored;
+    return getStoredPosition('routines-position', fallback);
   });
   const [routinesSize, setRoutinesSize] = useState(() => {
     const fallback = { width: state.windowPositions.routines.width, height: state.windowPositions.routines.height };
@@ -269,9 +267,7 @@ export default function Index() {
   });
   const [quickTasksPosition, setQuickTasksPosition] = useState(() => {
     const fallback = { x: state.windowPositions.quickTasks.x, y: state.windowPositions.quickTasks.y };
-    const stored = getStoredPosition('tasks-position', fallback);
-    console.log('[TasksPanel] Mount read:', stored);
-    return stored;
+    return getStoredPosition('tasks-position', fallback);
   });
   const [quickTasksSize, setQuickTasksSize] = useState(() => {
     const fallback = { width: state.windowPositions.quickTasks.width, height: state.windowPositions.quickTasks.height };
@@ -279,9 +275,7 @@ export default function Index() {
   });
   const [calendarPosition, setCalendarPosition] = useState(() => {
     const fallback = { x: state.windowPositions.calendar.x, y: state.windowPositions.calendar.y };
-    const stored = getStoredPosition('calendar-position', fallback);
-    console.log('[CalendarPanel] Mount read:', stored);
-    return stored;
+    return getStoredPosition('calendar-position', fallback);
   });
   const [calendarSize, setCalendarSize] = useState(() => {
     const fallback = { width: state.windowPositions.calendar.width, height: state.windowPositions.calendar.height };
@@ -289,13 +283,19 @@ export default function Index() {
   });
   const [weeklyNotesPosition, setWeeklyNotesPosition] = useState(() => {
     const fallback = { x: state.windowPositions.weeklyNotes.x, y: state.windowPositions.weeklyNotes.y };
-    const stored = getStoredPosition('weekly-notes-position', fallback);
-    console.log('[WeeklyNotesPanel] Mount read:', stored);
-    return stored;
+    return getStoredPosition('weekly-notes-position', fallback);
   });
   const [weeklyNotesSize, setWeeklyNotesSize] = useState(() => {
     const fallback = { width: state.windowPositions.weeklyNotes.width, height: state.windowPositions.weeklyNotes.height };
     return getStoredSize('weeklyNotes-size', fallback);
+  });
+  const [toolsPosition, setToolsPosition] = useState(() => {
+    const fallback = { x: 100, y: 200 };
+    return getStoredPosition('tools-position', fallback);
+  });
+  const [toolsSize, setToolsSize] = useState(() => {
+    const fallback = { width: 400, height: 500 };
+    return getStoredSize('tools-size', fallback);
   });
 
   const stopclockPanel = isStopclockOpen ? (
@@ -818,7 +818,6 @@ export default function Index() {
           onPositionChange={(pos) => {
             setRoutinesPosition(pos);
             savePosition('routines-position', pos);
-            console.log('[RoutinesPanel] Save write:', pos);
             updateWindowPosition('routines', pos);
           }}
           onSizeChange={(size) => {
@@ -862,7 +861,6 @@ export default function Index() {
           onPositionChange={(pos) => {
             setQuickTasksPosition(pos);
             savePosition('tasks-position', pos);
-            console.log('[TasksPanel] Save write:', pos);
             updateWindowPosition('quickTasks', pos);
           }}
           onSizeChange={(size) => {
@@ -893,7 +891,6 @@ export default function Index() {
           onPositionChange={(pos) => {
             setCalendarPosition(pos);
             savePosition('calendar-position', pos);
-            console.log('[CalendarPanel] Save write:', pos);
             updateWindowPosition('calendar', pos);
           }}
           onSizeChange={(size) => {
@@ -945,7 +942,6 @@ export default function Index() {
             onPositionChange={(pos) => {
               setWeeklyNotesPosition(pos);
               savePosition('weekly-notes-position', pos);
-              console.log('[WeeklyNotesPanel] Save write:', pos);
               updateWindowPosition('weeklyNotes', pos);
             }}
             onSizeChange={(size) => {
@@ -979,10 +975,18 @@ export default function Index() {
         <FloatingWindow
           title="Tools"
           icon={<Wrench className="w-4 h-4 text-muted-foreground" />}
-          position={{ x: state.windowPositions.routines.x, y: state.windowPositions.routines.y + state.windowPositions.routines.height + 20 }}
-          size={{ width: 320, height: 420 }}
+          position={toolsPosition}
+          size={toolsSize}
           minWidth={260}
           minHeight={200}
+          onPositionChange={(pos) => {
+            setToolsPosition(pos);
+            savePosition('tools-position', pos);
+          }}
+          onSizeChange={(size) => {
+            setToolsSize(size);
+            saveSize('tools-size', size);
+          }}
           minimized={minimized.stats}
           onMinimizeChange={() => toggleMinimize('stats')}
         >
