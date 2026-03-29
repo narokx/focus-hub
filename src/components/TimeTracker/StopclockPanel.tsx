@@ -50,8 +50,8 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
         </div>
 
         <button
-          onClick={mostRecentLog ? () => void toggleTimer(mostRecentLog.id) : undefined}
-          disabled={!mostRecentLog}
+          onClick={mostRecentLog ? () => void toggleTimer(mostRecentLog.id) : () => void createNewBlock()}
+          disabled={loading}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
         >
           {activeLog ? (
