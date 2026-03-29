@@ -12,6 +12,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { parseLocalDate } from '@/lib/dateUtils';
 
 interface HeatmapCalendarProps {
+  width?: number;
+  height?: number;
   calendar: Record<string, DayData>;
   routines?: Routine[];
   onDayClick: (date: string) => void;
@@ -126,6 +128,8 @@ function DayCell({
 }
 
 export function HeatmapCalendar({
+  width,
+  height,
   calendar,
   routines,
   onDayClick,
@@ -186,9 +190,27 @@ export function HeatmapCalendar({
 
   const showCalendarGrid = !isMobile || !selectedDate;
   const showTimeline = !!selectedDate;
+  const shouldHideDenseContent = (width ?? Number.POSITIVE_INFINITY) < 250 || (height ?? Number.POSITIVE_INFINITY) < 250;
 
   return (
     <div className="flex h-full">
+      {shouldHideDenseContent ? (
+        <div className="flex-1 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-sm font-semibold text-center">{format(currentMonth, 'MMMM yyyy')}</h2>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1.5 rounded-md hover:bg-secondary transition-colors">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground text-center">
+            Expand this window to show the calendar grid.
+          </p>
+        </div>
+      ) : (
+        <>
       {showTimeline && (
         <>
           <div
@@ -343,6 +365,8 @@ export function HeatmapCalendar({
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {showRoutinePicker && routines && selectedDate && (

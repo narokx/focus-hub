@@ -32,7 +32,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
-import { getStoredPosition, getStoredSize, savePosition, saveSize } from '@/lib/windowPersistence';
+import { getCloudWindowPositions, getStoredPosition, getStoredSize, savePosition, saveSize, syncToCloud } from '@/lib/windowPersistence';
 import { QuickTask, TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -297,6 +297,47 @@ export default function Index() {
     const fallback = { width: 400, height: 500 };
     return getStoredSize('tools-size', fallback);
   });
+
+  useEffect(() => {
+    if (!user) return;
+
+    const applyCloudWindowPositions = async () => {
+      const cloudPositions = await getCloudWindowPositions(user.id);
+      const applyPosition = (
+        storageKey: string,
+        setter: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>,
+      ) => {
+        const value = cloudPositions[storageKey];
+        if (!value || !Number.isFinite((value as any).x) || !Number.isFinite((value as any).y)) return;
+        const nextPosition = { x: Number((value as any).x), y: Number((value as any).y) };
+        savePosition(storageKey, nextPosition);
+        setter(nextPosition);
+      };
+      const applySize = (
+        storageKey: string,
+        setter: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>,
+      ) => {
+        const value = cloudPositions[storageKey];
+        if (!value || !Number.isFinite((value as any).width) || !Number.isFinite((value as any).height)) return;
+        const nextSize = { width: Number((value as any).width), height: Number((value as any).height) };
+        saveSize(storageKey, nextSize);
+        setter(nextSize);
+      };
+
+      applyPosition('routines-position', setRoutinesPosition);
+      applySize('routines-size', setRoutinesSize);
+      applyPosition('tasks-position', setQuickTasksPosition);
+      applySize('tasks-size', setQuickTasksSize);
+      applyPosition('calendar-position', setCalendarPosition);
+      applySize('calendar-size', setCalendarSize);
+      applyPosition('weekly-notes-position', setWeeklyNotesPosition);
+      applySize('weeklyNotes-size', setWeeklyNotesSize);
+      applyPosition('tools-position', setToolsPosition);
+      applySize('tools-size', setToolsSize);
+    };
+
+    void applyCloudWindowPositions();
+  }, [user]);
 
   const stopclockPanel = isStopclockOpen ? (
     <StopclockPanel
@@ -818,11 +859,13 @@ export default function Index() {
           onPositionChange={(pos) => {
             setRoutinesPosition(pos);
             savePosition('routines-position', pos);
+            if (user) syncToCloud(user.id, 'routines-position', pos);
             updateWindowPosition('routines', pos);
           }}
           onSizeChange={(size) => {
             setRoutinesSize(size);
             saveSize('routines-size', size);
+            if (user) syncToCloud(user.id, 'routines-size', size);
             updateWindowPosition('routines', size);
           }}
           onTitleChange={(title) => updateWindowTitle('routines', title)}
@@ -861,11 +904,13 @@ export default function Index() {
           onPositionChange={(pos) => {
             setQuickTasksPosition(pos);
             savePosition('tasks-position', pos);
+            if (user) syncToCloud(user.id, 'tasks-position', pos);
             updateWindowPosition('quickTasks', pos);
           }}
           onSizeChange={(size) => {
             setQuickTasksSize(size);
             saveSize('tasks-size', size);
+            if (user) syncToCloud(user.id, 'tasks-size', size);
             updateWindowPosition('quickTasks', size);
           }}
           onTitleChange={(title) => updateWindowTitle('quickTasks', title)}
@@ -891,11 +936,13 @@ export default function Index() {
           onPositionChange={(pos) => {
             setCalendarPosition(pos);
             savePosition('calendar-position', pos);
+            if (user) syncToCloud(user.id, 'calendar-position', pos);
             updateWindowPosition('calendar', pos);
           }}
           onSizeChange={(size) => {
             setCalendarSize(size);
             saveSize('calendar-size', size);
+            if (user) syncToCloud(user.id, 'calendar-size', size);
             updateWindowPosition('calendar', size);
           }}
           onTitleChange={(title) => updateWindowTitle('calendar', title)}
@@ -903,6 +950,8 @@ export default function Index() {
           onMinimizeChange={() => toggleMinimize('calendar')}
         >
           <HeatmapCalendar
+            width={calendarSize.width}
+            height={calendarSize.height}
             calendar={state.calendar}
             routines={state.routines}
             onDayClick={setSelectedDate}
@@ -942,11 +991,13 @@ export default function Index() {
             onPositionChange={(pos) => {
               setWeeklyNotesPosition(pos);
               savePosition('weekly-notes-position', pos);
+              if (user) syncToCloud(user.id, 'weekly-notes-position', pos);
               updateWindowPosition('weeklyNotes', pos);
             }}
             onSizeChange={(size) => {
               setWeeklyNotesSize(size);
               saveSize('weeklyNotes-size', size);
+              if (user) syncToCloud(user.id, 'weeklyNotes-size', size);
               updateWindowPosition('weeklyNotes', size);
             }}
             onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
@@ -982,10 +1033,12 @@ export default function Index() {
           onPositionChange={(pos) => {
             setToolsPosition(pos);
             savePosition('tools-position', pos);
+            if (user) syncToCloud(user.id, 'tools-position', pos);
           }}
           onSizeChange={(size) => {
             setToolsSize(size);
             saveSize('tools-size', size);
+            if (user) syncToCloud(user.id, 'tools-size', size);
           }}
           minimized={minimized.stats}
           onMinimizeChange={() => toggleMinimize('stats')}
