@@ -1,12 +1,9 @@
 import type { Config } from "tailwindcss";
 
-const plugins = [require("tailwindcss-animate")];
-
-try {
-  plugins.push(require("@tailwindcss/container-queries"));
-} catch {
-  // Optional in restricted environments.
-}
+const plugins = [
+  require("tailwindcss-animate"),
+  // require("@tailwindcss/container-queries"), // Removed due to 403 error
+];
 
 export default {
   darkMode: ["class"],

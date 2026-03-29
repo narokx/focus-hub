@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Eraser, Pause, PictureInPicture2, Play, Plus, X } from 'lucide-react';
 import { useTimeTracker } from '@/hooks/useTimeTracker';
@@ -62,8 +62,12 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const [pipContainer, setPipContainer] = useState<HTMLElement | null>(null);
   const pipCloseListenerRef = useRef<(() => void) | null>(null);
 
-  const position = useMemo(() => getStoredPosition(POSITION_KEY, DEFAULT_POSITION), []);
-  const size = useMemo(() => getStoredSize(SIZE_KEY, DEFAULT_SIZE), []);
+  const [position, setPosition] = useState(() => {
+    const stored = getStoredPosition(POSITION_KEY, DEFAULT_POSITION);
+    console.log('[StopclockPanel] Mount read:', stored);
+    return stored;
+  });
+  const [size, setSize] = useState(() => getStoredSize(SIZE_KEY, DEFAULT_SIZE));
   const supportsDocumentPiP = typeof window !== 'undefined' && 'documentPictureInPicture' in window;
 
   useEffect(() => {
@@ -161,10 +165,21 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
 
   const panelBody = (
     <div className={`space-y-4 px-4 py-4 ${miniMode ? 'max-h-[220px]' : ''}`}>
-      <div className="@container overflow-hidden rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
-        <p className="flex-shrink whitespace-nowrap overflow-hidden font-mono font-bold tracking-wider text-primary text-[clamp(1.5rem,12cqw,4rem)] leading-none">
-          {formatDuration(totalSecondsToday)}
-        </p>
+      <div className="overflow-hidden rounded-xl border border-border bg-background/70 p-4 text-center sm:p-6">
+        <div className="flex min-h-[80px] w-full items-center justify-center overflow-hidden">
+          <svg viewBox="0 0 400 100" className="h-auto w-full" preserveAspectRatio="xMidYMid meet">
+            <text
+              x="50%"
+              y="50%"
+              dominantBaseline="middle"
+              textAnchor="middle"
+              className="fill-current font-mono font-bold text-primary"
+              fontSize="40"
+            >
+              {formatDuration(totalSecondsToday)}
+            </text>
+          </svg>
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">Total tracked today</p>
       </div>
 
@@ -240,14 +255,21 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
     <FloatingWindow
       key={miniMode ? 'mini-mode' : 'full-mode'}
       title="Stopclock"
-      defaultPosition={position}
-      defaultSize={miniMode ? { width: 320, height: 250 } : size}
+      position={position}
+      size={miniMode ? { width: 320, height: 250 } : size}
       minWidth={320}
       minHeight={miniMode ? 220 : 450}
       maxWidth={760}
       maxHeight={900}
-      onPositionChange={(next) => savePosition(POSITION_KEY, next)}
-      onSizeChange={(next) => saveSize(SIZE_KEY, next)}
+      onPositionChange={(next) => {
+        setPosition(next);
+        savePosition(POSITION_KEY, next);
+        console.log('[StopclockPanel] Save write:', next);
+      }}
+      onSizeChange={(next) => {
+        setSize(next);
+        saveSize(SIZE_KEY, next);
+      }}
       headerActions={
         <>
           <button

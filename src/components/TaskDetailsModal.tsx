@@ -60,8 +60,8 @@ export function TaskDetailsModal({
   return (
     <FloatingWindow
       title="Task Details"
-      defaultPosition={defaultPosition}
-      defaultSize={{ width: 500, height: 500 }}
+      position={defaultPosition}
+      size={{ width: 500, height: 500 }}
       className="z-[1000]"
       headerActions={
         <button
