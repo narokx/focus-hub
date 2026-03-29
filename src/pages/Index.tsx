@@ -32,6 +32,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
+import { getStoredPosition, getStoredSize, savePosition, saveSize } from '@/lib/windowPersistence';
 import { QuickTask, TaskColor, getColorValue, getContrastColor, Routine } from '@/types';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -254,6 +255,39 @@ export default function Index() {
   const taskNameById = useMemo(
     () => Object.fromEntries(state.quickTasks.map((task) => [task.id, task.name])),
     [state.quickTasks]
+  );
+
+  const routinesPosition = useMemo(
+    () => getStoredPosition('routines-position', { x: state.windowPositions.routines.x, y: state.windowPositions.routines.y }),
+    [state.windowPositions.routines.x, state.windowPositions.routines.y],
+  );
+  const routinesSize = useMemo(
+    () => getStoredSize('routines-size', { width: state.windowPositions.routines.width, height: state.windowPositions.routines.height }),
+    [state.windowPositions.routines.width, state.windowPositions.routines.height],
+  );
+  const quickTasksPosition = useMemo(
+    () => getStoredPosition('tasks-position', { x: state.windowPositions.quickTasks.x, y: state.windowPositions.quickTasks.y }),
+    [state.windowPositions.quickTasks.x, state.windowPositions.quickTasks.y],
+  );
+  const quickTasksSize = useMemo(
+    () => getStoredSize('tasks-size', { width: state.windowPositions.quickTasks.width, height: state.windowPositions.quickTasks.height }),
+    [state.windowPositions.quickTasks.width, state.windowPositions.quickTasks.height],
+  );
+  const calendarPosition = useMemo(
+    () => getStoredPosition('calendar-position', { x: state.windowPositions.calendar.x, y: state.windowPositions.calendar.y }),
+    [state.windowPositions.calendar.x, state.windowPositions.calendar.y],
+  );
+  const calendarSize = useMemo(
+    () => getStoredSize('calendar-size', { width: state.windowPositions.calendar.width, height: state.windowPositions.calendar.height }),
+    [state.windowPositions.calendar.width, state.windowPositions.calendar.height],
+  );
+  const weeklyNotesPosition = useMemo(
+    () => getStoredPosition('weeklyNotes-position', { x: state.windowPositions.weeklyNotes.x, y: state.windowPositions.weeklyNotes.y }),
+    [state.windowPositions.weeklyNotes.x, state.windowPositions.weeklyNotes.y],
+  );
+  const weeklyNotesSize = useMemo(
+    () => getStoredSize('weeklyNotes-size', { width: state.windowPositions.weeklyNotes.width, height: state.windowPositions.weeklyNotes.height }),
+    [state.windowPositions.weeklyNotes.width, state.windowPositions.weeklyNotes.height],
   );
 
   const stopclockPanel = isStopclockOpen ? (
@@ -769,12 +803,18 @@ export default function Index() {
         <FloatingWindow
           title={state.windowTitles.routines}
           icon={<Layers className="w-4 h-4 text-muted-foreground" />}
-          defaultPosition={{ x: state.windowPositions.routines.x, y: state.windowPositions.routines.y }}
-          defaultSize={{ width: state.windowPositions.routines.width, height: state.windowPositions.routines.height }}
+          defaultPosition={routinesPosition}
+          defaultSize={routinesSize}
           minWidth={300}
           minHeight={200}
-          onPositionChange={(pos) => updateWindowPosition('routines', pos)}
-          onSizeChange={(size) => updateWindowPosition('routines', size)}
+          onPositionChange={(pos) => {
+            savePosition('routines-position', pos);
+            updateWindowPosition('routines', pos);
+          }}
+          onSizeChange={(size) => {
+            saveSize('routines-size', size);
+            updateWindowPosition('routines', size);
+          }}
           onTitleChange={(title) => updateWindowTitle('routines', title)}
           minimized={minimized.routines}
           onMinimizeChange={() => toggleMinimize('routines')}
@@ -804,12 +844,18 @@ export default function Index() {
         <FloatingWindow
           title={state.windowTitles.quickTasks}
           icon={<List className="w-4 h-4 text-muted-foreground" />}
-          defaultPosition={{ x: state.windowPositions.quickTasks.x, y: state.windowPositions.quickTasks.y }}
-          defaultSize={{ width: state.windowPositions.quickTasks.width, height: state.windowPositions.quickTasks.height }}
+          defaultPosition={quickTasksPosition}
+          defaultSize={quickTasksSize}
           minWidth={250}
           minHeight={200}
-          onPositionChange={(pos) => updateWindowPosition('quickTasks', pos)}
-          onSizeChange={(size) => updateWindowPosition('quickTasks', size)}
+          onPositionChange={(pos) => {
+            savePosition('tasks-position', pos);
+            updateWindowPosition('quickTasks', pos);
+          }}
+          onSizeChange={(size) => {
+            saveSize('tasks-size', size);
+            updateWindowPosition('quickTasks', size);
+          }}
           onTitleChange={(title) => updateWindowTitle('quickTasks', title)}
           minimized={minimized.quickTasks}
           onMinimizeChange={() => toggleMinimize('quickTasks')}
@@ -826,12 +872,18 @@ export default function Index() {
         <FloatingWindow
           title={state.windowTitles.calendar}
           icon={<Calendar className="w-4 h-4 text-muted-foreground" />}
-          defaultPosition={{ x: state.windowPositions.calendar.x, y: state.windowPositions.calendar.y }}
-          defaultSize={{ width: state.windowPositions.calendar.width, height: state.windowPositions.calendar.height }}
+          defaultPosition={calendarPosition}
+          defaultSize={calendarSize}
           minWidth={400}
           minHeight={400}
-          onPositionChange={(pos) => updateWindowPosition('calendar', pos)}
-          onSizeChange={(size) => updateWindowPosition('calendar', size)}
+          onPositionChange={(pos) => {
+            savePosition('calendar-position', pos);
+            updateWindowPosition('calendar', pos);
+          }}
+          onSizeChange={(size) => {
+            saveSize('calendar-size', size);
+            updateWindowPosition('calendar', size);
+          }}
           onTitleChange={(title) => updateWindowTitle('calendar', title)}
           minimized={minimized.calendar}
           onMinimizeChange={() => toggleMinimize('calendar')}
@@ -869,12 +921,18 @@ export default function Index() {
           <FloatingWindow
             title={state.windowTitles.weeklyNotes}
             icon={<NotebookPen className="w-4 h-4 text-muted-foreground" />}
-            defaultPosition={{ x: state.windowPositions.weeklyNotes.x, y: state.windowPositions.weeklyNotes.y }}
-            defaultSize={{ width: state.windowPositions.weeklyNotes.width, height: state.windowPositions.weeklyNotes.height }}
+            defaultPosition={weeklyNotesPosition}
+            defaultSize={weeklyNotesSize}
             minWidth={250}
             minHeight={220}
-            onPositionChange={(pos) => updateWindowPosition('weeklyNotes', pos)}
-            onSizeChange={(size) => updateWindowPosition('weeklyNotes', size)}
+            onPositionChange={(pos) => {
+              savePosition('weeklyNotes-position', pos);
+              updateWindowPosition('weeklyNotes', pos);
+            }}
+            onSizeChange={(size) => {
+              saveSize('weeklyNotes-size', size);
+              updateWindowPosition('weeklyNotes', size);
+            }}
             onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
             minimized={minimized.weeklyNotes}
             onMinimizeChange={() => toggleMinimize('weeklyNotes')}
