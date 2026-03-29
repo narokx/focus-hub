@@ -8,12 +8,10 @@ type WindowPositionsPayload = Record<string, WindowPersistValue>;
 type WindowLayoutsRow = { window_positions?: unknown; updated_at?: string | null };
 type CloudWindowPositionsResult = {
   positions: WindowPositionsPayload;
-  updatedAtMs: number;
   source: 'ui_layouts' | 'profiles' | 'none';
 };
 
 const CLOUD_SYNC_DEBOUNCE_MS = 500;
-const LOCAL_LAYOUT_UPDATED_KEY = 'productivity-window-layout-updated-at';
 const ALL_WINDOW_LAYOUT_KEYS = [
   'routines-position',
   'routines-size',
@@ -34,18 +32,6 @@ const timersByUser = new Map<string, ReturnType<typeof setTimeout>>();
 const parseWindowPositions = (value: unknown): WindowPositionsPayload => {
   if (!value || typeof value !== 'object') return {};
   return value as WindowPositionsPayload;
-};
-
-const readLocalLayoutUpdatedAt = (): number => {
-  if (typeof window === 'undefined') return 0;
-  const raw = localStorage.getItem(LOCAL_LAYOUT_UPDATED_KEY);
-  const parsed = raw ? Number(raw) : 0;
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const writeLocalLayoutUpdatedAt = (updatedAtMs: number): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(LOCAL_LAYOUT_UPDATED_KEY, String(updatedAtMs));
 };
 
 const readLocalWindowPositions = (): WindowPositionsPayload => {
@@ -83,7 +69,6 @@ const readRemoteRow = async (userId: string): Promise<CloudWindowPositionsResult
     const row = (data ?? null) as WindowLayoutsRow | null;
     return {
       positions: parseWindowPositions(row?.window_positions),
-      updatedAtMs: row?.updated_at ? Date.parse(row.updated_at) : 0,
       source: 'ui_layouts',
     };
   }
@@ -98,12 +83,11 @@ const readRemoteRow = async (userId: string): Promise<CloudWindowPositionsResult
 
   if (profileError) {
     console.error('Failed reading fallback profiles.window_positions:', profileError);
-    return { positions: {}, updatedAtMs: 0, source: 'none' };
+    return { positions: {}, source: 'none' };
   }
 
   return {
     positions: parseWindowPositions(profileData?.window_positions),
-    updatedAtMs: 0,
     source: 'profiles',
   };
 };
@@ -153,7 +137,6 @@ export const syncToCloud = (userId: string, key: string, value: WindowPersistVal
 
   const pending = pendingByUser.get(userId) ?? {};
   pendingByUser.set(userId, { ...pending, [key]: value });
-  writeLocalLayoutUpdatedAt(Date.now());
 
   const existingTimer = timersByUser.get(userId);
   if (existingTimer) clearTimeout(existingTimer);
@@ -194,21 +177,21 @@ const flushCloudSync = async (userId: string): Promise<void> => {
 export const getCloudWindowPositions = async (userId: string): Promise<WindowPositionsPayload> => {
   if (!userId) return {};
 
-  const localUpdatedAt = readLocalLayoutUpdatedAt();
   const localPositions = readLocalWindowPositions();
   const remote = await readRemoteRow(userId);
+  const hasRemote = Object.keys(remote.positions).length > 0;
 
-  if (localUpdatedAt > remote.updatedAtMs) {
-    if (Object.keys(localPositions).length > 0) {
-      const pending = pendingByUser.get(userId) ?? {};
-      pendingByUser.set(userId, { ...pending, ...localPositions });
-      void flushCloudSync(userId);
-    }
-    return localPositions;
+  if (hasRemote) {
+    return remote.positions;
   }
 
-  writeLocalLayoutUpdatedAt(Math.max(localUpdatedAt, remote.updatedAtMs, Date.now()));
-  return remote.positions;
+  if (Object.keys(localPositions).length > 0) {
+    const pending = pendingByUser.get(userId) ?? {};
+    pendingByUser.set(userId, { ...pending, ...localPositions });
+    void flushCloudSync(userId);
+  }
+
+  return localPositions;
 };
 
 export const subscribeToCloudWindowPositions = (
@@ -229,9 +212,6 @@ export const subscribeToCloudWindowPositions = (
       },
       (payload) => {
         const next = payload.new as WindowLayoutsRow;
-        const nextUpdatedAt = next?.updated_at ? Date.parse(next.updated_at) : Date.now();
-        if (readLocalLayoutUpdatedAt() > nextUpdatedAt) return;
-        writeLocalLayoutUpdatedAt(nextUpdatedAt);
         onUpdate(parseWindowPositions(next?.window_positions));
       },
     )
