@@ -27,6 +27,7 @@ function formatDuration(totalSeconds: number): string {
 
 function getStoredPosition() {
   const fallback = { x: 24, y: 90 };
+  if (typeof window === 'undefined') return fallback;
   const raw = window.localStorage.getItem(POSITION_KEY);
   if (!raw) return fallback;
 
@@ -41,6 +42,7 @@ function getStoredPosition() {
 
 function getStoredSize() {
   const fallback = { width: 440, height: 700 };
+  if (typeof window === 'undefined') return fallback;
   const raw = window.localStorage.getItem(SIZE_KEY);
   if (!raw) return fallback;
 
@@ -58,12 +60,13 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
     unfinishedLogs,
     finishedLogs,
     currentLog,
+    mostRecentLog,
     activeLog,
     totalSecondsToday,
     loading,
     pauseLog,
     resumeLog,
-    startNewLog,
+    createNewBlock,
     finishLog,
     resetAll,
   } = useTimeTracker();
@@ -74,10 +77,12 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const size = useMemo(() => getStoredSize(), []);
 
   const handlePrimaryButton = async () => {
-    if (!currentLog) {
+    if (!mostRecentLog) {
       setPickerMode('start');
       return;
     }
+
+    if (!currentLog) return;
 
     if (currentLog.is_running) {
       await pauseLog(currentLog.id);
@@ -203,7 +208,7 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
           title={pickerMode === 'start' ? 'Start timer for...' : 'Select next task'}
           onClose={() => setPickerMode(null)}
           onSelect={(task) => {
-            void startNewLog(task?.id ?? null);
+            void createNewBlock({ taskId: task?.id, isUnassigned: !task });
             setPickerMode(null);
           }}
         />

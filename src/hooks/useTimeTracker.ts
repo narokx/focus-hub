@@ -21,12 +21,6 @@ function getLogDurationSeconds(log: TimeLog, nowMs: number): number {
   return baseSeconds + Math.floor((nowMs - startedAtMs) / 1000);
 }
 
-function sortByRecent(a: TimeLog, b: TimeLog) {
-  const aMs = a.last_started_at ? Date.parse(a.last_started_at) : 0;
-  const bMs = b.last_started_at ? Date.parse(b.last_started_at) : 0;
-  return bMs - aMs;
-}
-
 export function useTimeTracker() {
   const { user } = useAuth();
   const [logs, setLogs] = useState<TimeLog[]>([]);
@@ -44,7 +38,8 @@ export function useTimeTracker() {
     const { data, error } = await supabase
       .from('time_logs')
       .select('id, user_id, task_id, last_started_at, accumulated_seconds, is_running, is_finished')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .order('last_started_at', { ascending: false, nullsFirst: false });
 
     if (error) {
       console.error('Failed to fetch time logs:', error);
@@ -63,17 +58,12 @@ export function useTimeTracker() {
     }));
   }, [logs, nowMs]);
 
-  const unfinishedLogs = useMemo(
-    () => logsWithDuration.filter((log) => !log.is_finished).sort(sortByRecent),
-    [logsWithDuration]
-  );
+  const unfinishedLogs = useMemo(() => logsWithDuration.filter((log) => !log.is_finished), [logsWithDuration]);
 
-  const finishedLogs = useMemo(
-    () => logsWithDuration.filter((log) => log.is_finished).sort(sortByRecent),
-    [logsWithDuration]
-  );
+  const finishedLogs = useMemo(() => logsWithDuration.filter((log) => log.is_finished), [logsWithDuration]);
 
   const currentLog = unfinishedLogs[0] ?? null;
+  const mostRecentLog = logsWithDuration[0] ?? null;
   const activeLog = unfinishedLogs.find((log) => log.is_running) ?? null;
 
   const totalSecondsToday = useMemo(() => {
@@ -82,6 +72,8 @@ export function useTimeTracker() {
 
   const pauseLog = useCallback(
     async (logId: string) => {
+      if (!user) return;
+
       const log = logs.find((item) => item.id === logId);
       if (!log || !log.is_running || !log.last_started_at) return;
 
@@ -93,7 +85,7 @@ export function useTimeTracker() {
           is_running: false,
         })
         .eq('id', logId)
-        .eq('user_id', user?.id ?? '');
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Failed to pause timer:', error);
@@ -102,7 +94,7 @@ export function useTimeTracker() {
 
       await fetchLogs();
     },
-    [fetchLogs, logs, user?.id]
+    [fetchLogs, logs, user]
   );
 
   const resumeLog = useCallback(
@@ -141,9 +133,11 @@ export function useTimeTracker() {
     [fetchLogs, user]
   );
 
-  const startNewLog = useCallback(
-    async (taskId: string | null) => {
+  const createNewBlock = useCallback(
+    async ({ taskId, isUnassigned }: { taskId?: string | null; isUnassigned?: boolean } = {}) => {
       if (!user) return;
+
+      const selectedTaskId = isUnassigned ? null : (taskId ?? null);
 
       const { error: stopOthersError } = await supabase
         .from('time_logs')
@@ -158,7 +152,7 @@ export function useTimeTracker() {
 
       const { error } = await supabase.from('time_logs').insert({
         user_id: user.id,
-        task_id: taskId,
+        task_id: selectedTaskId,
         last_started_at: new Date().toISOString(),
         accumulated_seconds: 0,
         is_running: true,
@@ -177,6 +171,8 @@ export function useTimeTracker() {
 
   const finishLog = useCallback(
     async (logId: string) => {
+      if (!user) return;
+
       const log = logs.find((item) => item.id === logId);
       if (!log) return;
 
@@ -193,7 +189,7 @@ export function useTimeTracker() {
           is_finished: true,
         })
         .eq('id', logId)
-        .eq('user_id', user?.id ?? '');
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Failed to finish timer block:', error);
@@ -202,7 +198,7 @@ export function useTimeTracker() {
 
       await fetchLogs();
     },
-    [fetchLogs, logs, user?.id]
+    [fetchLogs, logs, user]
   );
 
   const resetAll = useCallback(async () => {
@@ -250,12 +246,14 @@ export function useTimeTracker() {
     unfinishedLogs,
     finishedLogs,
     currentLog,
+    mostRecentLog,
     activeLog,
     totalSecondsToday,
     loading,
     pauseLog,
     resumeLog,
-    startNewLog,
+    createNewBlock,
+    startNewLog: (taskId: string | null) => createNewBlock({ taskId, isUnassigned: taskId === null }),
     finishLog,
     resetAll,
     refresh: fetchLogs,
