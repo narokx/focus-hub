@@ -254,6 +254,24 @@ export type Database = {
           },
         ]
       }
+      ui_layouts: {
+        Row: {
+          updated_at: string
+          user_id: string
+          window_positions: Json
+        }
+        Insert: {
+          updated_at?: string
+          user_id: string
+          window_positions?: Json
+        }
+        Update: {
+          updated_at?: string
+          user_id?: string
+          window_positions?: Json
+        }
+        Relationships: []
+      }
       task_notes: {
         Row: {
           content: string
