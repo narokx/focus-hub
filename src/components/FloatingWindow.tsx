@@ -71,9 +71,22 @@ export function FloatingWindow({
   const [zIndex, setZIndex] = useState(10);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
-  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const dragRef = useRef<{
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    pointerId: number;
+    captureTarget: HTMLElement;
+  } | null>(null);
 
   const stopDragging = useCallback(() => {
+    if (dragRef.current) {
+      const { captureTarget, pointerId } = dragRef.current;
+      if (captureTarget.hasPointerCapture(pointerId)) {
+        captureTarget.releasePointerCapture(pointerId);
+      }
+    }
     setIsDragging(false);
     setZIndex(10);
     dragRef.current = null;
@@ -90,10 +103,11 @@ export function FloatingWindow({
     }
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
 
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
     setZIndex(100);
     dragRef.current = {
@@ -101,6 +115,8 @@ export function FloatingWindow({
       startY: e.clientY,
       initialX: position.x,
       initialY: position.y,
+      pointerId: e.pointerId,
+      captureTarget: e.currentTarget,
     };
   }, [isResizing, position.x, position.y]);
 
@@ -110,8 +126,12 @@ export function FloatingWindow({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
       if (!dragRef.current) return;
+      if (moveEvent.buttons === 0) {
+        stopDragging();
+        return;
+      }
       const dx = moveEvent.clientX - dragRef.current.startX;
       const dy = moveEvent.clientY - dragRef.current.startY;
       const newX = Math.max(0, dragRef.current.initialX + dx);
@@ -119,10 +139,10 @@ export function FloatingWindow({
       onPositionChange?.({ x: newX, y: newY });
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('pointermove', handlePointerMove);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('pointermove', handlePointerMove);
     };
   }, [isDragging, onPositionChange, stopDragging]);
 
@@ -175,6 +195,7 @@ export function FloatingWindow({
         enable={enableResize}
         onResizeStart={handleResizeStart}
         onResizeStop={handleResizeStop}
+        enableUserSelectHack={false}
         handleStyles={{
           top: { cursor: 'ns-resize', height: 8, top: -4 },
           bottom: { cursor: 'ns-resize', height: 8, bottom: -4 },
@@ -193,7 +214,7 @@ export function FloatingWindow({
         }}
       >
         <div className={cn('window-panel flex flex-col h-full', className)}>
-          <div className="window-header flex-shrink-0" onMouseDown={handleMouseDown}>
+          <div className="window-header flex-shrink-0" onPointerDown={handlePointerDown}>
             <div className="flex items-center gap-2">
               {icon}
               {isEditingTitle ? (

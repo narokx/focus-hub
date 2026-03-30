@@ -29,54 +29,116 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const dragRef = React.useRef<{ sx: number; sy: number; ix: number; iy: number } | null>(null);
-  const resizeRef = React.useRef<{ sx: number; sy: number; iw: number; ih: number } | null>(null);
+  const dragRef = React.useRef<{
+    sx: number;
+    sy: number;
+    ix: number;
+    iy: number;
+    pointerId: number;
+    captureTarget: HTMLElement;
+  } | null>(null);
+  const resizeRef = React.useRef<{
+    sx: number;
+    sy: number;
+    iw: number;
+    ih: number;
+    pointerId: number;
+    captureTarget: HTMLElement;
+  } | null>(null);
+  const posRef = React.useRef(pos);
+  const sizeRef = React.useRef(size);
+
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  useEffect(() => {
+    sizeRef.current = size;
+  }, [size]);
 
   useEffect(() => {
     setDraft(note);
   }, [note]);
 
-  const handleDragStart = (e: React.MouseEvent) => {
+  const handleDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('.no-drag')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
-    dragRef.current = { sx: e.clientX, sy: e.clientY, ix: pos.x, iy: pos.y };
+    dragRef.current = {
+      sx: e.clientX,
+      sy: e.clientY,
+      ix: pos.x,
+      iy: pos.y,
+      pointerId: e.pointerId,
+      captureTarget: e.currentTarget,
+    };
 
-    const move = (e: MouseEvent) => {
+    const move = (e: PointerEvent) => {
       if (!dragRef.current) return;
+      if (e.buttons === 0) {
+        up();
+        return;
+      }
       setPos({
         x: Math.max(0, dragRef.current.ix + e.clientX - dragRef.current.sx),
         y: Math.max(0, dragRef.current.iy + e.clientY - dragRef.current.sy),
       });
     };
     const up = () => {
+      if (dragRef.current) {
+        const { captureTarget, pointerId } = dragRef.current;
+        if (captureTarget.hasPointerCapture(pointerId)) {
+          captureTarget.releasePointerCapture(pointerId);
+        }
+      }
       setIsDragging(false);
-      localStorage.setItem('task-notes-modal-pos', JSON.stringify(pos));
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
+      dragRef.current = null;
+      localStorage.setItem('task-notes-modal-pos', JSON.stringify(posRef.current));
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
     };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
   };
 
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleResizeStart = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsResizing(true);
-    resizeRef.current = { sx: e.clientX, sy: e.clientY, iw: size.width, ih: size.height };
+    resizeRef.current = {
+      sx: e.clientX,
+      sy: e.clientY,
+      iw: size.width,
+      ih: size.height,
+      pointerId: e.pointerId,
+      captureTarget: e.currentTarget,
+    };
 
-    const move = (e: MouseEvent) => {
+    const move = (e: PointerEvent) => {
       if (!resizeRef.current) return;
+      if (e.buttons === 0) {
+        up();
+        return;
+      }
       const newW = Math.max(300, resizeRef.current.iw + e.clientX - resizeRef.current.sx);
       const newH = Math.max(200, resizeRef.current.ih + e.clientY - resizeRef.current.sy);
       setSize({ width: newW, height: newH });
     };
     const up = () => {
+      if (resizeRef.current) {
+        const { captureTarget, pointerId } = resizeRef.current;
+        if (captureTarget.hasPointerCapture(pointerId)) {
+          captureTarget.releasePointerCapture(pointerId);
+        }
+      }
       setIsResizing(false);
-      localStorage.setItem('task-notes-modal-size', JSON.stringify(size));
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
+      resizeRef.current = null;
+      localStorage.setItem('task-notes-modal-size', JSON.stringify(sizeRef.current));
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
     };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
   };
 
   const handleSave = () => {
@@ -140,7 +202,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
         {/* Header */}
         <div
           className="flex items-center gap-2 px-4 py-3 border-b border-border cursor-move select-none rounded-t-xl bg-secondary/30"
-          onMouseDown={handleDragStart}
+          onPointerDown={handleDragStart}
         >
           <FileText className="w-4 h-4 text-muted-foreground" />
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -177,7 +239,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
         {/* Resize handle */}
         <div
           className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize flex items-end justify-end p-1 opacity-40 hover:opacity-80 transition-opacity"
-          onMouseDown={handleResizeStart}
+          onPointerDown={handleResizeStart}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M2 8L8 2M5 8L8 5M8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
