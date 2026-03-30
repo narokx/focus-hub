@@ -33,6 +33,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
 import {
+  flushCloudSyncNow,
   getCloudWindowPositions,
   getStoredPosition,
   getStoredSize,
@@ -351,6 +352,30 @@ export default function Index() {
 
     const unsubscribe = subscribeToCloudWindowPositions(user.id, applyPositions);
     return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const flushPendingLayoutSync = () => {
+      void flushCloudSyncNow(user.id);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPendingLayoutSync();
+      }
+    };
+
+    window.addEventListener('beforeunload', flushPendingLayoutSync);
+    window.addEventListener('pagehide', flushPendingLayoutSync);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', flushPendingLayoutSync);
+      window.removeEventListener('pagehide', flushPendingLayoutSync);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      flushPendingLayoutSync();
+    };
   }, [user]);
 
   const stopclockPanel = isStopclockOpen ? (

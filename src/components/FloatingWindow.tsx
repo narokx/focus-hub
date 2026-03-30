@@ -42,12 +42,20 @@ export function FloatingWindow({
   onMinimizeChange,
 }: FloatingWindowProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [zIndex, setZIndex] = useState(10);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
 
+  const stopDragging = useCallback(() => {
+    setIsDragging(false);
+    setZIndex(10);
+    dragRef.current = null;
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
 
     setIsDragging(true);
@@ -58,7 +66,7 @@ export function FloatingWindow({
       initialX: position.x,
       initialY: position.y,
     };
-  }, [position.x, position.y]);
+  }, [isResizing, position.x, position.y]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -72,23 +80,40 @@ export function FloatingWindow({
       onPositionChange?.({ x: newX, y: newY });
     };
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      setZIndex(10);
-      dragRef.current = null;
+    const handleMouseUp = () => stopDragging();
+    const handleWindowBlur = () => stopDragging();
+    const handlePointerUp = () => stopDragging();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopDragging();
+      }
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isDragging, onPositionChange]);
+  }, [isDragging, onPositionChange, stopDragging]);
+
+  const handleResizeStart = useCallback(() => {
+    setIsResizing(true);
+    setIsDragging(false);
+    setZIndex(100);
+  }, []);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    setIsResizing(false);
+    setZIndex(10);
     onSizeChange?.(newSize);
   }, [onSizeChange]);
 
@@ -127,6 +152,7 @@ export function FloatingWindow({
         maxWidth={maxWidth}
         maxHeight={minimized ? 44 : maxHeight}
         enable={enableResize}
+        onResizeStart={handleResizeStart}
         onResizeStop={handleResizeStop}
         handleStyles={{
           top: { cursor: 'ns-resize', height: 8, top: -4 },
