@@ -23,31 +23,6 @@ interface FloatingWindowProps {
   onMinimizeChange?: (minimized: boolean) => void;
 }
 
-function useInteractionEnd(isActive: boolean, onEnd: () => void) {
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleEnd = () => onEnd();
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        onEnd();
-      }
-    };
-
-    document.addEventListener('mouseup', handleEnd);
-    document.addEventListener('pointerup', handleEnd);
-    window.addEventListener('blur', handleEnd);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('mouseup', handleEnd);
-      document.removeEventListener('pointerup', handleEnd);
-      window.removeEventListener('blur', handleEnd);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isActive, onEnd]);
-}
-
 export function FloatingWindow({
   title,
   icon,
@@ -71,7 +46,19 @@ export function FloatingWindow({
   const [zIndex, setZIndex] = useState(10);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
-  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const dragRef = useRef<{ pointerId: number; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const resizePointerRef = useRef<{ pointerId: number; target: HTMLElement } | null>(null);
+  const windowElementRef = useRef<HTMLDivElement | null>(null);
+  const currentPositionRef = useRef(position);
+  const currentSizeRef = useRef(size);
+
+  useEffect(() => {
+    currentPositionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    currentSizeRef.current = size;
+  }, [size]);
 
   const stopDragging = useCallback(() => {
     setIsDragging(false);
@@ -90,41 +77,41 @@ export function FloatingWindow({
     }
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleDragPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
 
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
     setZIndex(100);
     dragRef.current = {
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      initialX: position.x,
-      initialY: position.y,
+      initialX: currentPositionRef.current.x,
+      initialY: currentPositionRef.current.y,
     };
-  }, [isResizing, position.x, position.y]);
+  }, [isResizing]);
 
-  useInteractionEnd(isDragging, stopDragging);
-  useInteractionEnd(isResizing, stopResizing);
+  const handleDragPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    if (dragRef.current.pointerId !== e.pointerId) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    const newX = Math.max(0, dragRef.current.initialX + dx);
+    const newY = Math.max(0, dragRef.current.initialY + dy);
+    const nextPosition = { x: newX, y: newY };
+    currentPositionRef.current = nextPosition;
+    onPositionChange?.(nextPosition);
+  }, [onPositionChange]);
 
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!dragRef.current) return;
-      const dx = moveEvent.clientX - dragRef.current.startX;
-      const dy = moveEvent.clientY - dragRef.current.startY;
-      const newX = Math.max(0, dragRef.current.initialX + dx);
-      const newY = Math.max(0, dragRef.current.initialY + dy);
-      onPositionChange?.({ x: newX, y: newY });
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-    };
-  }, [isDragging, onPositionChange, stopDragging]);
+  const handleDragPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current || dragRef.current.pointerId !== e.pointerId) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    stopDragging();
+  }, [stopDragging]);
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
@@ -134,9 +121,39 @@ export function FloatingWindow({
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    currentSizeRef.current = newSize;
     stopResizing();
     onSizeChange?.(newSize);
   }, [onSizeChange, stopResizing]);
+
+  const handleResize = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
+    const nextSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    currentSizeRef.current = nextSize;
+    onSizeChange?.(nextSize);
+  }, [onSizeChange]);
+
+  const handleResizePointerDownCapture = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.resize-handle')) return;
+    target.setPointerCapture(e.pointerId);
+    resizePointerRef.current = { pointerId: e.pointerId, target };
+  }, []);
+
+  const handleResizePointerUpCapture = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizePointerRef.current || resizePointerRef.current.pointerId !== e.pointerId) return;
+    if (resizePointerRef.current.target.hasPointerCapture(e.pointerId)) {
+      resizePointerRef.current.target.releasePointerCapture(e.pointerId);
+    }
+    resizePointerRef.current = null;
+    if (!isResizing) return;
+    const windowElement = windowElementRef.current;
+    if (windowElement) {
+      const nextSize = { width: windowElement.offsetWidth, height: windowElement.offsetHeight };
+      currentSizeRef.current = nextSize;
+      onSizeChange?.(nextSize);
+    }
+    stopResizing();
+  }, [isResizing, onSizeChange, stopResizing]);
 
   const handleTitleDoubleClick = () => {
     if (onTitleChange) {
@@ -162,8 +179,14 @@ export function FloatingWindow({
 
   return (
     <div
+      ref={windowElementRef}
       className="absolute"
-      style={{ left: position.x, top: position.y, zIndex: isDragging ? 100 : zIndex }}
+      style={{
+        left: position.x,
+        top: position.y,
+        zIndex: isDragging ? 100 : zIndex,
+        userSelect: isDragging || isResizing ? 'none' : undefined,
+      }}
       onMouseDown={() => setZIndex(50)}
     >
       <Resizable
@@ -174,7 +197,11 @@ export function FloatingWindow({
         maxHeight={minimized ? 44 : maxHeight}
         enable={enableResize}
         onResizeStart={handleResizeStart}
+        onResize={handleResize}
         onResizeStop={handleResizeStop}
+        onPointerDownCapture={handleResizePointerDownCapture}
+        onPointerUpCapture={handleResizePointerUpCapture}
+        onPointerCancelCapture={handleResizePointerUpCapture}
         handleStyles={{
           top: { cursor: 'ns-resize', height: 8, top: -4 },
           bottom: { cursor: 'ns-resize', height: 8, bottom: -4 },
@@ -193,7 +220,13 @@ export function FloatingWindow({
         }}
       >
         <div className={cn('window-panel flex flex-col h-full', className)}>
-          <div className="window-header flex-shrink-0" onMouseDown={handleMouseDown}>
+          <div
+            className="window-header flex-shrink-0"
+            onPointerDown={handleDragPointerDown}
+            onPointerMove={handleDragPointerMove}
+            onPointerUp={handleDragPointerUp}
+            onPointerCancel={handleDragPointerUp}
+          >
             <div className="flex items-center gap-2">
               {icon}
               {isEditingTitle ? (
