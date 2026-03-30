@@ -250,6 +250,19 @@ export default function Index() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleUndo, handleRedo]);
 
+  // Iframe safety watchdog: if pointer buttons are released outside the iframe,
+  // synthesize end events so drag/resize interactions cannot get stuck.
+  useEffect(() => {
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.buttons !== 0) return;
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, cancelable: true }));
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, []);
+
   // Minimized state for each window
   const [minimized, setMinimized] = useState<Record<WindowKey, boolean>>({
     calendar: false,
