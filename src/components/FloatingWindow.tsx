@@ -42,12 +42,31 @@ export function FloatingWindow({
   onMinimizeChange,
 }: FloatingWindowProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
   const [zIndex, setZIndex] = useState(10);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
 
+  const stopDragging = useCallback(() => {
+    setIsDragging(false);
+    setZIndex(10);
+    dragRef.current = null;
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+    setZIndex(10);
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.documentElement.style.cursor = '';
+      document.documentElement.style.userSelect = '';
+    }
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
 
     setIsDragging(true);
@@ -58,7 +77,7 @@ export function FloatingWindow({
       initialX: position.x,
       initialY: position.y,
     };
-  }, [position.x, position.y]);
+  }, [isResizing, position.x, position.y]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -72,25 +91,66 @@ export function FloatingWindow({
       onPositionChange?.({ x: newX, y: newY });
     };
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      setZIndex(10);
-      dragRef.current = null;
+    const handleMouseUp = () => stopDragging();
+    const handleWindowBlur = () => stopDragging();
+    const handlePointerUp = () => stopDragging();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopDragging();
+      }
     };
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isDragging, onPositionChange]);
+  }, [isDragging, onPositionChange, stopDragging]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseUp = () => stopResizing();
+    const handlePointerUp = () => stopResizing();
+    const handleWindowBlur = () => stopResizing();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopResizing();
+      }
+    };
+
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isResizing, stopResizing]);
+
+  const handleResizeStart = useCallback(() => {
+    setIsResizing(true);
+    setIsDragging(false);
+    setZIndex(100);
+  }, []);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    stopResizing();
     onSizeChange?.(newSize);
-  }, [onSizeChange]);
+  }, [onSizeChange, stopResizing]);
 
   const handleTitleDoubleClick = () => {
     if (onTitleChange) {
@@ -127,6 +187,7 @@ export function FloatingWindow({
         maxWidth={maxWidth}
         maxHeight={minimized ? 44 : maxHeight}
         enable={enableResize}
+        onResizeStart={handleResizeStart}
         onResizeStop={handleResizeStop}
         handleStyles={{
           top: { cursor: 'ns-resize', height: 8, top: -4 },
