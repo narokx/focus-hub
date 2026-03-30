@@ -115,7 +115,7 @@ export function FloatingWindow({
     setIsResizing(false);
     setZIndex(10);
     onSizeChange?.(newSize);
-  }, [onSizeChange]);
+  }, [onSizeChange, stopResizing]);
 
   const handleTitleDoubleClick = () => {
     if (onTitleChange) {
