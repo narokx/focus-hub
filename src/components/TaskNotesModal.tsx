@@ -31,52 +31,96 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   const [isResizing, setIsResizing] = useState(false);
   const dragRef = React.useRef<{ sx: number; sy: number; ix: number; iy: number } | null>(null);
   const resizeRef = React.useRef<{ sx: number; sy: number; iw: number; ih: number } | null>(null);
+  const posRef = React.useRef(pos);
+  const sizeRef = React.useRef(size);
 
   useEffect(() => {
     setDraft(note);
   }, [note]);
 
-  const handleDragStart = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('.no-drag')) return;
-    setIsDragging(true);
-    dragRef.current = { sx: e.clientX, sy: e.clientY, ix: pos.x, iy: pos.y };
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  useEffect(() => {
+    sizeRef.current = size;
+  }, [size]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    document.body.style.cursor = 'move';
+    document.body.style.userSelect = 'none';
 
     const move = (e: MouseEvent) => {
       if (!dragRef.current) return;
-      setPos({
+      const newPos = {
         x: Math.max(0, dragRef.current.ix + e.clientX - dragRef.current.sx),
         y: Math.max(0, dragRef.current.iy + e.clientY - dragRef.current.sy),
-      });
+      };
+      posRef.current = newPos;
+      setPos(newPos);
     };
-    const up = () => {
-      setIsDragging(false);
-      localStorage.setItem('task-notes-modal-pos', JSON.stringify(pos));
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-  };
 
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsResizing(true);
-    resizeRef.current = { sx: e.clientX, sy: e.clientY, iw: size.width, ih: size.height };
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      localStorage.setItem('task-notes-modal-pos', JSON.stringify(posRef.current));
+      dragRef.current = null;
+    };
+
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    document.body.style.cursor = 'se-resize';
+    document.body.style.userSelect = 'none';
 
     const move = (e: MouseEvent) => {
       if (!resizeRef.current) return;
       const newW = Math.max(300, resizeRef.current.iw + e.clientX - resizeRef.current.sx);
       const newH = Math.max(200, resizeRef.current.ih + e.clientY - resizeRef.current.sy);
-      setSize({ width: newW, height: newH });
+      const nextSize = { width: newW, height: newH };
+      sizeRef.current = nextSize;
+      setSize(nextSize);
     };
-    const up = () => {
+
+    const handleMouseUp = () => {
       setIsResizing(false);
-      localStorage.setItem('task-notes-modal-size', JSON.stringify(size));
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
+      localStorage.setItem('task-notes-modal-size', JSON.stringify(sizeRef.current));
+      resizeRef.current = null;
     };
+
     document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.no-drag')) return;
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ix: pos.x, iy: pos.y };
+    setIsDragging(true);
+  };
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    resizeRef.current = { sx: e.clientX, sy: e.clientY, iw: size.width, ih: size.height };
+    setIsResizing(true);
   };
 
   const handleSave = () => {

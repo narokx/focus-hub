@@ -158,8 +158,44 @@ export function HeatmapCalendar({
   const [showRoutinePicker, setShowRoutinePicker] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const resizingRef = React.useRef<{ startX: number; startW: number } | null>(null);
+  const timeListWidthRef = React.useRef(timeListWidth);
+  const [isDividerResizing, setIsDividerResizing] = useState(false);
   const isMobile = useIsMobile();
   const [pickerSlotId, setPickerSlotId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    timeListWidthRef.current = timeListWidth;
+  }, [timeListWidth]);
+
+  React.useEffect(() => {
+    if (!isDividerResizing) return;
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const move = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = e.clientX - resizingRef.current.startX;
+      const nextWidth = Math.max(200, Math.min(500, resizingRef.current.startW + delta));
+      timeListWidthRef.current = nextWidth;
+      setTimeListWidth(nextWidth);
+    };
+
+    const up = () => {
+      resizingRef.current = null;
+      setIsDividerResizing(false);
+    };
+
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+
+    return () => {
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDividerResizing]);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -173,19 +209,7 @@ export function HeatmapCalendar({
   const handleDividerMouseDown = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     resizingRef.current = { startX: e.clientX, startW: timeListWidth };
-
-    const move = (e: MouseEvent) => {
-      if (!resizingRef.current) return;
-      const delta = e.clientX - resizingRef.current.startX;
-      setTimeListWidth(Math.max(200, Math.min(500, resizingRef.current.startW + delta)));
-    };
-    const up = () => {
-      resizingRef.current = null;
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
+    setIsDividerResizing(true);
   }, [timeListWidth]);
 
   const showCalendarGrid = !isMobile || !selectedDate;
