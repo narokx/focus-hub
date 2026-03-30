@@ -72,6 +72,16 @@ export function FloatingWindow({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const currentPositionRef = useRef(position);
+  const currentSizeRef = useRef(size);
+
+  useEffect(() => {
+    currentPositionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    currentSizeRef.current = size;
+  }, [size]);
 
   const stopDragging = useCallback(() => {
     setIsDragging(false);
@@ -99,10 +109,10 @@ export function FloatingWindow({
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      initialX: position.x,
-      initialY: position.y,
+      initialX: currentPositionRef.current.x,
+      initialY: currentPositionRef.current.y,
     };
-  }, [isResizing, position.x, position.y]);
+  }, [isResizing]);
 
   useInteractionEnd(isDragging, stopDragging);
   useInteractionEnd(isResizing, stopResizing);
@@ -116,7 +126,9 @@ export function FloatingWindow({
       const dy = moveEvent.clientY - dragRef.current.startY;
       const newX = Math.max(0, dragRef.current.initialX + dx);
       const newY = Math.max(0, dragRef.current.initialY + dy);
-      onPositionChange?.({ x: newX, y: newY });
+      const nextPosition = { x: newX, y: newY };
+      currentPositionRef.current = nextPosition;
+      onPositionChange?.(nextPosition);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -124,7 +136,7 @@ export function FloatingWindow({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [isDragging, onPositionChange, stopDragging]);
+  }, [isDragging, onPositionChange]);
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
@@ -134,9 +146,16 @@ export function FloatingWindow({
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    currentSizeRef.current = newSize;
     stopResizing();
     onSizeChange?.(newSize);
   }, [onSizeChange, stopResizing]);
+
+  const handleResize = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
+    const nextSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    currentSizeRef.current = nextSize;
+    onSizeChange?.(nextSize);
+  }, [onSizeChange]);
 
   const handleTitleDoubleClick = () => {
     if (onTitleChange) {
@@ -174,6 +193,7 @@ export function FloatingWindow({
         maxHeight={minimized ? 44 : maxHeight}
         enable={enableResize}
         onResizeStart={handleResizeStart}
+        onResize={handleResize}
         onResizeStop={handleResizeStop}
         handleStyles={{
           top: { cursor: 'ns-resize', height: 8, top: -4 },
