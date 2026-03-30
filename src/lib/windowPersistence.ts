@@ -67,6 +67,12 @@ const readLocalWindowPositions = (): WindowPositionsPayload => {
   }, {});
 };
 
+const writeLocalLayoutUpdatedAt = (timestamp: number): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('window-layout-updated-at', String(timestamp));
+  }
+};
+
 const readRemoteRow = async (userId: string): Promise<CloudWindowPositionsResult> => {
   const { data, error } = await supabase
     .from('ui_layouts')
