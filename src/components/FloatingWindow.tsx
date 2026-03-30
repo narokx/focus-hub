@@ -23,6 +23,14 @@ interface FloatingWindowProps {
   onMinimizeChange?: (minimized: boolean) => void;
 }
 
+const BASE_WINDOW_Z_INDEX = 20;
+let highestWindowZIndex = BASE_WINDOW_Z_INDEX;
+
+const getNextWindowZIndex = () => {
+  highestWindowZIndex += 1;
+  return highestWindowZIndex;
+};
+
 function useInteractionEnd(isActive: boolean, onEnd: () => void) {
   useEffect(() => {
     if (!isActive) return;
@@ -68,20 +76,21 @@ export function FloatingWindow({
 }: FloatingWindowProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [zIndex, setZIndex] = useState(10);
+  const [zIndex, setZIndex] = useState(() => getNextWindowZIndex());
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const bringToFront = useCallback(() => {
+    setZIndex(getNextWindowZIndex());
+  }, []);
 
   const stopDragging = useCallback(() => {
     setIsDragging(false);
-    setZIndex(10);
     dragRef.current = null;
   }, []);
 
   const stopResizing = useCallback(() => {
     setIsResizing(false);
-    setZIndex(10);
     if (typeof document !== 'undefined') {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -94,15 +103,15 @@ export function FloatingWindow({
     if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
 
+    bringToFront();
     setIsDragging(true);
-    setZIndex(100);
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       initialX: position.x,
       initialY: position.y,
     };
-  }, [isResizing, position.x, position.y]);
+  }, [bringToFront, isResizing, position.x, position.y]);
 
   useInteractionEnd(isDragging, stopDragging);
   useInteractionEnd(isResizing, stopResizing);
@@ -127,10 +136,10 @@ export function FloatingWindow({
   }, [isDragging, onPositionChange, stopDragging]);
 
   const handleResizeStart = useCallback(() => {
+    bringToFront();
     setIsResizing(true);
     setIsDragging(false);
-    setZIndex(100);
-  }, []);
+  }, [bringToFront]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
@@ -163,8 +172,8 @@ export function FloatingWindow({
   return (
     <div
       className="absolute"
-      style={{ left: position.x, top: position.y, zIndex: isDragging ? 100 : zIndex }}
-      onMouseDown={() => setZIndex(50)}
+      style={{ left: position.x, top: position.y, zIndex }}
+      onMouseDownCapture={bringToFront}
     >
       <Resizable
         size={minimized ? { width: size.width, height: 44 } : size}
