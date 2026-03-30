@@ -124,7 +124,13 @@ export function FloatingWindow({
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
     };
-  }, [isDragging, onPositionChange]);
+  }, [isDragging, onPositionChange, stopDragging]);
+
+  const handleResizeStart = useCallback(() => {
+    setIsResizing(true);
+    setIsDragging(false);
+    setZIndex(100);
+  }, []);
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
