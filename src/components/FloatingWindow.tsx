@@ -23,31 +23,6 @@ interface FloatingWindowProps {
   onMinimizeChange?: (minimized: boolean) => void;
 }
 
-function useInteractionEnd(isActive: boolean, onEnd: () => void) {
-  useEffect(() => {
-    if (!isActive) return;
-
-    const handleEnd = () => onEnd();
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        onEnd();
-      }
-    };
-
-    document.addEventListener('mouseup', handleEnd);
-    document.addEventListener('pointerup', handleEnd);
-    window.addEventListener('blur', handleEnd);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('mouseup', handleEnd);
-      document.removeEventListener('pointerup', handleEnd);
-      window.removeEventListener('blur', handleEnd);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isActive, onEnd]);
-}
-
 export function FloatingWindow({
   title,
   icon,
@@ -72,6 +47,25 @@ export function FloatingWindow({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const sizeRef = useRef(size);
+  const positionRef = useRef(position);
+  const isResizingRef = useRef(false);
+  const onSizeChangeRef = useRef(onSizeChange);
+  const onPositionChangeRef = useRef(onPositionChange);
+
+  useEffect(() => {
+    sizeRef.current = size;
+    positionRef.current = position;
+  }, [size, position]);
+
+  useEffect(() => {
+    isResizingRef.current = isResizing;
+  }, [isResizing]);
+
+  useEffect(() => {
+    onSizeChangeRef.current = onSizeChange;
+    onPositionChangeRef.current = onPositionChange;
+  }, [onSizeChange, onPositionChange]);
 
   const stopDragging = useCallback(() => {
     setIsDragging(false);
@@ -80,8 +74,15 @@ export function FloatingWindow({
   }, []);
 
   const stopResizing = useCallback(() => {
+    if (isResizingRef.current) {
+      onSizeChangeRef.current?.(sizeRef.current);
+      onPositionChangeRef.current?.(positionRef.current);
+    }
+
     setIsResizing(false);
+    isResizingRef.current = false;
     setZIndex(10);
+
     if (typeof document !== 'undefined') {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -104,8 +105,53 @@ export function FloatingWindow({
     };
   }, [isResizing, position.x, position.y]);
 
-  useInteractionEnd(isDragging, stopDragging);
-  useInteractionEnd(isResizing, stopResizing);
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleEnd = () => stopDragging();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopDragging();
+      }
+    };
+
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('pointerup', handleEnd);
+    window.addEventListener('blur', handleEnd);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('blur', handleEnd);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, stopDragging]);
+
+  useEffect(() => {
+    const handleEnd = () => stopResizing();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopResizing();
+      }
+    };
+
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('pointerup', handleEnd);
+    window.addEventListener('blur', handleEnd);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('blur', handleEnd);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [stopResizing]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -123,20 +169,27 @@ export function FloatingWindow({
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
   }, [isDragging, onPositionChange, stopDragging]);
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
+    isResizingRef.current = true;
     setIsDragging(false);
     setZIndex(100);
+    if (typeof document !== 'undefined') {
+      document.body.style.userSelect = 'none';
+      document.documentElement.style.userSelect = 'none';
+    }
   }, []);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    sizeRef.current = newSize;
     stopResizing();
-    onSizeChange?.(newSize);
-  }, [onSizeChange, stopResizing]);
+  }, [stopResizing]);
 
   const handleTitleDoubleClick = () => {
     if (onTitleChange) {
