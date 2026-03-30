@@ -183,6 +183,16 @@ const flushCloudSync = async (userId: string): Promise<void> => {
   }
 };
 
+export const flushCloudSyncNow = async (userId: string): Promise<void> => {
+  if (!userId) return;
+  const existingTimer = timersByUser.get(userId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    timersByUser.delete(userId);
+  }
+  await flushCloudSync(userId);
+};
+
 export const getCloudWindowPositions = async (userId: string): Promise<WindowPositionsPayload> => {
   if (!userId) return {};
 
