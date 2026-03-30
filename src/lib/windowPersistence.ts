@@ -28,6 +28,15 @@ const ALL_WINDOW_LAYOUT_KEYS = [
 ] as const;
 const pendingByUser = new Map<string, WindowPositionsPayload>();
 const timersByUser = new Map<string, ReturnType<typeof setTimeout>>();
+const SUPABASE_URL = (() => {
+  try {
+    return new URL(import.meta.env.VITE_SUPABASE_URL ?? 'https://wjnsfhvwrsfzpwghjjnh.supabase.co').origin;
+  } catch {
+    return 'https://wjnsfhvwrsfzpwghjjnh.supabase.co';
+  }
+})();
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqbnNmaHZ3cnNmenB3Z2hqam5oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0OTI4MzcsImV4cCI6MjA4ODA2ODgzN30.X-RUfUhhHvM-NBDr5i-95jlXBWsh8U2toND3azydNEo';
 
 const parseWindowPositions = (value: unknown): WindowPositionsPayload => {
   if (!value || typeof value !== 'object') return {};
@@ -144,7 +153,8 @@ export const syncToCloud = (userId: string, key: string, value: WindowPersistVal
   if (!userId) return;
 
   const pending = pendingByUser.get(userId) ?? {};
-  pendingByUser.set(userId, { ...pending, [key]: value });
+  const localSnapshot = readLocalWindowPositions();
+  pendingByUser.set(userId, { ...localSnapshot, ...pending, [key]: value });
   writeLocalLayoutUpdatedAt(Date.now());
 
   const existingTimer = timersByUser.get(userId);
@@ -181,6 +191,74 @@ const flushCloudSync = async (userId: string): Promise<void> => {
   if (fallbackError) {
     console.error('Failed fallback write to profiles.window_positions:', fallbackError);
   }
+};
+
+export const flushCloudSyncNow = async (userId: string): Promise<void> => {
+  if (!userId) return;
+  const existingTimer = timersByUser.get(userId);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    timersByUser.delete(userId);
+  }
+  await flushCloudSync(userId);
+};
+
+const readAccessTokenFromStorage = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  const authTokenKey = Object.keys(localStorage).find((key) => key.endsWith('-auth-token'));
+  if (!authTokenKey) return null;
+
+  const raw = localStorage.getItem(authTokenKey);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as {
+      access_token?: string;
+      currentSession?: { access_token?: string };
+    };
+    return parsed.currentSession?.access_token ?? parsed.access_token ?? null;
+  } catch {
+    return null;
+  }
+};
+
+export const flushCloudSyncKeepalive = (userId: string): void => {
+  if (!userId || typeof window === 'undefined') return;
+
+  const pending = pendingByUser.get(userId) ?? {};
+  const localSnapshot = readLocalWindowPositions();
+  const positions = { ...localSnapshot, ...pending };
+  if (Object.keys(positions).length === 0) return;
+
+  const accessToken = readAccessTokenFromStorage();
+  if (!accessToken) return;
+
+  pendingByUser.delete(userId);
+  const timer = timersByUser.get(userId);
+  if (timer) {
+    clearTimeout(timer);
+    timersByUser.delete(userId);
+  }
+
+  writeLocalLayoutUpdatedAt(Date.now());
+
+  void fetch(`${SUPABASE_URL}/rest/v1/ui_layouts?on_conflict=user_id`, {
+    method: 'POST',
+    keepalive: true,
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      Prefer: 'resolution=merge-duplicates',
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      window_positions: positions,
+      updated_at: new Date().toISOString(),
+    }),
+  }).catch(() => {
+    // Ignore keepalive failures; regular sync on next session will recover.
+  });
 };
 
 export const getCloudWindowPositions = async (userId: string): Promise<WindowPositionsPayload> => {
