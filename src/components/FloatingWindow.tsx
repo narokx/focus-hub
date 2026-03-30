@@ -132,12 +132,6 @@ export function FloatingWindow({
     setZIndex(100);
   }, []);
 
-  const handleResizeStart = useCallback(() => {
-    setIsResizing(true);
-    setIsDragging(false);
-    setZIndex(100);
-  }, []);
-
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
     stopResizing();
