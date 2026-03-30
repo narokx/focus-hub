@@ -23,6 +23,31 @@ interface FloatingWindowProps {
   onMinimizeChange?: (minimized: boolean) => void;
 }
 
+function useInteractionEnd(isActive: boolean, onEnd: () => void) {
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleEnd = () => onEnd();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        onEnd();
+      }
+    };
+
+    document.addEventListener('mouseup', handleEnd);
+    document.addEventListener('pointerup', handleEnd);
+    window.addEventListener('blur', handleEnd);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('mouseup', handleEnd);
+      document.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('blur', handleEnd);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isActive, onEnd]);
+}
+
 export function FloatingWindow({
   title,
   icon,
@@ -54,6 +79,17 @@ export function FloatingWindow({
     dragRef.current = null;
   }, []);
 
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+    setZIndex(10);
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.documentElement.style.cursor = '';
+      document.documentElement.style.userSelect = '';
+    }
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
@@ -68,6 +104,9 @@ export function FloatingWindow({
     };
   }, [isResizing, position.x, position.y]);
 
+  useInteractionEnd(isDragging, stopDragging);
+  useInteractionEnd(isResizing, stopResizing);
+
   useEffect(() => {
     if (!isDragging) return;
 
@@ -80,27 +119,10 @@ export function FloatingWindow({
       onPositionChange?.({ x: newX, y: newY });
     };
 
-    const handleMouseUp = () => stopDragging();
-    const handleWindowBlur = () => stopDragging();
-    const handlePointerUp = () => stopDragging();
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        stopDragging();
-      }
-    };
-
     document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('blur', handleWindowBlur);
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('blur', handleWindowBlur);
-      document.removeEventListener('pointerup', handlePointerUp);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isDragging, onPositionChange, stopDragging]);
 
@@ -110,10 +132,15 @@ export function FloatingWindow({
     setZIndex(100);
   }, []);
 
+  const handleResizeStart = useCallback(() => {
+    setIsResizing(true);
+    setIsDragging(false);
+    setZIndex(100);
+  }, []);
+
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
-    setIsResizing(false);
-    setZIndex(10);
+    stopResizing();
     onSizeChange?.(newSize);
   }, [onSizeChange, stopResizing]);
 
