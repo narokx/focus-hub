@@ -71,7 +71,36 @@ export function FloatingWindow({
   const [zIndex, setZIndex] = useState(10);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
+  const [currentSize, setCurrentSize] = useState(size);
+  const [currentPosition, setCurrentPosition] = useState(position);
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const sizeRef = useRef(size);
+  const positionRef = useRef(position);
+  const isResizingRef = useRef(false);
+  const onSizeChangeRef = useRef(onSizeChange);
+  const onPositionChangeRef = useRef(onPositionChange);
+
+  useEffect(() => {
+    setCurrentSize(size);
+    sizeRef.current = size;
+  }, [size]);
+
+  useEffect(() => {
+    setCurrentPosition(position);
+    positionRef.current = position;
+  }, [position]);
+
+  useEffect(() => {
+    isResizingRef.current = isResizing;
+  }, [isResizing]);
+
+  useEffect(() => {
+    onSizeChangeRef.current = onSizeChange;
+  }, [onSizeChange]);
+
+  useEffect(() => {
+    onPositionChangeRef.current = onPositionChange;
+  }, [onPositionChange]);
 
   const stopDragging = useCallback(() => {
     setIsDragging(false);
@@ -82,6 +111,9 @@ export function FloatingWindow({
   const stopResizing = useCallback(() => {
     setIsResizing(false);
     setZIndex(10);
+    isResizingRef.current = false;
+    onSizeChangeRef.current?.(sizeRef.current);
+    onPositionChangeRef.current?.(positionRef.current);
     if (typeof document !== 'undefined') {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -91,7 +123,7 @@ export function FloatingWindow({
   }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (isResizing) return;
+    if (isResizingRef.current) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
 
     setIsDragging(true);
@@ -99,10 +131,10 @@ export function FloatingWindow({
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      initialX: position.x,
-      initialY: position.y,
+      initialX: positionRef.current.x,
+      initialY: positionRef.current.y,
     };
-  }, [isResizing, position.x, position.y]);
+  }, []);
 
   useInteractionEnd(isDragging, stopDragging);
   useInteractionEnd(isResizing, stopResizing);
@@ -116,6 +148,9 @@ export function FloatingWindow({
       const dy = moveEvent.clientY - dragRef.current.startY;
       const newX = Math.max(0, dragRef.current.initialX + dx);
       const newY = Math.max(0, dragRef.current.initialY + dy);
+      const newPosition = { x: newX, y: newY };
+      positionRef.current = newPosition;
+      setCurrentPosition(newPosition);
       onPositionChange?.({ x: newX, y: newY });
     };
 
@@ -128,15 +163,23 @@ export function FloatingWindow({
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
+    isResizingRef.current = true;
     setIsDragging(false);
     setZIndex(100);
   }, []);
 
+  const handleResize = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
+    const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    sizeRef.current = newSize;
+    setCurrentSize(newSize);
+  }, []);
+
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
+    sizeRef.current = newSize;
+    setCurrentSize(newSize);
     stopResizing();
-    onSizeChange?.(newSize);
-  }, [onSizeChange, stopResizing]);
+  }, [stopResizing]);
 
   const handleTitleDoubleClick = () => {
     if (onTitleChange) {
@@ -163,17 +206,19 @@ export function FloatingWindow({
   return (
     <div
       className="absolute"
-      style={{ left: position.x, top: position.y, zIndex: isDragging ? 100 : zIndex }}
+      style={{ left: currentPosition.x, top: currentPosition.y, zIndex: isDragging ? 100 : zIndex }}
       onMouseDown={() => setZIndex(50)}
     >
       <Resizable
-        size={minimized ? { width: size.width, height: 44 } : size}
+        size={minimized ? { width: currentSize.width, height: 44 } : currentSize}
         minWidth={minimized ? 200 : minWidth}
         minHeight={minimized ? 44 : minHeight}
         maxWidth={maxWidth}
         maxHeight={minimized ? 44 : maxHeight}
         enable={enableResize}
+        enableUserSelectHack={false}
         onResizeStart={handleResizeStart}
+        onResize={handleResize}
         onResizeStop={handleResizeStop}
         handleStyles={{
           top: { cursor: 'ns-resize', height: 8, top: -4 },
