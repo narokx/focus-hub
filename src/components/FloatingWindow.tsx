@@ -54,17 +54,6 @@ export function FloatingWindow({
     dragRef.current = null;
   }, []);
 
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-    setZIndex(10);
-    if (typeof document !== 'undefined') {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.documentElement.style.cursor = '';
-      document.documentElement.style.userSelect = '';
-    }
-  }, []);
-
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
@@ -115,31 +104,6 @@ export function FloatingWindow({
     };
   }, [isDragging, onPositionChange, stopDragging]);
 
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const handleMouseUp = () => stopResizing();
-    const handlePointerUp = () => stopResizing();
-    const handleWindowBlur = () => stopResizing();
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        stopResizing();
-      }
-    };
-
-    document.addEventListener('mouseup', handleMouseUp);
-    document.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('blur', handleWindowBlur);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('blur', handleWindowBlur);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isResizing, stopResizing]);
-
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
     setIsDragging(false);
@@ -148,7 +112,8 @@ export function FloatingWindow({
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
-    stopResizing();
+    setIsResizing(false);
+    setZIndex(10);
     onSizeChange?.(newSize);
   }, [onSizeChange, stopResizing]);
 
