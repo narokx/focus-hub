@@ -50,6 +50,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type MobileTab = 'calendar' | 'routines' | 'tasks' | 'stats';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats' | 'weeklyNotes';
+const DEFAULT_WINDOW_STACK: WindowKey[] = ['routines', 'quickTasks', 'calendar', 'stats', 'weeklyNotes'];
 
 export default function Index() {
   const { user } = useAuth();
@@ -173,6 +174,19 @@ export default function Index() {
   } | null>(null);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isStopclockOpen, setIsStopclockOpen] = useState(false);
+  const [windowStack, setWindowStack] = useState<WindowKey[]>(DEFAULT_WINDOW_STACK);
+
+  const bringWindowToFront = useCallback((key: WindowKey) => {
+    setWindowStack((prev) => {
+      const withoutKey = prev.filter((item) => item !== key);
+      return [...withoutKey, key];
+    });
+  }, []);
+
+  const getWindowZIndex = useCallback((key: WindowKey) => {
+    const index = windowStack.indexOf(key);
+    return 20 + (index >= 0 ? index : 0);
+  }, [windowStack]);
 
   // History for undo/redo
   const history = useHistory(state);
@@ -261,6 +275,9 @@ export default function Index() {
 
   const toggleMinimize = (key: WindowKey) => {
     setMinimized(prev => ({ ...prev, [key]: !prev[key] }));
+    if (minimized[key]) {
+      bringWindowToFront(key);
+    }
   };
 
   const taskNameById = useMemo(
@@ -914,6 +931,8 @@ export default function Index() {
           onTitleChange={(title) => updateWindowTitle('routines', title)}
           minimized={minimized.routines}
           onMinimizeChange={() => toggleMinimize('routines')}
+          zIndex={getWindowZIndex('routines')}
+          onInteract={() => bringWindowToFront('routines')}
         >
           <RoutinesPanel
             routines={state.routines}
@@ -959,6 +978,8 @@ export default function Index() {
           onTitleChange={(title) => updateWindowTitle('quickTasks', title)}
           minimized={minimized.quickTasks}
           onMinimizeChange={() => toggleMinimize('quickTasks')}
+          zIndex={getWindowZIndex('quickTasks')}
+          onInteract={() => bringWindowToFront('quickTasks')}
         >
           <QuickTasksPanel
             tasks={state.quickTasks}
@@ -991,6 +1012,8 @@ export default function Index() {
           onTitleChange={(title) => updateWindowTitle('calendar', title)}
           minimized={minimized.calendar}
           onMinimizeChange={() => toggleMinimize('calendar')}
+          zIndex={getWindowZIndex('calendar')}
+          onInteract={() => bringWindowToFront('calendar')}
         >
           <HeatmapCalendar
             width={calendarSize.width}
@@ -1046,6 +1069,8 @@ export default function Index() {
             onTitleChange={(title) => updateWindowTitle('weeklyNotes', title)}
             minimized={minimized.weeklyNotes}
             onMinimizeChange={() => toggleMinimize('weeklyNotes')}
+            zIndex={getWindowZIndex('weeklyNotes')}
+            onInteract={() => bringWindowToFront('weeklyNotes')}
             headerActions={
               <button
                 onMouseDown={(e) => e.stopPropagation()}
@@ -1085,6 +1110,8 @@ export default function Index() {
           }}
           minimized={minimized.stats}
           onMinimizeChange={() => toggleMinimize('stats')}
+          zIndex={getWindowZIndex('stats')}
+          onInteract={() => bringWindowToFront('stats')}
         >
           <WeeklyStatsPanel calendar={state.calendar} routines={state.routines} />
         </FloatingWindow>
