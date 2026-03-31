@@ -36,9 +36,12 @@ import {
   flushCloudSyncNow,
   flushCloudSyncKeepalive,
   getCloudWindowPositions,
+  getStoredMinimized,
+  getStoredMinimizedWithLegacyKey,
   getStoredPosition,
   getStoredSize,
   getStoredSizeWithLegacyKey,
+  saveMinimized,
   savePosition,
   saveSize,
   subscribeToCloudWindowPositions,
@@ -50,6 +53,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type MobileTab = 'calendar' | 'routines' | 'tasks' | 'stats';
 type WindowKey = 'calendar' | 'routines' | 'quickTasks' | 'stats' | 'weeklyNotes';
+const MINIMIZED_STORAGE_KEY: Record<WindowKey, string> = {
+  calendar: 'calendar-minimized',
+  routines: 'routines-minimized',
+  quickTasks: 'tasks-minimized',
+  stats: 'tools-minimized',
+  weeklyNotes: 'weekly-notes-minimized',
+};
 
 export default function Index() {
   const { user } = useAuth();
@@ -251,16 +261,22 @@ export default function Index() {
   }, [handleUndo, handleRedo]);
 
   // Minimized state for each window
-  const [minimized, setMinimized] = useState<Record<WindowKey, boolean>>({
-    calendar: false,
-    routines: false,
-    quickTasks: false,
-    stats: true, // Stats starts minimized
-    weeklyNotes: false,
-  });
+  const [minimized, setMinimized] = useState<Record<WindowKey, boolean>>(() => ({
+    calendar: getStoredMinimized('calendar-minimized', false),
+    routines: getStoredMinimized('routines-minimized', false),
+    quickTasks: getStoredMinimized('tasks-minimized', false),
+    stats: getStoredMinimizedWithLegacyKey('tools-minimized', 'stats-minimized', false),
+    weeklyNotes: getStoredMinimized('weekly-notes-minimized', false),
+  }));
 
   const toggleMinimize = (key: WindowKey) => {
-    setMinimized(prev => ({ ...prev, [key]: !prev[key] }));
+    setMinimized(prev => {
+      const nextValue = !prev[key];
+      const storageKey = MINIMIZED_STORAGE_KEY[key];
+      saveMinimized(storageKey, nextValue);
+      if (user) syncToCloud(user.id, storageKey, nextValue);
+      return { ...prev, [key]: nextValue };
+    });
   };
 
   const taskNameById = useMemo(
@@ -330,6 +346,15 @@ export default function Index() {
         saveSize(storageKey, nextSize);
         setter(nextSize);
       };
+      const applyMinimized = (
+        storageKey: string,
+        setter: (value: boolean) => void,
+      ) => {
+        const value = cloudPositions[storageKey];
+        if (typeof value !== 'boolean') return;
+        saveMinimized(storageKey, value);
+        setter(value);
+      };
 
       applyPosition('routines-position', setRoutinesPosition);
       applySize('routines-size', setRoutinesSize);
@@ -342,6 +367,12 @@ export default function Index() {
       applySize('weeklyNotes-size', setWeeklyNotesSize);
       applyPosition('tools-position', setToolsPosition);
       applySize('tools-size', setToolsSize);
+      applyMinimized('routines-minimized', (value) => setMinimized(prev => ({ ...prev, routines: value })));
+      applyMinimized('tasks-minimized', (value) => setMinimized(prev => ({ ...prev, quickTasks: value })));
+      applyMinimized('calendar-minimized', (value) => setMinimized(prev => ({ ...prev, calendar: value })));
+      applyMinimized('weekly-notes-minimized', (value) => setMinimized(prev => ({ ...prev, weeklyNotes: value })));
+      applyMinimized('tools-minimized', (value) => setMinimized(prev => ({ ...prev, stats: value })));
+      applyMinimized('stats-minimized', (value) => setMinimized(prev => ({ ...prev, stats: value })));
     };
 
     const applyCloudWindowPositions = async () => {

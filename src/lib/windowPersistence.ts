@@ -1,6 +1,6 @@
 export type Position = { x: number; y: number };
 export type Size = { width: number; height: number };
-export type WindowPersistValue = Position | Size;
+export type WindowPersistValue = Position | Size | boolean;
 
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,14 +15,19 @@ const CLOUD_SYNC_DEBOUNCE_MS = 500;
 const ALL_WINDOW_LAYOUT_KEYS = [
   'routines-position',
   'routines-size',
+  'routines-minimized',
   'tasks-position',
   'tasks-size',
+  'tasks-minimized',
   'calendar-position',
   'calendar-size',
+  'calendar-minimized',
   'weekly-notes-position',
   'weekly-notes-size',
+  'weekly-notes-minimized',
   'tools-position',
   'tools-size',
+  'tools-minimized',
   'stopclock-position',
   'stopclock-size',
 ] as const;
@@ -52,7 +57,9 @@ const readLocalWindowPositions = (): WindowPositionsPayload => {
 
     try {
       const parsed = JSON.parse(raw);
-      if (
+      if (typeof parsed === 'boolean') {
+        acc[key] = parsed;
+      } else if (
         parsed &&
         typeof parsed === 'object' &&
         ((Number.isFinite(parsed.x) && Number.isFinite(parsed.y)) ||
@@ -145,6 +152,29 @@ export const getStoredSizeWithLegacyKey = (key: string, legacyKey: string, fallb
   return getStoredSize(legacyKey, fallback);
 };
 
+export const getStoredMinimized = (key: string, fallback: boolean): boolean => {
+  if (typeof window === 'undefined') return fallback;
+
+  const stored = localStorage.getItem(key);
+  if (!stored) return fallback;
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (typeof parsed === 'boolean') return parsed;
+    return fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+export const getStoredMinimizedWithLegacyKey = (key: string, legacyKey: string, fallback: boolean): boolean => {
+  const next = getStoredMinimized(key, fallback);
+  if (next !== fallback) {
+    return next;
+  }
+  return getStoredMinimized(legacyKey, fallback);
+};
+
 export const savePosition = (key: string, position: Position): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(key, JSON.stringify(position));
@@ -153,6 +183,11 @@ export const savePosition = (key: string, position: Position): void => {
 export const saveSize = (key: string, size: Size): void => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(key, JSON.stringify(size));
+};
+
+export const saveMinimized = (key: string, minimized: boolean): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(key, JSON.stringify(minimized));
 };
 
 export const syncToCloud = (userId: string, key: string, value: WindowPersistValue): void => {
