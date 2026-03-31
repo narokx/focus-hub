@@ -348,7 +348,7 @@ export default function Index() {
       };
       const applyMinimized = (
         storageKey: string,
-        setter: React.Dispatch<React.SetStateAction<boolean>>,
+        setter: (value: boolean) => void,
       ) => {
         const value = cloudPositions[storageKey];
         if (typeof value !== 'boolean') return;
