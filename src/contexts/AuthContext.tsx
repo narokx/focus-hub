@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'SIGNED_OUT') {
           clearPersistedAuthTokens();
         }
-        setLoading(false);
+        // setLoading(false); // Remove this to let getSession handle the initial loading state transition
       }
     );
 
