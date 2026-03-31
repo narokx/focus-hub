@@ -111,7 +111,7 @@ export function FloatingWindow({
 
     setIsDragging(false);
     dragRef.current = null;
-  }, [onPositionChange]);
+  }, []);
 
   const stopResizing = useCallback(() => {
     setIsResizing(false);
@@ -125,8 +125,10 @@ export function FloatingWindow({
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isResizing) return;
+    if (isDragging) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
     if (e.button !== 0) return;
+    if (!e.isPrimary) return;
 
     bringToFront();
     setIsDragging(true);
@@ -141,7 +143,7 @@ export function FloatingWindow({
       latestX: latestPositionRef.current.x,
       latestY: latestPositionRef.current.y,
     };
-  }, [bringToFront, isResizing]);
+  }, [bringToFront, isDragging, isResizing]);
 
   useInteractionEnd(isDragging, stopDragging);
   useInteractionEnd(isResizing, stopResizing);
