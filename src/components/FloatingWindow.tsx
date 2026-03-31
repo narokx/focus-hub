@@ -79,15 +79,39 @@ export function FloatingWindow({
   const [zIndex, setZIndex] = useState(() => getNextWindowZIndex());
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
-  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    latestX: number;
+    latestY: number;
+  } | null>(null);
+  const dragHandleRef = useRef<HTMLDivElement | null>(null);
+  const latestPositionRef = useRef(position);
+
+  useEffect(() => {
+    latestPositionRef.current = position;
+  }, [position]);
+
   const bringToFront = useCallback(() => {
     setZIndex(getNextWindowZIndex());
   }, []);
 
   const stopDragging = useCallback(() => {
+    if (dragRef.current) {
+      onPositionChange?.({ x: dragRef.current.latestX, y: dragRef.current.latestY });
+
+      const dragHandle = dragHandleRef.current;
+      if (dragHandle?.hasPointerCapture(dragRef.current.pointerId)) {
+        dragHandle.releasePointerCapture(dragRef.current.pointerId);
+      }
+    }
+
     setIsDragging(false);
     dragRef.current = null;
-  }, []);
+  }, [onPositionChange]);
 
   const stopResizing = useCallback(() => {
     setIsResizing(false);
@@ -99,19 +123,25 @@ export function FloatingWindow({
     }
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (isResizing) return;
     if ((e.target as HTMLElement).closest('.no-drag')) return;
+    if (e.button !== 0) return;
 
     bringToFront();
     setIsDragging(true);
+
+    e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
-      initialX: position.x,
-      initialY: position.y,
+      initialX: latestPositionRef.current.x,
+      initialY: latestPositionRef.current.y,
+      latestX: latestPositionRef.current.x,
+      latestY: latestPositionRef.current.y,
     };
-  }, [bringToFront, isResizing, position.x, position.y]);
+  }, [bringToFront, isResizing]);
 
   useInteractionEnd(isDragging, stopDragging);
   useInteractionEnd(isResizing, stopResizing);
@@ -119,19 +149,32 @@ export function FloatingWindow({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
       if (!dragRef.current) return;
+      if (moveEvent.pointerId !== dragRef.current.pointerId) return;
       const dx = moveEvent.clientX - dragRef.current.startX;
       const dy = moveEvent.clientY - dragRef.current.startY;
       const newX = Math.max(0, dragRef.current.initialX + dx);
       const newY = Math.max(0, dragRef.current.initialY + dy);
+      dragRef.current.latestX = newX;
+      dragRef.current.latestY = newY;
       onPositionChange?.({ x: newX, y: newY });
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      if (!dragRef.current) return;
+      if (upEvent.pointerId !== dragRef.current.pointerId) return;
+      stopDragging();
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isDragging, onPositionChange, stopDragging]);
 
@@ -202,7 +245,7 @@ export function FloatingWindow({
         }}
       >
         <div className={cn('window-panel flex flex-col h-full', className)}>
-          <div className="window-header flex-shrink-0" onMouseDown={handleMouseDown}>
+          <div ref={dragHandleRef} className="window-header flex-shrink-0" onPointerDown={handlePointerDown}>
             <div className="flex items-center gap-2">
               {icon}
               {isEditingTitle ? (
