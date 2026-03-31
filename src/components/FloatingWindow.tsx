@@ -101,7 +101,7 @@ export function FloatingWindow({
 
   const stopDragging = useCallback(() => {
     if (dragRef.current) {
-      onPositionChange?.({ x: dragRef.current.latestX, y: dragRef.current.latestY });
+      // onPositionChange call removed as it is redundant with handlePointerMove
 
       const dragHandle = dragHandleRef.current;
       if (dragHandle?.hasPointerCapture(dragRef.current.pointerId)) {
