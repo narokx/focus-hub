@@ -18,19 +18,49 @@ const AuthContext = createContext<AuthContextType>({
 
 export const useAuth = () => useContext(AuthContext);
 
+const isInvalidRefreshTokenError = (message: string | undefined): boolean =>
+  /invalid refresh token|refresh token not found/i.test(message ?? '');
+
+const clearPersistedAuthTokens = (): void => {
+  if (typeof window === 'undefined') return;
+
+  Object.keys(localStorage)
+    .filter((key) => key.endsWith('-auth-token'))
+    .forEach((key) => localStorage.removeItem(key));
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setLoading(false);
+      (event, nextSession) => {
+        setSession(nextSession);
+        if (event === 'SIGNED_OUT') {
+          clearPersistedAuthTokens();
+        }
+        // setLoading(false); // Remove this to let getSession handle the initial loading state transition
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error && isInvalidRefreshTokenError(error.message)) {
+        console.warn('Invalid Supabase refresh token detected. Clearing persisted auth session.');
+        clearPersistedAuthTokens();
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
+      if (error) {
+        console.error('Failed to restore Supabase session:', error);
+        setSession(null);
+        setLoading(false);
+        return;
+      }
+
       setSession(session);
       setLoading(false);
     });
