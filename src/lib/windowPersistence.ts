@@ -51,12 +51,13 @@ const parseWindowPositions = (value: unknown): WindowPositionsPayload => {
 };
 
 const isEqualPersistValue = (a: WindowPersistValue | undefined, b: WindowPersistValue | undefined): boolean => {
+  if (a === b) return true;
   if (typeof a === 'boolean' || typeof b === 'boolean') return a === b;
   if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
 
-  const aPosition = a as Position;
-  const bPosition = b as Position;
-  if (Number.isFinite(aPosition.x) || Number.isFinite(aPosition.y) || Number.isFinite(bPosition.x) || Number.isFinite(bPosition.y)) {
+  if ('x' in a || 'y' in a || 'x' in b || 'y' in b) {
+    const aPosition = a as Position;
+    const bPosition = b as Position;
     return aPosition.x === bPosition.x && aPosition.y === bPosition.y;
   }
 
