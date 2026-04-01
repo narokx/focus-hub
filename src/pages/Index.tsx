@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -41,6 +41,7 @@ import {
   getStoredPosition,
   getStoredSize,
   getStoredSizeWithLegacyKey,
+  getCloudValueRetryDelayMs,
   saveMinimized,
   savePosition,
   saveSize,
@@ -326,6 +327,29 @@ export default function Index() {
     return getStoredSize('tools-size', fallback);
   });
 
+  const cloudRetryTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const scheduleCloudRetry = useCallback((
+    storageKey: string,
+    nextValue: { x: number; y: number } | { width: number; height: number } | boolean,
+    applyNow: () => void,
+  ) => {
+    if (!user) return;
+
+    const retryDelayMs = getCloudValueRetryDelayMs(user.id, storageKey, nextValue);
+    if (retryDelayMs === null || retryDelayMs === 0) return;
+
+    const existingTimer = cloudRetryTimersRef.current.get(storageKey);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const retryTimer = setTimeout(() => {
+      cloudRetryTimersRef.current.delete(storageKey);
+      applyNow();
+    }, retryDelayMs);
+
+    cloudRetryTimersRef.current.set(storageKey, retryTimer);
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -334,7 +358,14 @@ export default function Index() {
         const value = cloudPositions[storageKey] as { x?: number; y?: number } | undefined;
         if (!value || !Number.isFinite(value.x) || !Number.isFinite(value.y)) return;
         const nextPosition = { x: Number(value.x), y: Number(value.y) };
-        if (!shouldApplyCloudValue(user.id, storageKey, nextPosition)) return;
+        if (!shouldApplyCloudValue(user.id, storageKey, nextPosition)) {
+          scheduleCloudRetry(storageKey, nextPosition, () => {
+            if (!shouldApplyCloudValue(user.id, storageKey, nextPosition)) return;
+            savePosition(storageKey, nextPosition);
+            setter(nextPosition);
+          });
+          return;
+        }
         savePosition(storageKey, nextPosition);
         setter(nextPosition);
       };
@@ -345,7 +376,14 @@ export default function Index() {
         const value = cloudPositions[storageKey] as { width?: number; height?: number } | undefined;
         if (!value || !Number.isFinite(value.width) || !Number.isFinite(value.height)) return;
         const nextSize = { width: Number(value.width), height: Number(value.height) };
-        if (!shouldApplyCloudValue(user.id, storageKey, nextSize)) return;
+        if (!shouldApplyCloudValue(user.id, storageKey, nextSize)) {
+          scheduleCloudRetry(storageKey, nextSize, () => {
+            if (!shouldApplyCloudValue(user.id, storageKey, nextSize)) return;
+            saveSize(storageKey, nextSize);
+            setter(nextSize);
+          });
+          return;
+        }
         saveSize(storageKey, nextSize);
         setter(nextSize);
       };
@@ -355,7 +393,14 @@ export default function Index() {
       ) => {
         const value = cloudPositions[storageKey];
         if (typeof value !== 'boolean') return;
-        if (!shouldApplyCloudValue(user.id, storageKey, value)) return;
+        if (!shouldApplyCloudValue(user.id, storageKey, value)) {
+          scheduleCloudRetry(storageKey, value, () => {
+            if (!shouldApplyCloudValue(user.id, storageKey, value)) return;
+            saveMinimized(storageKey, value);
+            setter(value);
+          });
+          return;
+        }
         saveMinimized(storageKey, value);
         setter(value);
       };
@@ -387,8 +432,12 @@ export default function Index() {
     void applyCloudWindowPositions();
 
     const unsubscribe = subscribeToCloudWindowPositions(user.id, applyPositions);
-    return () => unsubscribe();
-  }, [user]);
+    return () => {
+      unsubscribe();
+      cloudRetryTimersRef.current.forEach((timer) => clearTimeout(timer));
+      cloudRetryTimersRef.current.clear();
+    };
+  }, [scheduleCloudRetry, user]);
 
   useEffect(() => {
     if (!user) return;

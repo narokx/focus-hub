@@ -71,17 +71,23 @@ const markLocalWindowMutation = (userId: string, key: string) => {
   localWriteTimestampsByUser.set(userId, byKey);
 };
 
-export const shouldApplyCloudValue = (userId: string, key: string, nextValue: WindowPersistValue): boolean => {
+export const getCloudValueRetryDelayMs = (userId: string, key: string, nextValue: WindowPersistValue): number | null => {
   const pending = pendingByUser.get(userId);
   const pendingValue = pending?.[key];
   if (pendingValue !== undefined && !isEqualPersistValue(pendingValue, nextValue)) {
-    return false;
+    return null;
   }
 
   const localWriteAt = localWriteTimestampsByUser.get(userId)?.get(key);
-  if (!localWriteAt) return true;
+  if (!localWriteAt) return 0;
 
-  return Date.now() - localWriteAt > REMOTE_RECONCILE_COOLDOWN_MS;
+  const elapsedMs = Date.now() - localWriteAt;
+  return elapsedMs >= REMOTE_RECONCILE_COOLDOWN_MS ? 0 : REMOTE_RECONCILE_COOLDOWN_MS - elapsedMs;
+};
+
+export const shouldApplyCloudValue = (userId: string, key: string, nextValue: WindowPersistValue): boolean => {
+  const retryDelayMs = getCloudValueRetryDelayMs(userId, key, nextValue);
+  return retryDelayMs === 0;
 };
 
 const readLocalWindowPositions = (): WindowPositionsPayload => {

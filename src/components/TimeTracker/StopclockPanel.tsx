@@ -8,6 +8,7 @@ import {
   getCloudWindowPositions,
   getStoredPosition,
   getStoredSize,
+  getCloudValueRetryDelayMs,
   savePosition,
   saveSize,
   shouldApplyCloudValue,
@@ -72,6 +73,7 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
   const [pipWindow, setPipWindow] = useState<Window | null>(null);
   const [pipContainer, setPipContainer] = useState<HTMLElement | null>(null);
   const pipCloseListenerRef = useRef<(() => void) | null>(null);
+  const cloudRetryTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const [position, setPosition] = useState(() => {
     return getStoredPosition(POSITION_KEY, DEFAULT_POSITION);
@@ -90,6 +92,19 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
         if (shouldApplyCloudValue(user.id, POSITION_KEY, nextPosition)) {
           savePosition(POSITION_KEY, nextPosition);
           setPosition(nextPosition);
+        } else {
+          const retryDelayMs = getCloudValueRetryDelayMs(user.id, POSITION_KEY, nextPosition);
+          if (retryDelayMs !== null && retryDelayMs > 0) {
+            const existingTimer = cloudRetryTimersRef.current.get(POSITION_KEY);
+            if (existingTimer) clearTimeout(existingTimer);
+            const retryTimer = setTimeout(() => {
+              cloudRetryTimersRef.current.delete(POSITION_KEY);
+              if (!shouldApplyCloudValue(user.id, POSITION_KEY, nextPosition)) return;
+              savePosition(POSITION_KEY, nextPosition);
+              setPosition(nextPosition);
+            }, retryDelayMs);
+            cloudRetryTimersRef.current.set(POSITION_KEY, retryTimer);
+          }
         }
       }
 
@@ -99,6 +114,19 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
         if (shouldApplyCloudValue(user.id, SIZE_KEY, nextSize)) {
           saveSize(SIZE_KEY, nextSize);
           setSize(nextSize);
+        } else {
+          const retryDelayMs = getCloudValueRetryDelayMs(user.id, SIZE_KEY, nextSize);
+          if (retryDelayMs !== null && retryDelayMs > 0) {
+            const existingTimer = cloudRetryTimersRef.current.get(SIZE_KEY);
+            if (existingTimer) clearTimeout(existingTimer);
+            const retryTimer = setTimeout(() => {
+              cloudRetryTimersRef.current.delete(SIZE_KEY);
+              if (!shouldApplyCloudValue(user.id, SIZE_KEY, nextSize)) return;
+              saveSize(SIZE_KEY, nextSize);
+              setSize(nextSize);
+            }, retryDelayMs);
+            cloudRetryTimersRef.current.set(SIZE_KEY, retryTimer);
+          }
         }
       }
     };
@@ -106,7 +134,11 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
     void getCloudWindowPositions(user.id).then(applyStopclockLayout);
     const unsubscribe = subscribeToCloudWindowPositions(user.id, applyStopclockLayout);
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      cloudRetryTimersRef.current.forEach((timer) => clearTimeout(timer));
+      cloudRetryTimersRef.current.clear();
+    };
   }, [user]);
 
   useEffect(() => {
