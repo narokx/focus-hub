@@ -44,6 +44,7 @@ import {
   saveMinimized,
   savePosition,
   saveSize,
+  shouldApplyCloudValue,
   subscribeToCloudWindowPositions,
   syncToCloud,
 } from '@/lib/windowPersistence';
@@ -329,29 +330,38 @@ export default function Index() {
     if (!user) return;
 
     const applyPositions = (cloudPositions: Record<string, unknown>) => {
-      const applyPosition = (storageKey: string, setter: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>) => {
+      const applyPosition = (
+        storageKey: string,
+        setter: React.Dispatch<React.SetStateAction<{ x: number; y: number }>>,
+        guardKey = storageKey,
+      ) => {
         const value = cloudPositions[storageKey] as { x?: number; y?: number } | undefined;
         if (!value || !Number.isFinite(value.x) || !Number.isFinite(value.y)) return;
         const nextPosition = { x: Number(value.x), y: Number(value.y) };
+        if (!shouldApplyCloudValue(user.id, guardKey, nextPosition)) return;
         savePosition(storageKey, nextPosition);
         setter(nextPosition);
       };
       const applySize = (
         storageKey: string,
         setter: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>,
+        guardKey = storageKey,
       ) => {
         const value = cloudPositions[storageKey] as { width?: number; height?: number } | undefined;
         if (!value || !Number.isFinite(value.width) || !Number.isFinite(value.height)) return;
         const nextSize = { width: Number(value.width), height: Number(value.height) };
+        if (!shouldApplyCloudValue(user.id, guardKey, nextSize)) return;
         saveSize(storageKey, nextSize);
         setter(nextSize);
       };
       const applyMinimized = (
         storageKey: string,
         setter: (value: boolean) => void,
+        guardKey = storageKey,
       ) => {
         const value = cloudPositions[storageKey];
         if (typeof value !== 'boolean') return;
+        if (!shouldApplyCloudValue(user.id, guardKey, value)) return;
         saveMinimized(storageKey, value);
         setter(value);
       };
@@ -364,7 +374,7 @@ export default function Index() {
       applySize('calendar-size', setCalendarSize);
       applyPosition('weekly-notes-position', setWeeklyNotesPosition);
       applySize('weekly-notes-size', setWeeklyNotesSize);
-      applySize('weeklyNotes-size', setWeeklyNotesSize);
+      applySize('weeklyNotes-size', setWeeklyNotesSize, 'weekly-notes-size');
       applyPosition('tools-position', setToolsPosition);
       applySize('tools-size', setToolsSize);
       applyMinimized('routines-minimized', (value) => setMinimized(prev => ({ ...prev, routines: value })));
@@ -372,7 +382,7 @@ export default function Index() {
       applyMinimized('calendar-minimized', (value) => setMinimized(prev => ({ ...prev, calendar: value })));
       applyMinimized('weekly-notes-minimized', (value) => setMinimized(prev => ({ ...prev, weeklyNotes: value })));
       applyMinimized('tools-minimized', (value) => setMinimized(prev => ({ ...prev, stats: value })));
-      applyMinimized('stats-minimized', (value) => setMinimized(prev => ({ ...prev, stats: value })));
+      applyMinimized('stats-minimized', (value) => setMinimized(prev => ({ ...prev, stats: value })), 'tools-minimized');
     };
 
     const applyCloudWindowPositions = async () => {
