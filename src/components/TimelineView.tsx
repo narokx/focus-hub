@@ -29,38 +29,86 @@ function getDurationScale(minutes: number): number {
 const PICKER_HOURS = Array.from({ length: 24 }, (_, idx) => idx.toString().padStart(2, '0'));
 const PICKER_MINUTES = Array.from({ length: 60 }, (_, idx) => idx.toString().padStart(2, '0'));
 
-function TimePickerField({
-  value,
+function TimeRangePickerField({
+  startValue,
+  endValue,
   onChange,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  startValue: string;
+  endValue: string;
+  onChange: (field: 'startTime' | 'endTime', value: string) => void;
 }) {
-  const normalized = parseTimeTo24h(value);
-  const [hour, minute] = normalized.split(':');
+  const normalizedStart = parseTimeTo24h(startValue);
+  const normalizedEnd = parseTimeTo24h(endValue);
+  const [open, setOpen] = useState(false);
+  const [activeField, setActiveField] = useState<'startTime' | 'endTime'>('startTime');
 
-  const updatePart = (nextHour: string, nextMinute: string) => {
-    onChange(`${nextHour}:${nextMinute}`);
+  const activeValue = activeField === 'startTime' ? normalizedStart : normalizedEnd;
+  const [hour, minute] = activeValue.split(':');
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setActiveField('startTime');
+    }
+  };
+
+  const updatePart = (part: 'hour' | 'minute', value: string) => {
+    const [currentHour, currentMinute] = activeValue.split(':');
+    const nextHour = part === 'hour' ? value : currentHour;
+    const nextMinute = part === 'minute' ? value : currentMinute;
+    const nextTime = `${nextHour}:${nextMinute}`;
+
+    onChange(activeField, nextTime);
+
+    if (activeField === 'startTime') {
+      setActiveField('endTime');
+    } else {
+      setOpen(false);
+    }
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full flex items-center justify-start gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
-          aria-label="Open time picker"
+          className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Open time range picker"
         >
-          <span>{normalized}</span>
+          <span>{normalizedStart} - {normalizedEnd}</span>
           <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-2">
+      <PopoverContent align="start" className="w-auto p-2 space-y-2">
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className={cn(
+              'px-2 py-1 rounded text-xs border',
+              activeField === 'startTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
+            )}
+            onClick={() => setActiveField('startTime')}
+          >
+            Start
+          </button>
+          <button
+            type="button"
+            className={cn(
+              'px-2 py-1 rounded text-xs border',
+              activeField === 'endTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
+            )}
+            onClick={() => setActiveField('endTime')}
+          >
+            End
+          </button>
+        </div>
+
         <div className="flex gap-2">
           <select
             className="h-28 w-14 bg-background border border-input rounded text-xs"
             value={hour}
-            onChange={(e) => updatePart(e.target.value, minute)}
+            onChange={(e) => updatePart('hour', e.target.value)}
             size={6}
           >
             {PICKER_HOURS.map((h) => (
@@ -70,7 +118,7 @@ function TimePickerField({
           <select
             className="h-28 w-14 bg-background border border-input rounded text-xs"
             value={minute}
-            onChange={(e) => updatePart(hour, e.target.value)}
+            onChange={(e) => updatePart('minute', e.target.value)}
             size={6}
           >
             {PICKER_MINUTES.map((m) => (
@@ -82,6 +130,7 @@ function TimePickerField({
     </Popover>
   );
 }
+
 
 interface TimelineViewProps {
   timeSlots: TimeSlot[];
@@ -413,34 +462,6 @@ function TimeSlotRow({
   const scale = slot.task ? getDurationScale(durationMin) : 1;
   const baseHeight = 32; // px, standard min-height
   const scaledHeight = Math.round(baseHeight * scale);
-  const [startInput, setStartInput] = useState(parseTimeTo24h(slot.startTime));
-  const [endInput, setEndInput] = useState(parseTimeTo24h(slot.endTime));
-
-  React.useEffect(() => {
-    setStartInput(parseTimeTo24h(slot.startTime));
-  }, [slot.startTime]);
-
-  React.useEffect(() => {
-    setEndInput(parseTimeTo24h(slot.endTime));
-  }, [slot.endTime]);
-
-  const commitTimeChange = (
-    field: 'startTime' | 'endTime',
-    inputValue: string,
-    setInput: React.Dispatch<React.SetStateAction<string>>,
-    fallbackValue: string,
-  ) => {
-    const normalized = normalizeTimeInput(inputValue);
-    const fallback = parseTimeTo24h(fallbackValue);
-    if (!normalized) {
-      setInput(fallback);
-      return;
-    }
-    setInput(normalized);
-    if (normalized !== fallback) {
-      onUpdateSlotTime(slot.id, field, normalized);
-    }
-  };
 
   return (
     <div className="flex items-stretch gap-1 group">
@@ -448,14 +469,11 @@ function TimeSlotRow({
         className="flex items-center gap-0.5 flex-shrink-0 overflow-hidden"
         style={{ width: timeColumnWidth }}
       >
-        <div className="flex flex-col min-w-0">
-          <TimePickerField
-            value={slot.startTime}
-            onChange={(value) => onUpdateSlotTime(slot.id, 'startTime', value)}
-          />
-          <TimePickerField
-            value={slot.endTime}
-            onChange={(value) => onUpdateSlotTime(slot.id, 'endTime', value)}
+        <div className="flex flex-col min-w-0 w-full">
+          <TimeRangePickerField
+            startValue={slot.startTime}
+            endValue={slot.endTime}
+            onChange={(field, value) => onUpdateSlotTime(slot.id, field, value)}
           />
         </div>
       </div>
