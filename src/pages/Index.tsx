@@ -44,6 +44,7 @@ import {
   saveMinimized,
   savePosition,
   saveSize,
+  shouldApplyCloudValue,
   subscribeToCloudWindowPositions,
   syncToCloud,
 } from '@/lib/windowPersistence';
@@ -333,6 +334,7 @@ export default function Index() {
         const value = cloudPositions[storageKey] as { x?: number; y?: number } | undefined;
         if (!value || !Number.isFinite(value.x) || !Number.isFinite(value.y)) return;
         const nextPosition = { x: Number(value.x), y: Number(value.y) };
+        if (!shouldApplyCloudValue(user.id, storageKey, nextPosition)) return;
         savePosition(storageKey, nextPosition);
         setter(nextPosition);
       };
@@ -343,6 +345,7 @@ export default function Index() {
         const value = cloudPositions[storageKey] as { width?: number; height?: number } | undefined;
         if (!value || !Number.isFinite(value.width) || !Number.isFinite(value.height)) return;
         const nextSize = { width: Number(value.width), height: Number(value.height) };
+        if (!shouldApplyCloudValue(user.id, storageKey, nextSize)) return;
         saveSize(storageKey, nextSize);
         setter(nextSize);
       };
@@ -352,6 +355,7 @@ export default function Index() {
       ) => {
         const value = cloudPositions[storageKey];
         if (typeof value !== 'boolean') return;
+        if (!shouldApplyCloudValue(user.id, storageKey, value)) return;
         saveMinimized(storageKey, value);
         setter(value);
       };

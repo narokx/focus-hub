@@ -33,6 +33,8 @@ const ALL_WINDOW_LAYOUT_KEYS = [
 ] as const;
 const pendingByUser = new Map<string, WindowPositionsPayload>();
 const timersByUser = new Map<string, ReturnType<typeof setTimeout>>();
+const localWriteTimestampsByUser = new Map<string, Map<string, number>>();
+const REMOTE_RECONCILE_COOLDOWN_MS = 4000;
 const SUPABASE_URL = (() => {
   try {
     return new URL(import.meta.env.VITE_SUPABASE_URL ?? 'https://wjnsfhvwrsfzpwghjjnh.supabase.co').origin;
@@ -46,6 +48,40 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 const parseWindowPositions = (value: unknown): WindowPositionsPayload => {
   if (!value || typeof value !== 'object') return {};
   return value as WindowPositionsPayload;
+};
+
+const isEqualPersistValue = (a: WindowPersistValue | undefined, b: WindowPersistValue | undefined): boolean => {
+  if (typeof a === 'boolean' || typeof b === 'boolean') return a === b;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+
+  const aPosition = a as Position;
+  const bPosition = b as Position;
+  if (Number.isFinite(aPosition.x) || Number.isFinite(aPosition.y) || Number.isFinite(bPosition.x) || Number.isFinite(bPosition.y)) {
+    return aPosition.x === bPosition.x && aPosition.y === bPosition.y;
+  }
+
+  const aSize = a as Size;
+  const bSize = b as Size;
+  return aSize.width === bSize.width && aSize.height === bSize.height;
+};
+
+const markLocalWindowMutation = (userId: string, key: string) => {
+  const byKey = localWriteTimestampsByUser.get(userId) ?? new Map<string, number>();
+  byKey.set(key, Date.now());
+  localWriteTimestampsByUser.set(userId, byKey);
+};
+
+export const shouldApplyCloudValue = (userId: string, key: string, nextValue: WindowPersistValue): boolean => {
+  const pending = pendingByUser.get(userId);
+  const pendingValue = pending?.[key];
+  if (pendingValue !== undefined && !isEqualPersistValue(pendingValue, nextValue)) {
+    return false;
+  }
+
+  const localWriteAt = localWriteTimestampsByUser.get(userId)?.get(key);
+  if (!localWriteAt) return true;
+
+  return Date.now() - localWriteAt > REMOTE_RECONCILE_COOLDOWN_MS;
 };
 
 const readLocalWindowPositions = (): WindowPositionsPayload => {
@@ -192,6 +228,8 @@ export const saveMinimized = (key: string, minimized: boolean): void => {
 
 export const syncToCloud = (userId: string, key: string, value: WindowPersistValue): void => {
   if (!userId) return;
+
+  markLocalWindowMutation(userId, key);
 
   const pending = pendingByUser.get(userId) ?? {};
   const localSnapshot = readLocalWindowPositions();

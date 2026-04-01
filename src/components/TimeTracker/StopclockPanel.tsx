@@ -10,6 +10,7 @@ import {
   getStoredSize,
   savePosition,
   saveSize,
+  shouldApplyCloudValue,
   subscribeToCloudWindowPositions,
   syncToCloud,
 } from '@/lib/windowPersistence';
@@ -86,15 +87,19 @@ export function StopclockPanel({ tasks = [], taskNameById = {}, onClose }: Stopc
       const positionValue = cloudPositions[POSITION_KEY] as { x?: number; y?: number } | undefined;
       if (positionValue && Number.isFinite(positionValue.x) && Number.isFinite(positionValue.y)) {
         const nextPosition = { x: Number(positionValue.x), y: Number(positionValue.y) };
-        savePosition(POSITION_KEY, nextPosition);
-        setPosition(nextPosition);
+        if (shouldApplyCloudValue(user.id, POSITION_KEY, nextPosition)) {
+          savePosition(POSITION_KEY, nextPosition);
+          setPosition(nextPosition);
+        }
       }
 
       const sizeValue = cloudPositions[SIZE_KEY] as { width?: number; height?: number } | undefined;
       if (sizeValue && Number.isFinite(sizeValue.width) && Number.isFinite(sizeValue.height)) {
         const nextSize = { width: Number(sizeValue.width), height: Number(sizeValue.height) };
-        saveSize(SIZE_KEY, nextSize);
-        setSize(nextSize);
+        if (shouldApplyCloudValue(user.id, SIZE_KEY, nextSize)) {
+          saveSize(SIZE_KEY, nextSize);
+          setSize(nextSize);
+        }
       }
     };
 
