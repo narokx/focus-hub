@@ -34,6 +34,7 @@ export interface TimeSlot {
   id: string;
   startTime: string;
   endTime: string;
+  locked?: boolean;
   task?: TimeSlotTask | null;
 }
 
@@ -210,6 +211,7 @@ export function generateDefaultTimeSlots(): TimeSlot[] {
       id: `ts-${i}`,
       startTime: formatHour(startHour),
       endTime: formatHour(endHour),
+      locked: false,
       task: null,
     });
   }

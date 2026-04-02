@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { timeToMinutes } from '@/lib/utils';
+import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 export function useSupabaseCalendar() {
@@ -24,7 +25,7 @@ export function useSupabaseCalendar() {
         .order('order_index', { ascending: true }),
       supabase
         .from('calendar_events')
-        .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
+        .select('id, date, start_time, end_time, task_id, completed, subtasks, locked, tasks(id, name, color)')
         .eq('user_id', user.id)
         .order('start_time', { ascending: true }),
     ]);
@@ -81,6 +82,7 @@ export function useSupabaseCalendar() {
             id: e.id,
             startTime: parseTimeTo24h(e.start_time),
             endTime: parseTimeTo24h(e.end_time),
+            locked: !!(e as any).locked,
             task: task ? {
               id: `dst-${e.id}`,
               taskId: task.id,
@@ -106,7 +108,7 @@ export function useSupabaseCalendar() {
         timeSlots = defaultSlots;
       }
 
-      cal[date] = { date, tasks, timeSlots, dayColor, isCustomColor };
+      cal[date] = { date, tasks, timeSlots: timeSlots.map(normalizeSlotLock), dayColor, isCustomColor };
     }
 
     setCalendar(cal);
@@ -175,6 +177,7 @@ export function useSupabaseCalendar() {
               start_time: parseTimeTo24h(slot.startTime),
               end_time: parseTimeTo24h(slot.endTime),
               completed: slot.task.completed || false,
+              locked: !!slot.locked,
             });
           }
         }
@@ -527,6 +530,7 @@ export function useSupabaseCalendar() {
         start_time: parseTimeTo24h(slot.startTime),
         end_time: parseTimeTo24h(slot.endTime),
         completed: false,
+        locked: !!slot.locked,
       }).select('id').maybeSingle();
 
       if (error || !data) {
@@ -639,7 +643,7 @@ export function useSupabaseCalendar() {
         ...prev,
         [date]: {
           ...dayData,
-          timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', task: null }],
+          timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', locked: true, task: null }],
         },
       };
     });
@@ -667,9 +671,9 @@ export function useSupabaseCalendar() {
       const dayData = prev[date];
       if (!dayData) return prev;
 
-      const updatedSlots = dayData.timeSlots
-        .map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
-        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      const updatedSlots = sortTimeSlotsRespectingLocks(
+        dayData.timeSlots.map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
+      );
 
       return {
         ...prev,
@@ -683,6 +687,33 @@ export function useSupabaseCalendar() {
       const { error } = await supabase.from('calendar_events').update({ [dbField]: parseTimeTo24h(value) }).eq('id', slotId);
       if (error) {
         console.error('Failed to update slot time:', error);
+        fetchCalendar();
+      }
+    }
+  }, [fetchCalendar]);
+
+  const toggleDaySlotLock = useCallback(async (date: string, slotId: string) => {
+    let nextLocked = false;
+
+    setCalendar(prev => {
+      const dayData = prev[date];
+      if (!dayData) return prev;
+
+      const updated = dayData.timeSlots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+        nextLocked = !slot.locked;
+        return { ...slot, locked: nextLocked };
+      });
+
+      const nextSlots = nextLocked ? updated : sortTimeSlotsRespectingLocks(updated);
+      return { ...prev, [date]: { ...dayData, timeSlots: nextSlots } };
+    });
+
+    const isDbSlot = !slotId.startsWith('ts-');
+    if (isDbSlot) {
+      const { error } = await supabase.from('calendar_events').update({ locked: nextLocked }).eq('id', slotId);
+      if (error) {
+        console.error('Failed to toggle slot lock:', error);
         fetchCalendar();
       }
     }
@@ -804,6 +835,7 @@ export function useSupabaseCalendar() {
           start_time: parseTimeTo24h(targetSlot.startTime),
           end_time: parseTimeTo24h(targetSlot.endTime),
           completed: task.completed || false,
+          locked: !!targetSlot.locked,
         });
       }
     }
@@ -1158,6 +1190,7 @@ export function useSupabaseCalendar() {
           start_time: parseTimeTo24h(rSlot.startTime),
           end_time: parseTimeTo24h(rSlot.endTime),
           completed: false,
+          locked: !!rSlot.locked,
         });
       }
     });
@@ -1227,6 +1260,7 @@ export function useSupabaseCalendar() {
             start_time: parseTimeTo24h(rSlot.startTime),
             end_time: parseTimeTo24h(rSlot.endTime),
             completed: false,
+            locked: !!rSlot.locked,
           });
         }
       });
@@ -1295,6 +1329,7 @@ export function useSupabaseCalendar() {
     addDayTimeSlot,
     deleteDayTimeSlot,
     updateDaySlotTime,
+    toggleDaySlotLock,
     updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,

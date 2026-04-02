@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, QuickTask, Routine, DayData, DayTask, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
+import { sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
 
 const STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -51,6 +52,7 @@ function normalizeTimeSlots(timeSlots?: TimeSlot[]): TimeSlot[] {
     ...slot,
     startTime: parseTimeTo24h(slot.startTime),
     endTime: parseTimeTo24h(slot.endTime),
+    locked: !!slot.locked,
   }));
 }
 
@@ -273,7 +275,7 @@ export function useAppState(
       ...prev,
       routines: prev.routines.map(r =>
         r.id === routineId
-          ? { ...r, timeSlots: [...r.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', task: null }] }
+          ? { ...r, timeSlots: [...r.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', locked: true, task: null }] }
           : r
       ),
     }));
@@ -295,9 +297,21 @@ export function useAppState(
       ...prev,
       routines: prev.routines.map(r =>
         r.id === routineId
-          ? { ...r, timeSlots: r.timeSlots.map(s => s.id === slotId ? { ...s, [field]: value } : s) }
+          ? { ...r, timeSlots: sortTimeSlotsRespectingLocks(r.timeSlots.map(s => s.id === slotId ? { ...s, [field]: value } : s)) }
           : r
       ),
+    }));
+  }, []);
+
+  const toggleRoutineSlotLock = useCallback((routineId: string, slotId: string) => {
+    setState(prev => ({
+      ...prev,
+      routines: prev.routines.map(r => {
+        if (r.id !== routineId) return r;
+        const updated = r.timeSlots.map(s => s.id === slotId ? { ...s, locked: !s.locked } : s);
+        const toggled = updated.find(s => s.id === slotId);
+        return { ...r, timeSlots: toggled?.locked ? updated : sortTimeSlotsRespectingLocks(updated) };
+      }),
     }));
   }, []);
 
@@ -451,7 +465,7 @@ export function useAppState(
           ...prev.calendar,
           [date]: {
             ...dayData,
-            timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', task: null }],
+            timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', locked: true, task: null }],
           },
         },
       };
@@ -480,7 +494,23 @@ export function useAppState(
         ...prev,
         calendar: {
           ...prev.calendar,
-          [date]: { ...dayData, timeSlots: dayData.timeSlots.map(s => s.id === slotId ? { ...s, [field]: value } : s) },
+          [date]: { ...dayData, timeSlots: sortTimeSlotsRespectingLocks(dayData.timeSlots.map(s => s.id === slotId ? { ...s, [field]: value } : s)) },
+        },
+      };
+    });
+  }, []);
+
+  const toggleDaySlotLock = useCallback((date: string, slotId: string) => {
+    setState(prev => {
+      const dayData = prev.calendar[date];
+      if (!dayData) return prev;
+      const updated = dayData.timeSlots.map(s => s.id === slotId ? { ...s, locked: !s.locked } : s);
+      const toggled = updated.find(s => s.id === slotId);
+      return {
+        ...prev,
+        calendar: {
+          ...prev.calendar,
+          [date]: { ...dayData, timeSlots: toggled?.locked ? updated : sortTimeSlotsRespectingLocks(updated) },
         },
       };
     });
@@ -634,10 +664,10 @@ export function useAppState(
     addRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, addSubtaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
-    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, updateRoutineSlotTaskName,
+    addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, toggleRoutineSlotLock, updateRoutineSlotTaskName,
     getDayData, addTaskToDay, toggleDayTask, updateDayTask, removeDayTask,
     assignTaskToDaySlot, toggleDaySlotTask, moveDaySlotToUnassigned,
-    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, updateDaySlotTaskName,
+    addDayTimeSlot, deleteDayTimeSlot, updateDaySlotTime, toggleDaySlotLock, updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
     updateWindowPosition, updateWindowTitle,

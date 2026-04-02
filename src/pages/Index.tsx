@@ -92,6 +92,7 @@ export default function Index() {
     addRoutineTimeSlot,
     deleteRoutineTimeSlot,
     updateRoutineSlotTime,
+    toggleRoutineSlotLock,
     updateRoutineSlotTaskName,
     clearRoutineTimeline,
     fetchRoutines,
@@ -114,6 +115,7 @@ export default function Index() {
     addDayTimeSlot,
     deleteDayTimeSlot,
     updateDaySlotTime,
+    toggleDaySlotLock,
     updateDaySlotTaskName,
     moveSlotToSlot: moveCalendarSlotToSlot,
     applyRoutineToDay: applyRoutineToDayCloud,
@@ -747,6 +749,7 @@ export default function Index() {
                 onAddDayTimeSlot={addDayTimeSlot}
                 onDeleteDayTimeSlot={deleteDayTimeSlot}
                 onUpdateDaySlotTime={updateDaySlotTime}
+                onToggleDaySlotLock={toggleDaySlotLock}
                 onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
                 onToggleDaySlotTask={toggleDaySlotTask}
                 onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}
@@ -773,6 +776,7 @@ export default function Index() {
                 onAddRoutineTimeSlot={addRoutineTimeSlot}
                 onDeleteRoutineTimeSlot={deleteRoutineTimeSlot}
                 onUpdateRoutineSlotTime={updateRoutineSlotTime}
+                onToggleRoutineSlotLock={toggleRoutineSlotLock}
                 onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
                 onUpdateRoutineSlotTaskName={async (routineId, slotId, name) => { await updateRoutineSlotTaskName(routineId, slotId, name); fetchTasks(); }}
                 availableTasks={state.quickTasks}
@@ -965,6 +969,7 @@ export default function Index() {
             onAddRoutineTimeSlot={addRoutineTimeSlot}
             onDeleteRoutineTimeSlot={deleteRoutineTimeSlot}
             onUpdateRoutineSlotTime={updateRoutineSlotTime}
+            onToggleRoutineSlotLock={toggleRoutineSlotLock}
             onMoveRoutineSlotToUnassigned={moveRoutineSlotToUnassigned}
             onUpdateRoutineSlotTaskName={async (routineId, slotId, name) => { await updateRoutineSlotTaskName(routineId, slotId, name); fetchTasks(); }}
             availableTasks={state.quickTasks}
@@ -1047,6 +1052,7 @@ export default function Index() {
             onAddDayTimeSlot={addDayTimeSlot}
             onDeleteDayTimeSlot={deleteDayTimeSlot}
             onUpdateDaySlotTime={updateDaySlotTime}
+            onToggleDaySlotLock={toggleDaySlotLock}
             onMoveDaySlotToUnassigned={moveDaySlotToUnassigned}
             onToggleDaySlotTask={toggleDaySlotTask}
             onUpdateDaySlotTaskName={async (date, slotId, name) => { await updateDaySlotTaskName(date, slotId, name); fetchTasks(); }}

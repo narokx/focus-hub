@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
-import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
+import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3, Lock, Unlock } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
 import { TaskChip } from './TaskChip';
 import { TaskNotesModal } from './TaskNotesModal';
@@ -140,6 +140,7 @@ interface TimelineViewProps {
   onAddTimeSlot: () => void;
   onDeleteTimeSlot: (slotId: string) => void;
   onUpdateSlotTime: (slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleSlotLock?: (slotId: string) => void;
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onToggleUnassigned?: (taskId: string) => void;
@@ -428,6 +429,7 @@ function TimeSlotRow({
   showCompleted,
   onDeleteTimeSlot,
   onUpdateSlotTime,
+  onToggleSlotLock,
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onUpdateSlotTaskName,
@@ -437,12 +439,14 @@ function TimeSlotRow({
   onUpdateSubtaskPercentages,
   timeColumnWidth,
   onEmptySlotClick,
+  slotIndex,
 }: {
   slot: TimeSlot;
   droppablePrefix: string;
   showCompleted?: boolean;
   onDeleteTimeSlot: (slotId: string) => void;
   onUpdateSlotTime: (slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleSlotLock?: (slotId: string) => void;
   onRemoveTaskFromSlot: (slotId: string) => void;
   onToggleSlotTask?: (slotId: string) => void;
   onUpdateSlotTaskName?: (slotId: string, name: string) => void;
@@ -452,6 +456,7 @@ function TimeSlotRow({
   onUpdateSubtaskPercentages?: (slotId: string, updatedSubtasks: SubtaskData[]) => Promise<void> | void;
   timeColumnWidth: number;
   onEmptySlotClick?: (slotId: string) => void;
+  slotIndex: number;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
@@ -469,6 +474,15 @@ function TimeSlotRow({
         className="flex items-center gap-0.5 flex-shrink-0 overflow-hidden"
         style={{ width: timeColumnWidth }}
       >
+        <div className="text-[10px] text-muted-foreground/80 w-7 text-right pr-1">#{slotIndex + 1}</div>
+        <button
+          type="button"
+          onClick={() => onToggleSlotLock?.(slot.id)}
+          className="p-0.5 text-muted-foreground hover:text-foreground rounded"
+          title={slot.locked ? 'Unlock slot (auto-sort by time)' : 'Lock slot position'}
+        >
+          {slot.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+        </button>
         <div className="flex flex-col min-w-0 w-full">
           <TimeRangePickerField
             startValue={slot.startTime}
@@ -594,6 +608,7 @@ export function TimelineView({
   onAddTimeSlot,
   onDeleteTimeSlot,
   onUpdateSlotTime,
+  onToggleSlotLock,
   onRemoveTaskFromSlot,
   onToggleSlotTask,
   onToggleUnassigned,
@@ -611,14 +626,16 @@ export function TimelineView({
   return (
     <div className="flex flex-col gap-1.5 h-full">
       <div className="flex flex-col gap-1 flex-1 overflow-auto scrollbar-thin min-h-0">
-        {timeSlots.map(slot => (
+        {timeSlots.map((slot, index) => (
           <TimeSlotRow
             key={slot.id}
             slot={slot}
+            slotIndex={index}
             droppablePrefix={droppablePrefix}
             showCompleted={showCompleted}
             onDeleteTimeSlot={onDeleteTimeSlot}
             onUpdateSlotTime={onUpdateSlotTime}
+            onToggleSlotLock={onToggleSlotLock}
             onRemoveTaskFromSlot={onRemoveTaskFromSlot}
             onToggleSlotTask={onToggleSlotTask}
             onUpdateSlotTaskName={onUpdateSlotTaskName}

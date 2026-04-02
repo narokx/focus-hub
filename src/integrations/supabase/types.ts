@@ -20,6 +20,7 @@ export type Database = {
           date: string
           end_time: string
           id: string
+          locked: boolean | null
           start_time: string
           subtasks: Json | null
           task_id: string | null
@@ -30,6 +31,7 @@ export type Database = {
           date: string
           end_time: string
           id?: string
+          locked?: boolean | null
           start_time: string
           subtasks?: Json | null
           task_id?: string | null
@@ -40,6 +42,7 @@ export type Database = {
           date?: string
           end_time?: string
           id?: string
+          locked?: boolean | null
           start_time?: string
           subtasks?: Json | null
           task_id?: string | null
@@ -130,6 +133,7 @@ export type Database = {
         Row: {
           end_time: string
           id: string
+          locked: boolean | null
           routine_id: string | null
           start_time: string
           subtasks: Json | null
@@ -138,6 +142,7 @@ export type Database = {
         Insert: {
           end_time: string
           id?: string
+          locked?: boolean | null
           routine_id?: string | null
           start_time: string
           subtasks?: Json | null
@@ -146,6 +151,7 @@ export type Database = {
         Update: {
           end_time?: string
           id?: string
+          locked?: boolean | null
           routine_id?: string | null
           start_time?: string
           subtasks?: Json | null
