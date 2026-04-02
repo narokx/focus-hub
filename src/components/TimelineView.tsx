@@ -471,10 +471,10 @@ function TimeSlotRow({
   return (
     <div className="flex items-stretch gap-1 group">
       <div
-        className="flex items-center gap-0.5 flex-shrink-0 overflow-hidden"
-        style={{ width: timeColumnWidth }}
+        className="flex items-center gap-1 flex-shrink-0 min-w-0"
+        style={{ width: timeColumnWidth, minWidth: timeColumnWidth }}
       >
-        <div className="text-[10px] text-muted-foreground/80 w-7 text-right pr-1">#{slotIndex + 1}</div>
+        <div className="text-[10px] text-muted-foreground/80 w-8 text-right pr-1">#{slotIndex + 1}</div>
         <button
           type="button"
           onClick={() => onToggleSlotLock?.(slot.id)}
@@ -598,7 +598,7 @@ function UnassignedZone({
   );
 }
 
-const DEFAULT_TIME_COL = 64;
+const DEFAULT_TIME_COL = 108;
 
 export function TimelineView({
   timeSlots,

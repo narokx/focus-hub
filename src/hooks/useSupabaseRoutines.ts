@@ -612,18 +612,47 @@ export function useSupabaseRoutines() {
         : r
     ));
 
-    const { error } = await insertRoutineSlotsWithLegacyFallback([{
-      routine_id: routineId,
-      start_time: '12:00',
-      end_time: '13:00',
-      task_id: null,
-      locked: true,
-    }]);
+    let insertRes = await supabase
+      .from('routine_time_slots')
+      .insert({
+        routine_id: routineId,
+        start_time: '12:00',
+        end_time: '13:00',
+        task_id: null,
+        locked: true,
+      })
+      .select('id')
+      .maybeSingle();
 
-    if (error) {
-      console.error('Failed to add routine time slot:', error);
+    if (insertRes.error && isMissingLockedColumnError(insertRes.error)) {
+      insertRes = await supabase
+        .from('routine_time_slots')
+        .insert({
+          routine_id: routineId,
+          start_time: '12:00',
+          end_time: '13:00',
+          task_id: null,
+        })
+        .select('id')
+        .maybeSingle();
     }
-    fetchRoutines();
+
+    if (insertRes.error || !insertRes.data) {
+      console.error('Failed to add routine time slot:', insertRes.error);
+      fetchRoutines();
+      return;
+    }
+
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? {
+            ...r,
+            timeSlots: r.timeSlots.map(slot =>
+              slot.id === tempId ? { ...slot, id: insertRes.data!.id, locked: true } : slot
+            ),
+          }
+        : r
+    ));
   }, [fetchRoutines]);
 
   const deleteRoutineTimeSlot = useCallback(async (routineId: string, slotId: string) => {
