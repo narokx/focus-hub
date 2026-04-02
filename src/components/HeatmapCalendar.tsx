@@ -25,6 +25,7 @@ interface HeatmapCalendarProps {
   onAddDayTimeSlot: (date: string) => void;
   onDeleteDayTimeSlot: (date: string, slotId: string) => void;
   onUpdateDaySlotTime: (date: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleDaySlotLock: (date: string, slotId: string) => void;
   onMoveDaySlotToUnassigned: (date: string, slotId: string) => void;
   onToggleDaySlotTask: (date: string, slotId: string) => void;
   onUpdateDaySlotTaskName?: (date: string, slotId: string, name: string) => void;
@@ -141,6 +142,7 @@ export function HeatmapCalendar({
   onAddDayTimeSlot,
   onDeleteDayTimeSlot,
   onUpdateDaySlotTime,
+  onToggleDaySlotLock,
   onMoveDaySlotToUnassigned,
   onToggleDaySlotTask,
   onUpdateDaySlotTaskName,
@@ -273,6 +275,7 @@ export function HeatmapCalendar({
                 onAddTimeSlot={() => onAddDayTimeSlot(selectedDate!)}
                 onDeleteTimeSlot={(slotId) => onDeleteDayTimeSlot(selectedDate!, slotId)}
                 onUpdateSlotTime={(slotId, field, value) => onUpdateDaySlotTime(selectedDate!, slotId, field, value)}
+                onToggleSlotLock={(slotId) => onToggleDaySlotLock(selectedDate!, slotId)}
                 onRemoveTaskFromSlot={(slotId) => onMoveDaySlotToUnassigned(selectedDate!, slotId)}
                 onToggleSlotTask={(slotId) => onToggleDaySlotTask(selectedDate!, slotId)}
                 onToggleUnassigned={(taskId) => onToggleDayTask(selectedDate!, taskId)}

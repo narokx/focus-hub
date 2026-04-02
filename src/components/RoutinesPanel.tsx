@@ -19,6 +19,7 @@ interface RoutinesPanelProps {
   onAddRoutineTimeSlot: (routineId: string) => void;
   onDeleteRoutineTimeSlot: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleRoutineSlotLock: (routineId: string, slotId: string) => void;
   onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
@@ -39,6 +40,7 @@ function RoutineItemContent({
   onAddRoutineTimeSlot,
   onDeleteRoutineTimeSlot,
   onUpdateRoutineSlotTime,
+  onToggleRoutineSlotLock,
   onMoveRoutineSlotToUnassigned,
   onUpdateRoutineSlotTaskName,
   availableTasks,
@@ -61,6 +63,7 @@ function RoutineItemContent({
   onAddRoutineTimeSlot: (routineId: string) => void;
   onDeleteRoutineTimeSlot: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleRoutineSlotLock: (routineId: string, slotId: string) => void;
   onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
@@ -168,6 +171,7 @@ function RoutineItemContent({
             onAddTimeSlot={() => onAddRoutineTimeSlot(routine.id)}
             onDeleteTimeSlot={(slotId) => onDeleteRoutineTimeSlot(routine.id, slotId)}
             onUpdateSlotTime={(slotId, field, value) => onUpdateRoutineSlotTime(routine.id, slotId, field, value)}
+            onToggleSlotLock={(slotId) => onToggleRoutineSlotLock(routine.id, slotId)}
             onRemoveTaskFromSlot={(slotId) => onMoveRoutineSlotToUnassigned(routine.id, slotId)}
             onRemoveUnassigned={(taskId) => onRemoveTaskFromRoutine(routine.id, taskId)}
             onUpdateSlotTaskName={onUpdateRoutineSlotTaskName ? (slotId, name) => onUpdateRoutineSlotTaskName(routine.id, slotId, name) : undefined}
@@ -230,6 +234,7 @@ function DraggableRoutineItem(props: {
   onAddRoutineTimeSlot: (routineId: string) => void;
   onDeleteRoutineTimeSlot: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleRoutineSlotLock: (routineId: string, slotId: string) => void;
   onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
@@ -273,6 +278,7 @@ function SortableRoutineItem(props: {
   onAddRoutineTimeSlot: (routineId: string) => void;
   onDeleteRoutineTimeSlot: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTime: (routineId: string, slotId: string, field: 'startTime' | 'endTime', value: string) => void;
+  onToggleRoutineSlotLock: (routineId: string, slotId: string) => void;
   onMoveRoutineSlotToUnassigned: (routineId: string, slotId: string) => void;
   onUpdateRoutineSlotTaskName?: (routineId: string, slotId: string, name: string) => void;
   availableTasks?: QuickTask[];
@@ -327,6 +333,7 @@ export function RoutinesPanel({
   onAddRoutineTimeSlot,
   onDeleteRoutineTimeSlot,
   onUpdateRoutineSlotTime,
+  onToggleRoutineSlotLock,
   onMoveRoutineSlotToUnassigned,
   onUpdateRoutineSlotTaskName,
   availableTasks,
@@ -401,6 +408,7 @@ export function RoutinesPanel({
                 onAddRoutineTimeSlot={onAddRoutineTimeSlot}
                 onDeleteRoutineTimeSlot={onDeleteRoutineTimeSlot}
                 onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
+                onToggleRoutineSlotLock={onToggleRoutineSlotLock}
                 onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
                 onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
                 availableTasks={availableTasks}
@@ -424,6 +432,7 @@ export function RoutinesPanel({
                 onAddRoutineTimeSlot={onAddRoutineTimeSlot}
                 onDeleteRoutineTimeSlot={onDeleteRoutineTimeSlot}
                 onUpdateRoutineSlotTime={onUpdateRoutineSlotTime}
+                onToggleRoutineSlotLock={onToggleRoutineSlotLock}
                 onMoveRoutineSlotToUnassigned={onMoveRoutineSlotToUnassigned}
                 onUpdateRoutineSlotTaskName={onUpdateRoutineSlotTaskName}
                 availableTasks={availableTasks}

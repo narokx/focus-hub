@@ -3,9 +3,53 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
-import { timeToMinutes } from '@/lib/utils';
+import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
+
+function isMissingLockedColumnError(error: any): boolean {
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+  return (message.includes('locked') || details.includes('locked')) && (message.includes('column') || details.includes('column'));
+}
+
+async function fetchRoutineSlotsWithLegacyFallback() {
+  const withLocked = await supabase
+    .from('routine_time_slots')
+    .select('id, routine_id, start_time, end_time, task_id, subtasks, locked, tasks(id, name, color)')
+    .order('start_time', { ascending: true });
+
+  if (!withLocked.error) {
+    return { data: withLocked.data || [], hasLockedColumn: true };
+  }
+
+  if (!isMissingLockedColumnError(withLocked.error)) {
+    return { data: null, error: withLocked.error, hasLockedColumn: false };
+  }
+
+  const withoutLocked = await supabase
+    .from('routine_time_slots')
+    .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
+    .order('start_time', { ascending: true });
+
+  if (withoutLocked.error) {
+    return { data: null, error: withoutLocked.error, hasLockedColumn: false };
+  }
+
+  return { data: withoutLocked.data || [], hasLockedColumn: false };
+}
+
+async function insertRoutineSlotsWithLegacyFallback(rows: any[]) {
+  if (rows.length === 0) return { error: null as any };
+
+  const withLocked = await supabase.from('routine_time_slots').insert(rows);
+  if (!withLocked.error || !isMissingLockedColumnError(withLocked.error)) {
+    return withLocked;
+  }
+
+  const legacyRows = rows.map(({ locked, ...rest }) => rest);
+  return supabase.from('routine_time_slots').insert(legacyRows);
+}
 
 
 export function useSupabaseRoutines() {
@@ -18,13 +62,8 @@ export function useSupabaseRoutines() {
   const fetchRoutines = useCallback(async () => {
     if (!user) return;
 
-    const routineSlotsWithSubtasksPromise = supabase
-      .from('routine_time_slots')
-      .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
-      .order('start_time', { ascending: true });
-
     // Fetch all three tables in parallel
-    const [routinesRes, tasksRes, slotsWithSubtasksRes] = await Promise.all([
+    const [routinesRes, tasksRes, slotsRes] = await Promise.all([
       supabase
         .from('routines')
         .select('id, name, color, order_index')
@@ -32,10 +71,8 @@ export function useSupabaseRoutines() {
         .order('order_index', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true }),
       supabase.from('routine_tasks').select('id, routine_id, task_id, order_index, tasks(id, name, color)').order('order_index', { ascending: true }),
-      routineSlotsWithSubtasksPromise,
+      fetchRoutineSlotsWithLegacyFallback(),
     ]);
-
-    const slotsRes = slotsWithSubtasksRes;
 
     if (routinesRes.error) {
       console.error('Failed to fetch routines:', routinesRes.error);
@@ -45,8 +82,9 @@ export function useSupabaseRoutines() {
       console.error('Failed to fetch routine tasks:', tasksRes.error);
       return;
     }
-    if (slotsRes.error) {
-      console.error('Failed to fetch routine time slots:', slotsRes.error);
+    const slotsError = (slotsRes as any).error;
+    if (slotsError) {
+      console.error('Failed to fetch routine time slots:', slotsError);
       return;
     }
 
@@ -79,6 +117,7 @@ export function useSupabaseRoutines() {
             id: s.id,
             startTime: parseTimeTo24h(s.start_time),
             endTime: parseTimeTo24h(s.end_time),
+            locked: !!(s as any).locked,
             task: s.task_id && task ? {
               id: `rst-${s.id}`,
               taskId: task.id,
@@ -97,7 +136,7 @@ export function useSupabaseRoutines() {
         name: r.name,
         color: r.color || '#3B82F6',
         tasks: bufferTasks,
-        timeSlots,
+        timeSlots: timeSlots.map(normalizeSlotLock),
       };
     });
 
@@ -180,7 +219,8 @@ export function useSupabaseRoutines() {
 
     // Reconcile task IDs for time slots (only slots with tasks)
     const slotRows = [];
-    for (const slot of routine.timeSlots) {
+    const routineSlots = Array.isArray((routine as any)?.timeSlots) ? routine.timeSlots : [];
+    for (const slot of routineSlots) {
       let taskId: string | null = null;
       if (slot.task) {
         taskId = await reconcileTaskId(slot.task.name, slot.task.color, userId, taskNameMap);
@@ -190,11 +230,12 @@ export function useSupabaseRoutines() {
         start_time: parseTimeTo24h(slot.startTime),
         end_time: parseTimeTo24h(slot.endTime),
         task_id: taskId,
+        locked: !!slot.locked,
       });
     }
 
     if (slotRows.length > 0) {
-      const { error } = await supabase.from('routine_time_slots').insert(slotRows);
+      const { error } = await insertRoutineSlotsWithLegacyFallback(slotRows);
       if (error) console.error('Failed to insert routine_time_slots:', error);
     }
   }
@@ -271,8 +312,9 @@ export function useSupabaseRoutines() {
       start_time: parseTimeTo24h(s.startTime),
       end_time: parseTimeTo24h(s.endTime),
       task_id: null,
+      locked: !!s.locked,
     }));
-    await supabase.from('routine_time_slots').insert(slotRows);
+    await insertRoutineSlotsWithLegacyFallback(slotRows);
 
     // Refetch to get proper IDs
     await fetchRoutines();
@@ -566,21 +608,51 @@ export function useSupabaseRoutines() {
     const tempId = `temp-ts-${Date.now()}`;
     setRoutines(prev => prev.map(r =>
       r.id === routineId
-        ? { ...r, timeSlots: [...r.timeSlots, { id: tempId, startTime: '12:00', endTime: '13:00', task: null }] }
+        ? { ...r, timeSlots: [...r.timeSlots, { id: tempId, startTime: '12:00', endTime: '13:00', locked: true, task: null }] }
         : r
     ));
 
-    const { error } = await supabase.from('routine_time_slots').insert({
-      routine_id: routineId,
-      start_time: '12:00',
-      end_time: '13:00',
-      task_id: null,
-    });
+    let insertRes = await supabase
+      .from('routine_time_slots')
+      .insert({
+        routine_id: routineId,
+        start_time: '12:00',
+        end_time: '13:00',
+        task_id: null,
+        locked: true,
+      })
+      .select('id')
+      .maybeSingle();
 
-    if (error) {
-      console.error('Failed to add routine time slot:', error);
+    if (insertRes.error && isMissingLockedColumnError(insertRes.error)) {
+      insertRes = await supabase
+        .from('routine_time_slots')
+        .insert({
+          routine_id: routineId,
+          start_time: '12:00',
+          end_time: '13:00',
+          task_id: null,
+        })
+        .select('id')
+        .maybeSingle();
     }
-    fetchRoutines();
+
+    if (insertRes.error || !insertRes.data) {
+      console.error('Failed to add routine time slot:', insertRes.error);
+      fetchRoutines();
+      return;
+    }
+
+    setRoutines(prev => prev.map(r =>
+      r.id === routineId
+        ? {
+            ...r,
+            timeSlots: r.timeSlots.map(slot =>
+              slot.id === tempId ? { ...slot, id: insertRes.data!.id, locked: true } : slot
+            ),
+          }
+        : r
+    ));
   }, [fetchRoutines]);
 
   const deleteRoutineTimeSlot = useCallback(async (routineId: string, slotId: string) => {
@@ -601,9 +673,9 @@ export function useSupabaseRoutines() {
     setRoutines(prev => prev.map(r => {
       if (r.id !== routineId) return r;
 
-      const updatedSlots = r.timeSlots
-        .map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
-        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      const updatedSlots = sortTimeSlotsRespectingLocks(
+        r.timeSlots.map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
+      );
 
       return { ...r, timeSlots: updatedSlots };
     }));
@@ -612,6 +684,26 @@ export function useSupabaseRoutines() {
     const { error } = await supabase.from('routine_time_slots').update({ [dbField]: parseTimeTo24h(value) }).eq('id', slotId);
     if (error) {
       console.error('Failed to update routine slot time:', error);
+      fetchRoutines();
+    }
+  }, [fetchRoutines]);
+
+  const toggleRoutineSlotLock = useCallback(async (routineId: string, slotId: string) => {
+    let nextLocked = false;
+
+    setRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+      const updated = r.timeSlots.map(slot => {
+        if (slot.id !== slotId) return slot;
+        nextLocked = !slot.locked;
+        return { ...slot, locked: nextLocked };
+      });
+      return { ...r, timeSlots: nextLocked ? updated : sortTimeSlotsRespectingLocks(updated) };
+    }));
+
+    const { error } = await supabase.from('routine_time_slots').update({ locked: nextLocked }).eq('id', slotId);
+    if (error && !isMissingLockedColumnError(error)) {
+      console.error('Failed to toggle routine slot lock:', error);
       fetchRoutines();
     }
   }, [fetchRoutines]);
@@ -713,6 +805,7 @@ export function useSupabaseRoutines() {
     addRoutineTimeSlot,
     deleteRoutineTimeSlot,
     updateRoutineSlotTime,
+    toggleRoutineSlotLock,
     updateRoutineSlotTaskName,
     clearRoutineTimeline,
     fetchRoutines,

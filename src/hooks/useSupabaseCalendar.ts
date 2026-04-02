@@ -4,8 +4,49 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { timeToMinutes } from '@/lib/utils';
+import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
+
+function isMissingLockedColumnError(error: any): boolean {
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+  return (message.includes('locked') || details.includes('locked')) && (message.includes('column') || details.includes('column'));
+}
+
+async function fetchCalendarEventsWithLegacyFallback(userId: string) {
+  const withLocked = await supabase
+    .from('calendar_events')
+    .select('id, date, start_time, end_time, task_id, completed, subtasks, locked, tasks(id, name, color)')
+    .eq('user_id', userId)
+    .order('start_time', { ascending: true });
+
+  if (!withLocked.error) {
+    return { data: withLocked.data || [] };
+  }
+
+  if (!isMissingLockedColumnError(withLocked.error)) {
+    return { error: withLocked.error, data: null };
+  }
+
+  const withoutLocked = await supabase
+    .from('calendar_events')
+    .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
+    .eq('user_id', userId)
+    .order('start_time', { ascending: true });
+
+  if (withoutLocked.error) return { error: withoutLocked.error, data: null };
+  return { data: withoutLocked.data || [] };
+}
+
+async function insertCalendarEventsWithLegacyFallback(rows: any[]) {
+  if (rows.length === 0) return { error: null as any };
+  const withLocked = await supabase.from('calendar_events').insert(rows);
+  if (!withLocked.error || !isMissingLockedColumnError(withLocked.error)) return withLocked;
+  const legacyRows = rows.map(({ locked, ...rest }) => rest);
+  return supabase.from('calendar_events').insert(legacyRows);
+}
+
 export function useSupabaseCalendar() {
   const { user } = useAuth();
   const [calendar, setCalendar] = useState<Record<string, DayData>>({});
@@ -22,19 +63,16 @@ export function useSupabaseCalendar() {
         .select('id, date, task_id, completed, order_index, day_color, is_custom_color, tasks(id, name, color)')
         .eq('user_id', user.id)
         .order('order_index', { ascending: true }),
-      supabase
-        .from('calendar_events')
-        .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
-        .eq('user_id', user.id)
-        .order('start_time', { ascending: true }),
+      fetchCalendarEventsWithLegacyFallback(user.id),
     ]);
 
     if (bufferRes.error) {
       console.error('Failed to fetch daily_task_buffer:', bufferRes.error);
       return;
     }
-    if (eventsRes.error) {
-      console.error('Failed to fetch calendar_events:', eventsRes.error);
+    const eventsError = (eventsRes as any).error;
+    if (eventsError) {
+      console.error('Failed to fetch calendar_events:', eventsError);
       return;
     }
 
@@ -81,6 +119,7 @@ export function useSupabaseCalendar() {
             id: e.id,
             startTime: parseTimeTo24h(e.start_time),
             endTime: parseTimeTo24h(e.end_time),
+            locked: !!(e as any).locked,
             task: task ? {
               id: `dst-${e.id}`,
               taskId: task.id,
@@ -106,7 +145,7 @@ export function useSupabaseCalendar() {
         timeSlots = defaultSlots;
       }
 
-      cal[date] = { date, tasks, timeSlots, dayColor, isCustomColor };
+      cal[date] = { date, tasks, timeSlots: timeSlots.map(normalizeSlotLock), dayColor, isCustomColor };
     }
 
     setCalendar(cal);
@@ -175,11 +214,12 @@ export function useSupabaseCalendar() {
               start_time: parseTimeTo24h(slot.startTime),
               end_time: parseTimeTo24h(slot.endTime),
               completed: slot.task.completed || false,
+              locked: !!slot.locked,
             });
           }
         }
         if (eventRows.length > 0) {
-          await supabase.from('calendar_events').insert(eventRows);
+          await insertCalendarEventsWithLegacyFallback(eventRows);
         }
       }
 
@@ -520,14 +560,27 @@ export function useSupabaseCalendar() {
       }
     } else {
       // Insert new event
-      const { data, error } = await supabase.from('calendar_events').insert({
+      let insertRes = await supabase.from('calendar_events').insert({
         user_id: user.id,
         date,
         task_id: task.taskId || null,
         start_time: parseTimeTo24h(slot.startTime),
         end_time: parseTimeTo24h(slot.endTime),
         completed: false,
+        locked: !!slot.locked,
       }).select('id').maybeSingle();
+      if (insertRes.error && isMissingLockedColumnError(insertRes.error)) {
+        insertRes = await supabase.from('calendar_events').insert({
+          user_id: user.id,
+          date,
+          task_id: task.taskId || null,
+          start_time: parseTimeTo24h(slot.startTime),
+          end_time: parseTimeTo24h(slot.endTime),
+          completed: false,
+        }).select('id').maybeSingle();
+      }
+
+      const { data, error } = insertRes;
 
       if (error || !data) {
         console.error('Failed to insert calendar event:', error);
@@ -639,7 +692,7 @@ export function useSupabaseCalendar() {
         ...prev,
         [date]: {
           ...dayData,
-          timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', task: null }],
+          timeSlots: [...dayData.timeSlots, { id: `ts-${Date.now()}`, startTime: '12:00', endTime: '13:00', locked: true, task: null }],
         },
       };
     });
@@ -667,9 +720,9 @@ export function useSupabaseCalendar() {
       const dayData = prev[date];
       if (!dayData) return prev;
 
-      const updatedSlots = dayData.timeSlots
-        .map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
-        .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      const updatedSlots = sortTimeSlotsRespectingLocks(
+        dayData.timeSlots.map(s => s.id === slotId ? { ...s, [field]: parseTimeTo24h(value) } : s)
+      );
 
       return {
         ...prev,
@@ -683,6 +736,33 @@ export function useSupabaseCalendar() {
       const { error } = await supabase.from('calendar_events').update({ [dbField]: parseTimeTo24h(value) }).eq('id', slotId);
       if (error) {
         console.error('Failed to update slot time:', error);
+        fetchCalendar();
+      }
+    }
+  }, [fetchCalendar]);
+
+  const toggleDaySlotLock = useCallback(async (date: string, slotId: string) => {
+    let nextLocked = false;
+
+    setCalendar(prev => {
+      const dayData = prev[date];
+      if (!dayData) return prev;
+
+      const updated = dayData.timeSlots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+        nextLocked = !slot.locked;
+        return { ...slot, locked: nextLocked };
+      });
+
+      const nextSlots = nextLocked ? updated : sortTimeSlotsRespectingLocks(updated);
+      return { ...prev, [date]: { ...dayData, timeSlots: nextSlots } };
+    });
+
+    const isDbSlot = !slotId.startsWith('ts-');
+    if (isDbSlot) {
+      const { error } = await supabase.from('calendar_events').update({ locked: nextLocked }).eq('id', slotId);
+      if (error && !isMissingLockedColumnError(error)) {
+        console.error('Failed to toggle slot lock:', error);
         fetchCalendar();
       }
     }
@@ -797,14 +877,15 @@ export function useSupabaseCalendar() {
           completed: task.completed || false,
         }).eq('id', targetSlotId);
       } else {
-        await supabase.from('calendar_events').insert({
+        await insertCalendarEventsWithLegacyFallback([{
           user_id: user.id,
           date: targetDate,
           task_id: task.taskId,
           start_time: parseTimeTo24h(targetSlot.startTime),
           end_time: parseTimeTo24h(targetSlot.endTime),
           completed: task.completed || false,
-        });
+          locked: !!targetSlot.locked,
+        }]);
       }
     }
 
@@ -1158,12 +1239,13 @@ export function useSupabaseCalendar() {
           start_time: parseTimeTo24h(rSlot.startTime),
           end_time: parseTimeTo24h(rSlot.endTime),
           completed: false,
+          locked: !!rSlot.locked,
         });
       }
     });
 
     if (eventRows.length > 0) {
-      const eventsInsert = await supabase.from('calendar_events').insert(eventRows);
+      const eventsInsert = await insertCalendarEventsWithLegacyFallback(eventRows);
       if (eventsInsert.error) {
         console.error('Failed to insert calendar events:', eventsInsert.error);
         return;
@@ -1227,12 +1309,13 @@ export function useSupabaseCalendar() {
             start_time: parseTimeTo24h(rSlot.startTime),
             end_time: parseTimeTo24h(rSlot.endTime),
             completed: false,
+            locked: !!rSlot.locked,
           });
         }
       });
 
       if (eventRows.length > 0) {
-        const eventsInsert = await supabase.from('calendar_events').insert(eventRows);
+        const eventsInsert = await insertCalendarEventsWithLegacyFallback(eventRows);
         if (eventsInsert.error) {
           console.error('Failed to insert calendar events for date:', date, eventsInsert.error);
           continue;
@@ -1295,6 +1378,7 @@ export function useSupabaseCalendar() {
     addDayTimeSlot,
     deleteDayTimeSlot,
     updateDaySlotTime,
+    toggleDaySlotLock,
     updateDaySlotTaskName,
     moveSlotToSlot,
     applyRoutineToDay,
