@@ -7,6 +7,7 @@ import { TaskNotesModal } from './TaskNotesModal';
 import { useTaskNote } from '@/hooks/useTaskNote';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { TaskPickerModal } from './TaskPickerModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toTaskNoteKey } from '@/lib/taskNoteKey';
 import { cn, getContrastColor } from '@/lib/utils';
 
@@ -41,44 +42,31 @@ function TimeRangePickerField({
   const normalizedEnd = parseTimeTo24h(endValue);
   const [open, setOpen] = useState(false);
   const [activeField, setActiveField] = useState<'startTime' | 'endTime'>('startTime');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
 
   const activeValue = activeField === 'startTime' ? normalizedStart : normalizedEnd;
   const [hour, minute] = activeValue.split(':');
 
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      setActiveField('startTime');
+    }
+  }, []);
+
   useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
+    if (!open) {
+      setActiveField('startTime');
+    }
   }, [open]);
 
-  const toggleOpen = () => {
-    setOpen((prev) => {
-      const nextOpen = !prev;
-      if (nextOpen) {
-        setActiveField('startTime');
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
       }
-      return nextOpen;
-    });
-  };
+    };
+  }, []);
 
   const updatePart = (part: 'hour' | 'minute', value: string) => {
     const [currentHour, currentMinute] = activeValue.split(':');
@@ -91,24 +79,36 @@ function TimeRangePickerField({
     if (activeField === 'startTime') {
       setActiveField('endTime');
     } else {
-      setOpen(false);
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+      closeTimeoutRef.current = window.setTimeout(() => {
+        setOpen(false);
+        closeTimeoutRef.current = null;
+      }, 0);
     }
   };
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
-        aria-label="Open time range picker"
-        aria-expanded={open}
-        onClick={toggleOpen}
+    <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+          aria-label="Open time range picker"
+          aria-expanded={open}
+        >
+          <span>{normalizedStart} - {normalizedEnd}</span>
+          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-auto p-2 space-y-2"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onEscapeKeyDown={() => setOpen(false)}
+        onPointerDownOutside={() => setOpen(false)}
       >
-        <span>{normalizedStart} - {normalizedEnd}</span>
-        <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
-      </button>
-      {open && (
-        <div className="absolute left-0 z-50 mt-1 w-auto space-y-2 rounded-md border bg-popover p-2 text-popover-foreground shadow-md outline-none">
           <div className="flex gap-1">
             <button
               type="button"
@@ -154,9 +154,8 @@ function TimeRangePickerField({
               ))}
             </select>
           </div>
-        </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
