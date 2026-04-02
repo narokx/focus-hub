@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { X, Search } from 'lucide-react';
 import { QuickTask, getColorValue } from '@/types';
+import { useEscapeStack } from '@/hooks/useEscapeStack';
 
 interface TaskPickerModalProps {
   tasks: QuickTask[];
@@ -17,6 +18,7 @@ export function TaskPickerModal({
   title = 'Select Task',
   includeUnassigned = false,
 }: TaskPickerModalProps) {
+  useEscapeStack(true, onClose);
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {

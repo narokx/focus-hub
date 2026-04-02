@@ -29,6 +29,7 @@ import { useSupabaseRoutines } from '@/hooks/useSupabaseRoutines';
 import { useSupabaseCalendar } from '@/hooks/useSupabaseCalendar';
 import { useSupabaseNotes } from '@/hooks/useSupabaseNotes';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useEscapeStack } from '@/hooks/useEscapeStack';
 import { useTheme } from '@/hooks/useTheme';
 import { useHistory } from '@/hooks/useHistory';
 import { syncCalendarForHistoryTransition } from '@/lib/supabaseCalendarHistorySync';
@@ -186,6 +187,7 @@ export default function Index() {
   } | null>(null);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isStopclockOpen, setIsStopclockOpen] = useState(false);
+  useEscapeStack(isNotesOpen, () => setIsNotesOpen(false), 'weekly-notes-layer');
 
   // History for undo/redo
   const history = useHistory(state);

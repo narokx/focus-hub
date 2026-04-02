@@ -10,6 +10,7 @@ import { TaskPickerModal } from './TaskPickerModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toTaskNoteKey } from '@/lib/taskNoteKey';
 import { cn, getContrastColor } from '@/lib/utils';
+import { useEscapeStack } from '@/hooks/useEscapeStack';
 
 function getSlotDurationMinutes(startTime: string, endTime: string): number {
   const s = parseTimeTo24h(startTime);
@@ -52,6 +53,8 @@ function TimeRangePickerField({
       setActiveField('startTime');
     }
   };
+
+  useEscapeStack(open, () => setOpen(false));
 
   const updatePart = (part: 'hour' | 'minute', value: string) => {
     const [currentHour, currentMinute] = activeValue.split(':');
@@ -474,7 +477,7 @@ function TimeSlotRow({
         className="flex items-center gap-1 flex-shrink-0 min-w-0"
         style={{ width: timeColumnWidth, minWidth: timeColumnWidth }}
       >
-        <div className="flex items-center justify-end text-[10px] leading-none text-muted-foreground/80 w-9 min-w-9 pr-1">
+        <div className="flex items-center justify-end text-[10px] leading-none text-muted-foreground/80 w-7 min-w-7 pr-0.5">
           #{slotIndex + 1}
         </div>
         <button

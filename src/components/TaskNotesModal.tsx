@@ -3,6 +3,7 @@ import { X, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTaskNote } from '@/hooks/useTaskNote';
+import { useEscapeStack } from '@/hooks/useEscapeStack';
 
 interface TaskNotesModalProps {
   taskId: string;
@@ -12,6 +13,7 @@ interface TaskNotesModalProps {
 }
 
 export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNotesModalProps) {
+  useEscapeStack(true, onClose);
   const { note, save } = useTaskNote(taskId);
   const [draft, setDraft] = useState(note);
   const isMobile = useIsMobile();

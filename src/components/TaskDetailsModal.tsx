@@ -3,6 +3,7 @@ import { Trash2, X } from 'lucide-react';
 import { SubtaskData, TimeSlotTask } from '@/types';
 import { formatMinutes } from '@/lib/utils';
 import { FloatingWindow } from '@/components/FloatingWindow';
+import { useEscapeStack } from '@/hooks/useEscapeStack';
 
 interface TaskDetailsModalProps {
   task: TimeSlotTask;
@@ -22,6 +23,7 @@ export function TaskDetailsModal({
   onRemoveSubtask,
   onUpdateSubtaskPercentages,
 }: TaskDetailsModalProps) {
+  useEscapeStack(true, onClose);
   const [draftSubtasks, setDraftSubtasks] = useState<SubtaskData[]>(task.subtasks || []);
   const defaultPosition = {
     x: Math.max(40, window.innerWidth / 2 - 250),
