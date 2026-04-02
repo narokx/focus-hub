@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
@@ -41,12 +41,29 @@ function TimeRangePickerField({
   const normalizedStart = parseTimeTo24h(startValue);
   const normalizedEnd = parseTimeTo24h(endValue);
   const [open, setOpen] = useState(false);
+  const openCount = useRef(0);
   const [activeField, setActiveField] = useState<'startTime' | 'endTime'>('startTime');
+  console.log('[Picker] open:', open);
+
+  useEffect(() => {
+    if (open) {
+      openCount.current += 1;
+      console.log('[Picker] opened count:', openCount.current);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      console.log('[Picker] cleanup');
+    };
+  }, []);
 
   const activeValue = activeField === 'startTime' ? normalizedStart : normalizedEnd;
   const [hour, minute] = activeValue.split(':');
 
   const handleOpenChange = (nextOpen: boolean) => {
+    console.log('[Picker] open:', nextOpen);
+    console.log('[PickerPopover] open:', nextOpen);
     setOpen(nextOpen);
     if (nextOpen) {
       setActiveField('startTime');
@@ -453,6 +470,7 @@ function TimeSlotRow({
   timeColumnWidth: number;
   onEmptySlotClick?: (slotId: string) => void;
 }) {
+  console.log('[TimelineRow] render');
   const { setNodeRef, isOver } = useDroppable({
     id: `${droppablePrefix}-slot-${slot.id}`,
     data: { type: 'timeslot', prefix: droppablePrefix, slotId: slot.id },
