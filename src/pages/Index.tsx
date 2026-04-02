@@ -436,6 +436,11 @@ export default function Index() {
     setActiveDragData(event.active.data.current as any);
   };
 
+  const resetDragState = useCallback(() => {
+    setActiveId(null);
+    setActiveDragData(null);
+  }, []);
+
   const resolveDaySlotTarget = (prefix: string, slotId: string) => {
     if (!prefix.startsWith('day-')) return null;
     const date = prefix.substring(4);
@@ -445,8 +450,7 @@ export default function Index() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveId(null);
-    setActiveDragData(null);
+    resetDragState();
 
     if (!over) return;
 
@@ -699,6 +703,7 @@ export default function Index() {
         collisionDetection={pointerWithin}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={resetDragState}
       >
         <div className={cn("flex flex-col h-screen bg-background", isApplyingRoutine && "pointer-events-none")}>
           {/* Mobile header */}
@@ -884,6 +889,7 @@ export default function Index() {
       collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={resetDragState}
     >
       <div className={cn("min-h-screen bg-background p-4 overflow-hidden relative", isApplyingRoutine && "pointer-events-none")}>
         <div className="absolute top-4 left-4 z-0 flex items-center gap-2">
