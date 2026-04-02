@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3 } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
@@ -7,7 +7,6 @@ import { TaskNotesModal } from './TaskNotesModal';
 import { useTaskNote } from '@/hooks/useTaskNote';
 import { TaskDetailsModal } from './TaskDetailsModal';
 import { TaskPickerModal } from './TaskPickerModal';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toTaskNoteKey } from '@/lib/taskNoteKey';
 import { cn, getContrastColor } from '@/lib/utils';
 
@@ -42,15 +41,43 @@ function TimeRangePickerField({
   const normalizedEnd = parseTimeTo24h(endValue);
   const [open, setOpen] = useState(false);
   const [activeField, setActiveField] = useState<'startTime' | 'endTime'>('startTime');
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const activeValue = activeField === 'startTime' ? normalizedStart : normalizedEnd;
   const [hour, minute] = activeValue.split(':');
 
-  const handleOpenChange = (nextOpen: boolean) => {
-    setOpen(nextOpen);
-    if (nextOpen) {
-      setActiveField('startTime');
-    }
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  const toggleOpen = () => {
+    setOpen((prev) => {
+      const nextOpen = !prev;
+      if (nextOpen) {
+        setActiveField('startTime');
+      }
+      return nextOpen;
+    });
   };
 
   const updatePart = (part: 'hour' | 'minute', value: string) => {
@@ -69,65 +96,67 @@ function TimeRangePickerField({
   };
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
-          aria-label="Open time range picker"
-        >
-          <span>{normalizedStart} - {normalizedEnd}</span>
-          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-2 space-y-2">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            className={cn(
-              'px-2 py-1 rounded text-xs border',
-              activeField === 'startTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
-            )}
-            onClick={() => setActiveField('startTime')}
-          >
-            Start
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'px-2 py-1 rounded text-xs border',
-              activeField === 'endTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
-            )}
-            onClick={() => setActiveField('endTime')}
-          >
-            End
-          </button>
-        </div>
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+        aria-label="Open time range picker"
+        aria-expanded={open}
+        onClick={toggleOpen}
+      >
+        <span>{normalizedStart} - {normalizedEnd}</span>
+        <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
+      </button>
+      {open && (
+        <div className="absolute left-0 z-50 mt-1 w-auto space-y-2 rounded-md border bg-popover p-2 text-popover-foreground shadow-md outline-none">
+          <div className="flex gap-1">
+            <button
+              type="button"
+              className={cn(
+                'px-2 py-1 rounded text-xs border',
+                activeField === 'startTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
+              )}
+              onClick={() => setActiveField('startTime')}
+            >
+              Start
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2 py-1 rounded text-xs border',
+                activeField === 'endTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
+              )}
+              onClick={() => setActiveField('endTime')}
+            >
+              End
+            </button>
+          </div>
 
-        <div className="flex gap-2">
-          <select
-            className="h-28 w-14 bg-background border border-input rounded text-xs"
-            value={hour}
-            onChange={(e) => updatePart('hour', e.target.value)}
-            size={6}
-          >
-            {PICKER_HOURS.map((h) => (
-              <option key={h} value={h}>{h}</option>
-            ))}
-          </select>
-          <select
-            className="h-28 w-14 bg-background border border-input rounded text-xs"
-            value={minute}
-            onChange={(e) => updatePart('minute', e.target.value)}
-            size={6}
-          >
-            {PICKER_MINUTES.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              className="h-28 w-14 bg-background border border-input rounded text-xs"
+              value={hour}
+              onChange={(e) => updatePart('hour', e.target.value)}
+              size={6}
+            >
+              {PICKER_HOURS.map((h) => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
+            <select
+              className="h-28 w-14 bg-background border border-input rounded text-xs"
+              value={minute}
+              onChange={(e) => updatePart('minute', e.target.value)}
+              size={6}
+            >
+              {PICKER_MINUTES.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 }
 
