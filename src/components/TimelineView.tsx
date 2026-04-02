@@ -474,11 +474,13 @@ function TimeSlotRow({
         className="flex items-center gap-1 flex-shrink-0 min-w-0"
         style={{ width: timeColumnWidth, minWidth: timeColumnWidth }}
       >
-        <div className="text-[10px] text-muted-foreground/80 w-8 text-right pr-1">#{slotIndex + 1}</div>
+        <div className="flex items-center justify-end text-[10px] leading-none text-muted-foreground/80 w-9 min-w-9 pr-1">
+          #{slotIndex + 1}
+        </div>
         <button
           type="button"
           onClick={() => onToggleSlotLock?.(slot.id)}
-          className="p-0.5 text-muted-foreground hover:text-foreground rounded"
+          className="p-0.5 text-muted-foreground hover:text-foreground rounded flex items-center justify-center"
           title={slot.locked ? 'Unlock slot (auto-sort by time)' : 'Lock slot position'}
         >
           {slot.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
