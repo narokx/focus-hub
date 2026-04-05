@@ -96,7 +96,7 @@ const Indent = Extension.create({
 
   addOptions() {
     return {
-      types: ['paragraph', 'heading'],
+      types: ['paragraph', 'heading', 'taskItem'],
     };
   },
 
@@ -127,12 +127,12 @@ const Indent = Extension.create({
   },
 
   addCommands() {
-    const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
+    const getActiveListItem = (state: any): { type: 'listItem' | 'taskItem'; depth: number } | null => {
       const { $from } = state.selection;
       for (let depth = $from.depth; depth > 0; depth -= 1) {
         const nodeName = $from.node(depth).type.name;
         if (nodeName === 'listItem' || nodeName === 'taskItem') {
-          return nodeName;
+          return { type: nodeName, depth };
         }
       }
       return null;
@@ -142,10 +142,24 @@ const Indent = Extension.create({
       (delta: number) =>
       ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
         const { $from } = state.selection;
-        const listItemType = getActiveListItemType(state);
+        const activeListItem = getActiveListItem(state);
 
-        if (listItemType) {
-          return delta > 0 ? editor.commands.sinkListItem(listItemType) : editor.commands.liftListItem(listItemType);
+        if (activeListItem?.type === 'listItem') {
+          return delta > 0
+            ? editor.commands.sinkListItem(activeListItem.type)
+            : editor.commands.liftListItem(activeListItem.type);
+        }
+
+        if (activeListItem?.type === 'taskItem') {
+          const didAdjustListDepth =
+            delta > 0 ? editor.commands.sinkListItem('taskItem') : editor.commands.liftListItem('taskItem');
+          if (didAdjustListDepth) return true;
+
+          const currentLevel = Number($from.node(activeListItem.depth).attrs.indentLevel ?? 0);
+          const nextLevel = Math.max(0, Math.min(MAX_INDENT_LEVEL, currentLevel + delta));
+          if (currentLevel === nextLevel) return true;
+
+          return commands.updateAttributes('taskItem', { indentLevel: nextLevel });
         }
 
         const nodeType = $from.parent.type.name;
