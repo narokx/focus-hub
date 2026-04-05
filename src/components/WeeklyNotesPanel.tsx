@@ -157,6 +157,7 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
     if (content === lastLocalContentRef.current) {
       return;
     }
+    lastLocalContentRef.current = content;
     if (editor.getHTML() !== content) {
       editor.commands.setContent(content, { emitUpdate: false });
     }
