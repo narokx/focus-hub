@@ -17,6 +17,7 @@ import {
   Italic,
   List,
   Plus,
+  Trash2,
   Underline as UnderlineIcon,
 } from 'lucide-react';
 
@@ -247,6 +248,7 @@ interface WeeklyNotesPanelProps {
   onSaveCurrentPage: (content: string) => void;
   onSetPage: (index: number) => void;
   onAddPage: () => void;
+  onDeletePage: (index: number) => void;
   isLoading: boolean;
 }
 
@@ -257,6 +259,7 @@ export function WeeklyNotesPanel({
   onSaveCurrentPage,
   onSetPage,
   onAddPage,
+  onDeletePage,
   isLoading,
 }: WeeklyNotesPanelProps) {
   const userIsInteracting = useRef(false);
@@ -329,6 +332,15 @@ export function WeeklyNotesPanel({
     if (!editor) return;
     onSaveCurrentPage(editor.getHTML());
     onAddPage();
+  };
+
+  const canDeletePage = totalPages > 1;
+
+  const handleDeletePage = () => {
+    if (!editor || !canDeletePage) return;
+    if (!window.confirm('Are you sure you want to delete this page?')) return;
+    onSaveCurrentPage(editor.getHTML());
+    onDeletePage(currentPageIndex);
   };
 
   if (!editor) {
@@ -506,6 +518,16 @@ export function WeeklyNotesPanel({
             aria-label="Next page"
           >
             <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleDeletePage}
+            disabled={!canDeletePage}
+            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Delete current page"
+            title={canDeletePage ? 'Delete current page' : 'Cannot delete the only page'}
+          >
+            <Trash2 className="h-4 w-4" />
           </button>
           <button
             type="button"

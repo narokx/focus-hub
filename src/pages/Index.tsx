@@ -134,6 +134,7 @@ export default function Index() {
     saveCurrentPage: saveWeeklyPage,
     setPage: setWeeklyPage,
     addPage: addWeeklyPage,
+    deletePage: deleteWeeklyPage,
     refresh: refreshNotes,
   } = useSupabaseNotes();
 
@@ -884,6 +885,7 @@ export default function Index() {
                 onSaveCurrentPage={saveWeeklyPage}
                 onSetPage={setWeeklyPage}
                 onAddPage={addWeeklyPage}
+                onDeletePage={deleteWeeklyPage}
                 isLoading={notesLoading}
               />
             </div>
@@ -1125,6 +1127,7 @@ export default function Index() {
               onSaveCurrentPage={saveWeeklyPage}
               onSetPage={setWeeklyPage}
               onAddPage={addWeeklyPage}
+              onDeletePage={deleteWeeklyPage}
               isLoading={notesLoading}
             />
           </FloatingWindow>

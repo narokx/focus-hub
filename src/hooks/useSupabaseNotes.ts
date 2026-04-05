@@ -165,6 +165,25 @@ export function useSupabaseNotes() {
     });
   }, [loading, queuePersist]);
 
+  const deletePage = useCallback((index: number) => {
+    if (!isReady.current || loading) return;
+
+    setPages((prev) => {
+      const safe = normalizePages(prev);
+      if (safe.length <= 1) {
+        return safe;
+      }
+
+      const boundedIndex = Math.min(Math.max(index, 0), safe.length - 1);
+      const next = safe.filter((_, pageIndex) => pageIndex !== boundedIndex);
+      const nextIndex = Math.max(0, Math.min(boundedIndex - 1, next.length - 1));
+      setCurrentPageIndex(nextIndex);
+      localStorage.setItem(LOCAL_NOTES_PAGE_INDEX_KEY, String(nextIndex));
+      queuePersist(next);
+      return next;
+    });
+  }, [loading, queuePersist]);
+
   const fetchOrCreateNote = useCallback(async () => {
     isReady.current = false;
 
@@ -314,6 +333,7 @@ export function useSupabaseNotes() {
     saveCurrentPage,
     setPage,
     addPage,
+    deletePage,
     refresh: fetchOrCreateNote,
   };
 }
