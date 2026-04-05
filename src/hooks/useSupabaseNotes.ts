@@ -4,6 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 
 const LOCAL_NOTES_KEY = 'productivity-weekly-notes';
 const LOCAL_NOTES_UPDATED_KEY = 'productivity-weekly-notes-updated-at';
+const LOCAL_NOTES_CLIENT_ID_KEY = 'productivity-weekly-notes-client-id';
+
+function createClientId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function useSupabaseNotes() {
   const { user } = useAuth();
@@ -13,12 +22,23 @@ export function useSupabaseNotes() {
   const isReady = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef('');
-  const ignoreNextRealtimeUpdate = useRef(false);
-  const realtimeIgnoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clientIdRef = useRef(createClientId());
 
   useEffect(() => {
     latestContentRef.current = content;
   }, [content]);
+
+  useEffect(() => {
+    const existingClientId = localStorage.getItem(LOCAL_NOTES_CLIENT_ID_KEY);
+    if (existingClientId) {
+      clientIdRef.current = existingClientId;
+      return;
+    }
+
+    const generatedClientId = createClientId();
+    clientIdRef.current = generatedClientId;
+    localStorage.setItem(LOCAL_NOTES_CLIENT_ID_KEY, generatedClientId);
+  }, []);
 
   const readLocalUpdatedAt = useCallback(() => {
     const raw = localStorage.getItem(LOCAL_NOTES_UPDATED_KEY);
@@ -30,21 +50,13 @@ export function useSupabaseNotes() {
     async (nextContent: string) => {
       if (!user) return;
 
-      ignoreNextRealtimeUpdate.current = true;
-      if (realtimeIgnoreTimeoutRef.current) {
-        clearTimeout(realtimeIgnoreTimeoutRef.current);
-      }
-      realtimeIgnoreTimeoutRef.current = setTimeout(() => {
-        ignoreNextRealtimeUpdate.current = false;
-        realtimeIgnoreTimeoutRef.current = null;
-      }, 2000);
-
       const { data, error } = await supabase
         .from('user_notes')
         .upsert(
           {
             user_id: user.id,
             content: nextContent,
+            last_client_id: clientIdRef.current,
             updated_at: new Date().toISOString(),
           },
           { onConflict: 'user_id' }
@@ -168,12 +180,8 @@ export function useSupabaseNotes() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          if (ignoreNextRealtimeUpdate.current) {
-            ignoreNextRealtimeUpdate.current = false;
-            if (realtimeIgnoreTimeoutRef.current) {
-              clearTimeout(realtimeIgnoreTimeoutRef.current);
-              realtimeIgnoreTimeoutRef.current = null;
-            }
+          const incomingClientId = (payload.new as { last_client_id?: string | null }).last_client_id;
+          if (incomingClientId && incomingClientId === clientIdRef.current) {
             return;
           }
 
@@ -200,9 +208,6 @@ export function useSupabaseNotes() {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
-      }
-      if (realtimeIgnoreTimeoutRef.current) {
-        clearTimeout(realtimeIgnoreTimeoutRef.current);
       }
     };
   }, []);

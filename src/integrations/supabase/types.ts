@@ -306,18 +306,21 @@ export type Database = {
         Row: {
           content: string
           id: string
+          last_client_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           content?: string
           id?: string
+          last_client_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           content?: string
           id?: string
+          last_client_id?: string | null
           updated_at?: string
           user_id?: string
         }
