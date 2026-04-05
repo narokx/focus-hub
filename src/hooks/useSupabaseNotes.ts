@@ -52,6 +52,7 @@ export function useSupabaseNotes() {
   
   const updateNote = useCallback((nextContent: string) => {
     if (!isReady.current || loading) return;
+    if (nextContent === latestContentRef.current) return;
 
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
