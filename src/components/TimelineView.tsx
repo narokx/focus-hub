@@ -485,6 +485,7 @@ function TimeSlotRow({
           onClick={() => onToggleSlotLock?.(slot.id)}
           className="p-0.5 text-muted-foreground hover:text-foreground rounded flex items-center justify-center"
           title={slot.locked ? 'Unlock slot (auto-sort by time)' : 'Lock slot position'}
+          aria-label={slot.locked ? 'Unlock slot' : 'Lock slot'}
         >
           {slot.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
         </button>
