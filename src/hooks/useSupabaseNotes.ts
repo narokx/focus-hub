@@ -107,7 +107,7 @@ export function useSupabaseNotes() {
 
       const { data: existingRows, error: fetchError } = await supabase
         .from('user_notes')
-        .select('id, content, updated_at, last_client_id')
+        .select('id, content, updated_at')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(1);
