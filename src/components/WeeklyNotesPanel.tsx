@@ -339,7 +339,6 @@ export function WeeklyNotesPanel({
   const handleDeletePage = () => {
     if (!editor || !canDeletePage) return;
     if (!window.confirm('Are you sure you want to delete this page?')) return;
-    onSaveCurrentPage(editor.getHTML());
     onDeletePage(currentPageIndex);
   };
 
