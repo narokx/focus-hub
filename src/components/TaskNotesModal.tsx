@@ -304,7 +304,6 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
           disabled={!canDeletePage}
           onClick={() => {
             if (!window.confirm('Are you sure you want to delete this page?')) return;
-            flushCurrentPage();
             deletePage(currentPageIndex);
           }}
           title={canDeletePage ? 'Delete current page' : 'Cannot delete the only page'}
