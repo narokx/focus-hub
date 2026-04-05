@@ -175,9 +175,22 @@ const Indent = Extension.create({
   },
 
   addKeyboardShortcuts() {
+    const runIndentCommand = (command: () => boolean, event?: KeyboardEvent) => {
+      event?.preventDefault();
+      event?.stopPropagation();
+
+      command();
+
+      if (!this.editor.isFocused) {
+        this.editor.commands.focus();
+      }
+
+      return true;
+    };
+
     return {
-      Tab: () => this.editor.commands.increaseIndent(),
-      'Shift-Tab': () => this.editor.commands.decreaseIndent(),
+      Tab: ({ event }) => runIndentCommand(() => this.editor.commands.increaseIndent(), event),
+      'Shift-Tab': ({ event }) => runIndentCommand(() => this.editor.commands.decreaseIndent(), event),
     };
   },
 });
