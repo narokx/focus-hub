@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
+import { enrichRowsWithTasks } from '@/lib/enrichRowsWithTasks';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 

@@ -5,6 +5,7 @@ import { DayData, DayTask, QuickTask, SubtaskData, TimeSlot, generateDefaultTime
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { timeToMinutes } from '@/lib/utils';
 import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
+import { enrichRowsWithTasks } from '@/lib/enrichRowsWithTasks';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -15,17 +16,6 @@ function isMissingLockedColumnError(error: any): boolean {
 }
 
 async function fetchCalendarEventsWithLegacyFallback(userId: string) {
-  const enrichWithTasks = async (rows: any[]) => {
-    const taskIds = Array.from(new Set(rows.map((row) => row.task_id).filter(Boolean)));
-    if (taskIds.length === 0) return rows.map((row) => ({ ...row, tasks: null }));
-
-    const { data: tasks, error: tasksError } = await supabase.from('tasks').select('id, name, color').in('id', taskIds);
-    if (tasksError) return { error: tasksError, data: null };
-
-    const taskMap = new Map((tasks || []).map((task) => [task.id, task]));
-    return rows.map((row) => ({ ...row, tasks: row.task_id ? taskMap.get(row.task_id) || null : null }));
-  };
-
   const withLockedJoin = await supabase
     .from('calendar_events')
     .select('id, date, start_time, end_time, task_id, completed, subtasks, locked, tasks(id, name, color)')
@@ -51,9 +41,9 @@ async function fetchCalendarEventsWithLegacyFallback(userId: string) {
     .order('start_time', { ascending: true });
 
   if (!withLockedNoJoin.error) {
-    const enriched = await enrichWithTasks(withLockedNoJoin.data || []);
-    if (Array.isArray(enriched)) return { data: enriched };
-    return enriched;
+    const enrichmentResult = await enrichRowsWithTasks(withLockedNoJoin.data || []);
+    if (enrichmentResult.error) return { data: null, error: enrichmentResult.error };
+    return { data: enrichmentResult.data || [] };
   }
 
   if (!isMissingLockedColumnError(withLockedNoJoin.error)) {
@@ -68,9 +58,9 @@ async function fetchCalendarEventsWithLegacyFallback(userId: string) {
 
   if (withoutLockedNoJoin.error) return { error: withoutLockedNoJoin.error, data: null };
 
-  const enriched = await enrichWithTasks(withoutLockedNoJoin.data || []);
-  if (Array.isArray(enriched)) return { data: enriched };
-  return enriched;
+  const enrichmentResult = await enrichRowsWithTasks(withoutLockedNoJoin.data || []);
+  if (enrichmentResult.error) return { data: null, error: enrichmentResult.error };
+  return { data: enrichmentResult.data || [] };
 }
 
 async function insertCalendarEventsWithLegacyFallback(rows: any[]) {
