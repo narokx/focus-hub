@@ -151,10 +151,9 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
 
   useEffect(() => {
     if (!editor) return;
-    if (lastEditorEmittedContentRef.current === content) {
-      lastEditorEmittedContentRef.current = null;
-      return;
-    }
+    const isInternalUpdate = lastEditorEmittedContentRef.current === content;
+    lastEditorEmittedContentRef.current = null;
+    if (isInternalUpdate) return;
 
     if (editor.getHTML() !== content) {
       editor.commands.setContent(content, { emitUpdate: false });
