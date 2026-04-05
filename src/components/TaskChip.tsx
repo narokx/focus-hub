@@ -45,8 +45,8 @@ export function TaskChip({
   const inputRef = useRef<HTMLInputElement>(null);
   const chipRef = useRef<HTMLDivElement>(null);
 
-  const { note } = useTaskNote(noteId || null);
-  const hasNotes = !!note?.trim();
+  const { pages } = useTaskNote(noteId || null);
+  const hasNotes = pages.some((page) => page.trim().length > 0);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id,

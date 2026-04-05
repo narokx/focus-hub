@@ -31,8 +31,8 @@ function SortableTaskChip({ task, onUpdateTask, onDeleteTask }: {
   const chipRef = useRef<HTMLDivElement>(null);
 
   const noteId = toTaskNoteKey(task.id) || `task-${task.id}`;
-  const { note } = useTaskNote(noteId);
-  const hasNotes = !!note?.trim();
+  const { pages } = useTaskNote(noteId);
+  const hasNotes = pages.some((page) => page.trim().length > 0);
 
   const {
     attributes,
