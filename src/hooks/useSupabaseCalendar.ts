@@ -15,28 +15,62 @@ function isMissingLockedColumnError(error: any): boolean {
 }
 
 async function fetchCalendarEventsWithLegacyFallback(userId: string) {
-  const withLocked = await supabase
+  const enrichWithTasks = async (rows: any[]) => {
+    const taskIds = Array.from(new Set(rows.map((row) => row.task_id).filter(Boolean)));
+    if (taskIds.length === 0) return rows.map((row) => ({ ...row, tasks: null }));
+
+    const { data: tasks, error: tasksError } = await supabase.from('tasks').select('id, name, color').in('id', taskIds);
+    if (tasksError) return { error: tasksError, data: null };
+
+    const taskMap = new Map((tasks || []).map((task) => [task.id, task]));
+    return rows.map((row) => ({ ...row, tasks: row.task_id ? taskMap.get(row.task_id) || null : null }));
+  };
+
+  const withLockedJoin = await supabase
     .from('calendar_events')
     .select('id, date, start_time, end_time, task_id, completed, subtasks, locked, tasks(id, name, color)')
     .eq('user_id', userId)
     .order('start_time', { ascending: true });
 
-  if (!withLocked.error) {
-    return { data: withLocked.data || [] };
-  }
+  if (!withLockedJoin.error) return { data: withLockedJoin.data || [] };
 
-  if (!isMissingLockedColumnError(withLocked.error)) {
-    return { error: withLocked.error, data: null };
-  }
+  const withoutLockedJoin = isMissingLockedColumnError(withLockedJoin.error)
+    ? await supabase
+        .from('calendar_events')
+        .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
+        .eq('user_id', userId)
+        .order('start_time', { ascending: true })
+    : null;
 
-  const withoutLocked = await supabase
+  if (withoutLockedJoin && !withoutLockedJoin.error) return { data: withoutLockedJoin.data || [] };
+
+  const withLockedNoJoin = await supabase
     .from('calendar_events')
-    .select('id, date, start_time, end_time, task_id, completed, subtasks, tasks(id, name, color)')
+    .select('id, date, start_time, end_time, task_id, completed, subtasks, locked')
     .eq('user_id', userId)
     .order('start_time', { ascending: true });
 
-  if (withoutLocked.error) return { error: withoutLocked.error, data: null };
-  return { data: withoutLocked.data || [] };
+  if (!withLockedNoJoin.error) {
+    const enriched = await enrichWithTasks(withLockedNoJoin.data || []);
+    if (Array.isArray(enriched)) return { data: enriched };
+    return enriched;
+  }
+
+  if (!isMissingLockedColumnError(withLockedNoJoin.error)) {
+    return { error: withLockedNoJoin.error, data: null };
+  }
+
+  const withoutLockedNoJoin = await supabase
+    .from('calendar_events')
+    .select('id, date, start_time, end_time, task_id, completed, subtasks')
+    .eq('user_id', userId)
+    .order('start_time', { ascending: true });
+
+  if (withoutLockedNoJoin.error) return { error: withoutLockedNoJoin.error, data: null };
+
+  const enriched = await enrichWithTasks(withoutLockedNoJoin.data || []);
+  if (Array.isArray(enriched)) return { data: enriched };
+  return enriched;
 }
 
 async function insertCalendarEventsWithLegacyFallback(rows: any[]) {

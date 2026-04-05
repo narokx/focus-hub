@@ -14,29 +14,62 @@ function isMissingLockedColumnError(error: any): boolean {
 }
 
 async function fetchRoutineSlotsWithLegacyFallback() {
-  const withLocked = await supabase
+  const enrichWithTasks = async (rows: any[]) => {
+    const taskIds = Array.from(new Set(rows.map((row) => row.task_id).filter(Boolean)));
+    if (taskIds.length === 0) return rows.map((row) => ({ ...row, tasks: null }));
+
+    const { data: tasks, error: tasksError } = await supabase.from('tasks').select('id, name, color').in('id', taskIds);
+    if (tasksError) return { data: null, error: tasksError, hasLockedColumn: false };
+
+    const taskMap = new Map((tasks || []).map((task) => [task.id, task]));
+    return rows.map((row) => ({ ...row, tasks: row.task_id ? taskMap.get(row.task_id) || null : null }));
+  };
+
+  const withLockedJoin = await supabase
     .from('routine_time_slots')
     .select('id, routine_id, start_time, end_time, task_id, subtasks, locked, tasks(id, name, color)')
     .order('start_time', { ascending: true });
 
-  if (!withLocked.error) {
-    return { data: withLocked.data || [], hasLockedColumn: true };
+  if (!withLockedJoin.error) return { data: withLockedJoin.data || [], hasLockedColumn: true };
+
+  const withoutLockedJoin = isMissingLockedColumnError(withLockedJoin.error)
+    ? await supabase
+        .from('routine_time_slots')
+        .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
+        .order('start_time', { ascending: true })
+    : null;
+
+  if (withoutLockedJoin && !withoutLockedJoin.error) {
+    return { data: withoutLockedJoin.data || [], hasLockedColumn: false };
   }
 
-  if (!isMissingLockedColumnError(withLocked.error)) {
-    return { data: null, error: withLocked.error, hasLockedColumn: false };
-  }
-
-  const withoutLocked = await supabase
+  const withLockedNoJoin = await supabase
     .from('routine_time_slots')
-    .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
+    .select('id, routine_id, start_time, end_time, task_id, subtasks, locked')
     .order('start_time', { ascending: true });
 
-  if (withoutLocked.error) {
-    return { data: null, error: withoutLocked.error, hasLockedColumn: false };
+  if (!withLockedNoJoin.error) {
+    const enriched = await enrichWithTasks(withLockedNoJoin.data || []);
+    if (Array.isArray(enriched)) return { data: enriched, hasLockedColumn: true };
+    return enriched;
   }
 
-  return { data: withoutLocked.data || [], hasLockedColumn: false };
+  if (!isMissingLockedColumnError(withLockedNoJoin.error)) {
+    return { data: null, error: withLockedNoJoin.error, hasLockedColumn: false };
+  }
+
+  const withoutLockedNoJoin = await supabase
+    .from('routine_time_slots')
+    .select('id, routine_id, start_time, end_time, task_id, subtasks')
+    .order('start_time', { ascending: true });
+
+  if (withoutLockedNoJoin.error) {
+    return { data: null, error: withoutLockedNoJoin.error, hasLockedColumn: false };
+  }
+
+  const enriched = await enrichWithTasks(withoutLockedNoJoin.data || []);
+  if (Array.isArray(enriched)) return { data: enriched, hasLockedColumn: false };
+  return enriched;
 }
 
 async function insertRoutineSlotsWithLegacyFallback(rows: any[]) {

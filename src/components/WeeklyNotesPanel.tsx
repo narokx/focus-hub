@@ -202,7 +202,7 @@ const Indent = Extension.create({
         const listItemType = getActiveListItemType(state);
 
         if (listItemType) {
-          return delta > 0 ? editor.commands.sinkListItem(listItemType) : editor.commands.liftListItem(listItemType);
+          return delta > 0 ? commands.sinkListItem(listItemType) : commands.liftListItem(listItemType);
         }
 
         const nodeType = $from.parent.type.name;
