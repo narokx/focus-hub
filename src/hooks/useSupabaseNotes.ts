@@ -51,7 +51,11 @@ export function useSupabaseNotes() {
 }, [user, noteId]);
   
   const updateNote = useCallback((nextContent: string) => {
-    if (!isReady.current || loading) return;
+    console.log('[Hook updateNote] called with content length:', nextContent.length);
+    if (!isReady.current || loading) {
+      console.log('[Hook updateNote] BLOCKED: isReady=', isReady.current, 'loading=', loading);
+      return;
+    }
 
     setContent(nextContent);
     localStorage.setItem(LOCAL_NOTES_KEY, nextContent);
@@ -62,6 +66,7 @@ export function useSupabaseNotes() {
     }
 
     saveTimeoutRef.current = setTimeout(() => {
+      console.log('[Hook] Debounced persistNote, content length:', nextContent.length);
       persistNote(nextContent);
     }, 1000);
   }, [persistNote, loading]);
@@ -157,6 +162,11 @@ export function useSupabaseNotes() {
           const nextContent = (payload.new as { content?: string }).content ?? '';
           const nextUpdatedAtRaw = (payload.new as { updated_at?: string }).updated_at;
           const nextUpdatedAt = nextUpdatedAtRaw ? Date.parse(nextUpdatedAtRaw) : Date.now();
+          console.log('[Realtime] Received update from server:', {
+            nextContentLength: nextContent.length,
+            localUpdatedAt: readLocalUpdatedAt(),
+            remoteUpdatedAt: nextUpdatedAt,
+          });
           const localUpdatedAt = readLocalUpdatedAt();
           if (localUpdatedAt > nextUpdatedAt) {
             return;

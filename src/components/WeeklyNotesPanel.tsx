@@ -104,6 +104,7 @@ interface WeeklyNotesPanelProps {
 
 export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNotesPanelProps) {
   const userIsInteracting = useRef(false);
+  const lastEditorEmittedContentRef = useRef<string | null>(null);
   
   const onUpdateNoteRef = useRef(onUpdateNote);
   useEffect(() => {
@@ -137,8 +138,16 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
       },
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
+      const newHtml = tiptapEditor.getHTML();
+      console.log('[Editor onUpdate] user changed content:', {
+        newHtml: newHtml.substring(0, 100),
+        transactionType: transaction.getMeta('origin'),
+        userIsInteracting: userIsInteracting.current,
+      });
       if (transaction.docChanged && userIsInteracting.current) {
-        onUpdateNoteRef.current(tiptapEditor.getHTML());
+        console.log('[Editor onUpdate] WILL call onUpdateNote');
+        lastEditorEmittedContentRef.current = newHtml;
+        onUpdateNoteRef.current(newHtml);
       }
     },
     onFocus: () => {
@@ -148,8 +157,19 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
 
   useEffect(() => {
     if (!editor) return;
+    const currentEditorHtml = editor.getHTML();
+    console.log('[Sync Effect] content prop changed:', {
+      newContent: content,
+      currentEditorHtml,
+      isDifferent: currentEditorHtml !== content,
+      lastEmitted: lastEditorEmittedContentRef?.current,
+    });
+
     if (editor.getHTML() !== content) {
+      console.log('[Sync Effect] WILL setContent to:', content.substring(0, 100));
       editor.commands.setContent(content, { emitUpdate: false });
+    } else {
+      console.log('[Sync Effect] SKIP setContent (already equal)');
     }
   }, [content, editor]);
 
