@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
+import { enrichRowsWithTasks } from '@/lib/enrichRowsWithTasks';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -14,17 +15,6 @@ function isMissingLockedColumnError(error: any): boolean {
 }
 
 async function fetchRoutineSlotsWithLegacyFallback() {
-  const enrichWithTasks = async (rows: any[]) => {
-    const taskIds = Array.from(new Set(rows.map((row) => row.task_id).filter(Boolean)));
-    if (taskIds.length === 0) return rows.map((row) => ({ ...row, tasks: null }));
-
-    const { data: tasks, error: tasksError } = await supabase.from('tasks').select('id, name, color').in('id', taskIds);
-    if (tasksError) return { data: null, error: tasksError, hasLockedColumn: false };
-
-    const taskMap = new Map((tasks || []).map((task) => [task.id, task]));
-    return rows.map((row) => ({ ...row, tasks: row.task_id ? taskMap.get(row.task_id) || null : null }));
-  };
-
   const withLockedJoin = await supabase
     .from('routine_time_slots')
     .select('id, routine_id, start_time, end_time, task_id, subtasks, locked, tasks(id, name, color)')
@@ -49,9 +39,9 @@ async function fetchRoutineSlotsWithLegacyFallback() {
     .order('start_time', { ascending: true });
 
   if (!withLockedNoJoin.error) {
-    const enriched = await enrichWithTasks(withLockedNoJoin.data || []);
-    if (Array.isArray(enriched)) return { data: enriched, hasLockedColumn: true };
-    return enriched;
+    const enrichmentResult = await enrichRowsWithTasks(withLockedNoJoin.data || []);
+    if (enrichmentResult.error) return { data: null, error: enrichmentResult.error, hasLockedColumn: true };
+    return { data: enrichmentResult.data || [], hasLockedColumn: true };
   }
 
   if (!isMissingLockedColumnError(withLockedNoJoin.error)) {
@@ -67,9 +57,9 @@ async function fetchRoutineSlotsWithLegacyFallback() {
     return { data: null, error: withoutLockedNoJoin.error, hasLockedColumn: false };
   }
 
-  const enriched = await enrichWithTasks(withoutLockedNoJoin.data || []);
-  if (Array.isArray(enriched)) return { data: enriched, hasLockedColumn: false };
-  return enriched;
+  const enrichmentResult = await enrichRowsWithTasks(withoutLockedNoJoin.data || []);
+  if (enrichmentResult.error) return { data: null, error: enrichmentResult.error, hasLockedColumn: false };
+  return { data: enrichmentResult.data || [], hasLockedColumn: false };
 }
 
 async function insertRoutineSlotsWithLegacyFallback(rows: any[]) {
