@@ -184,13 +184,25 @@ const Indent = Extension.create({
   },
 
   addCommands() {
+    const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
+      const { $from } = state.selection;
+      for (let depth = $from.depth; depth > 0; depth -= 1) {
+        const nodeName = $from.node(depth).type.name;
+        if (nodeName === 'listItem' || nodeName === 'taskItem') {
+          return nodeName;
+        }
+      }
+      return null;
+    };
+
     const adjustIndent =
       (delta: number) =>
       ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
         const { $from } = state.selection;
+        const listItemType = getActiveListItemType(state);
 
-        if ($from.parent.type.name === 'listItem' || $from.parent.type.name === 'taskItem') {
-          return delta > 0 ? editor.commands.sinkListItem($from.parent.type.name) : editor.commands.liftListItem($from.parent.type.name);
+        if (listItemType) {
+          return delta > 0 ? editor.commands.sinkListItem(listItemType) : editor.commands.liftListItem(listItemType);
         }
 
         const nodeType = $from.parent.type.name;

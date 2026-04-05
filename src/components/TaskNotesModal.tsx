@@ -32,6 +32,10 @@ declare module '@tiptap/core' {
       setFontSize: (fontSize: string) => ReturnType;
       unsetFontSize: () => ReturnType;
     };
+    indent: {
+      increaseIndent: () => ReturnType;
+      decreaseIndent: () => ReturnType;
+    };
   }
 }
 
@@ -80,6 +84,100 @@ const FontSize = Extension.create({
         () =>
         ({ chain }) =>
           chain().unsetMark('textStyle').run(),
+    };
+  },
+});
+
+const INDENT_STEP_REM = 2;
+const MAX_INDENT_LEVEL = 8;
+
+const Indent = Extension.create({
+  name: 'indent',
+
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          indentLevel: {
+            default: 0,
+            parseHTML: (element: HTMLElement) => {
+              const indentLevel = Number.parseInt(element.getAttribute('data-indent-level') ?? '0', 10);
+              return Number.isNaN(indentLevel) ? 0 : Math.max(0, Math.min(indentLevel, MAX_INDENT_LEVEL));
+            },
+            renderHTML: (attributes: { indentLevel?: number }) => {
+              const indentLevel = attributes.indentLevel ?? 0;
+              if (!indentLevel) return {};
+
+              return {
+                'data-indent-level': indentLevel,
+                style: `margin-inline-start: ${indentLevel * INDENT_STEP_REM}rem`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
+      const { $from } = state.selection;
+      for (let depth = $from.depth; depth > 0; depth -= 1) {
+        const nodeName = $from.node(depth).type.name;
+        if (nodeName === 'listItem' || nodeName === 'taskItem') {
+          return nodeName;
+        }
+      }
+      return null;
+    };
+
+    const adjustIndent =
+      (delta: number) =>
+      ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
+        const { $from } = state.selection;
+        const listItemType = getActiveListItemType(state);
+
+        if (listItemType) {
+          return delta > 0 ? editor.commands.sinkListItem(listItemType) : editor.commands.liftListItem(listItemType);
+        }
+
+        const nodeType = $from.parent.type.name;
+        if (!this.options.types.includes(nodeType)) {
+          return false;
+        }
+
+        const currentLevel = Number($from.parent.attrs.indentLevel ?? 0);
+        const nextLevel = Math.max(0, Math.min(MAX_INDENT_LEVEL, currentLevel + delta));
+        if (currentLevel === nextLevel) {
+          return false;
+        }
+
+        return commands.updateAttributes(nodeType, { indentLevel: nextLevel });
+      };
+
+    return {
+      increaseIndent:
+        () =>
+        (props) =>
+          adjustIndent(1)(props),
+      decreaseIndent:
+        () =>
+        (props) =>
+          adjustIndent(-1)(props),
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => this.editor.commands.increaseIndent(),
+      'Shift-Tab': () => this.editor.commands.decreaseIndent(),
     };
   },
 });
@@ -137,6 +235,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
       }),
       TextStyle,
       FontSize,
+      Indent,
       Underline,
       Highlight.configure({ multicolor: true }),
     ],

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Resizable, Enable } from 're-resizable';
-import { GripHorizontal, Minus } from 'lucide-react';
+import { GripHorizontal, Maximize2, Minimize2, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface FloatingWindowProps {
@@ -232,10 +232,12 @@ export function FloatingWindow({
     });
   }, [bringToFront, onPositionChange, onSizeChange, size]);
 
-  const enableResize: Enable = isFullscreen ? {
-    top: false, right: false, bottom: false, left: false,
-    topRight: false, bottomRight: false, bottomLeft: false, topLeft: false,
-  } : minimized ? {
+  const fullscreenSize = {
+    width: typeof window === 'undefined' ? size.width : window.innerWidth,
+    height: typeof window === 'undefined' ? size.height : window.innerHeight,
+  };
+
+  const enableResize: Enable | false = isFullscreen ? false : minimized ? {
     top: false, right: true, bottom: false, left: true,
     topRight: false, bottomRight: false, bottomLeft: false, topLeft: false,
   } : {
@@ -250,9 +252,9 @@ export function FloatingWindow({
       onMouseDownCapture={bringToFront}
     >
       <Resizable
-        size={isFullscreen ? { width: '100vw', height: '100vh' } : minimized ? { width: size.width, height: 44 } : size}
-        minWidth={minimized ? 200 : minWidth}
-        minHeight={minimized ? 44 : minHeight}
+        size={isFullscreen ? fullscreenSize : minimized ? { width: size.width, height: 44 } : size}
+        minWidth={isFullscreen ? fullscreenSize.width : minimized ? 200 : minWidth}
+        minHeight={isFullscreen ? fullscreenSize.height : minimized ? 44 : minHeight}
         maxWidth={isFullscreen ? Number.POSITIVE_INFINITY : maxWidth}
         maxHeight={isFullscreen ? Number.POSITIVE_INFINITY : minimized ? 44 : maxHeight}
         enable={enableResize}
@@ -313,6 +315,17 @@ export function FloatingWindow({
             </div>
             <div className="flex items-center gap-1">
               {headerActions}
+              <button
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFullscreen();
+                }}
+                className="no-drag p-1 rounded hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+              </button>
               <button
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => { e.stopPropagation(); onMinimizeChange?.(!minimized); }}
