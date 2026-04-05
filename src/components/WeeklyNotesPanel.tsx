@@ -7,6 +7,7 @@ import TaskList from '@tiptap/extension-task-list';
 import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import {
+  AlignCenter,
   Bold,
   CheckSquare,
   ChevronLeft,
@@ -24,6 +25,14 @@ declare module '@tiptap/core' {
     fontSize: {
       setFontSize: (fontSize: string) => ReturnType;
       unsetFontSize: () => ReturnType;
+    };
+    textAlign: {
+      setTextAlign: (alignment: 'left' | 'center') => ReturnType;
+      unsetTextAlign: () => ReturnType;
+    };
+    indent: {
+      increaseIndent: () => ReturnType;
+      decreaseIndent: () => ReturnType;
     };
   }
 }
@@ -84,6 +93,139 @@ const FontSize = Extension.create({
   },
 });
 
+const TextAlign = Extension.create({
+  name: 'textAlign',
+
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          textAlign: {
+            default: null,
+            parseHTML: (element: HTMLElement) => {
+              const alignment = element.style.textAlign;
+              return alignment === 'left' || alignment === 'center' ? alignment : null;
+            },
+            renderHTML: (attributes: { textAlign?: 'left' | 'center' | null }) => {
+              if (!attributes.textAlign) {
+                return {};
+              }
+
+              return {
+                style: `text-align: ${attributes.textAlign}`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    return {
+      setTextAlign:
+        (alignment) =>
+        ({ chain }) =>
+          this.options.types.every((type: string) => chain().updateAttributes(type, { textAlign: alignment }).run()),
+      unsetTextAlign:
+        () =>
+        ({ chain }) =>
+          this.options.types.every((type: string) => chain().resetAttributes(type, 'textAlign').run()),
+    };
+  },
+});
+
+const INDENT_STEP_REM = 2;
+const MAX_INDENT_LEVEL = 8;
+
+const Indent = Extension.create({
+  name: 'indent',
+
+  addOptions() {
+    return {
+      types: ['paragraph', 'heading'],
+    };
+  },
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          indentLevel: {
+            default: 0,
+            parseHTML: (element: HTMLElement) => {
+              const indentLevel = Number.parseInt(element.getAttribute('data-indent-level') ?? '0', 10);
+              return Number.isNaN(indentLevel) ? 0 : Math.max(0, Math.min(indentLevel, MAX_INDENT_LEVEL));
+            },
+            renderHTML: (attributes: { indentLevel?: number }) => {
+              const indentLevel = attributes.indentLevel ?? 0;
+              if (!indentLevel) {
+                return {};
+              }
+
+              return {
+                'data-indent-level': indentLevel,
+                style: `margin-inline-start: ${indentLevel * INDENT_STEP_REM}rem`,
+              };
+            },
+          },
+        },
+      },
+    ];
+  },
+
+  addCommands() {
+    const adjustIndent =
+      (delta: number) =>
+      ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
+        const { $from } = state.selection;
+
+        if ($from.parent.type.name === 'listItem' || $from.parent.type.name === 'taskItem') {
+          return delta > 0 ? editor.commands.sinkListItem($from.parent.type.name) : editor.commands.liftListItem($from.parent.type.name);
+        }
+
+        const nodeType = $from.parent.type.name;
+        if (!this.options.types.includes(nodeType)) {
+          return false;
+        }
+
+        const currentLevel = Number($from.parent.attrs.indentLevel ?? 0);
+        const nextLevel = Math.max(0, Math.min(MAX_INDENT_LEVEL, currentLevel + delta));
+        if (currentLevel === nextLevel) {
+          return false;
+        }
+
+        return commands.updateAttributes(nodeType, { indentLevel: nextLevel });
+      };
+
+    return {
+      increaseIndent:
+        () =>
+        (props) =>
+          adjustIndent(1)(props),
+      decreaseIndent:
+        () =>
+        (props) =>
+          adjustIndent(-1)(props),
+    };
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => this.editor.commands.increaseIndent(),
+      'Shift-Tab': () => this.editor.commands.decreaseIndent(),
+    };
+  },
+});
+
 const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
 
 const EDITOR_CLASSES = [
@@ -140,6 +282,8 @@ export function WeeklyNotesPanel({
       }),
       TextStyle,
       FontSize,
+      TextAlign,
+      Indent,
       Underline,
       Highlight.configure({ multicolor: true }),
     ],
@@ -254,6 +398,21 @@ export function WeeklyNotesPanel({
           aria-label="Toggle underline"
         >
           <UnderlineIcon className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const isCentered = editor.isActive({ textAlign: 'center' });
+            editor.chain().focus().setTextAlign(isCentered ? 'left' : 'center').run();
+          }}
+          className={`rounded-md p-2 transition hover:bg-muted ${
+            editor.isActive({ textAlign: 'center' })
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+          aria-label="Toggle center alignment"
+        >
+          <AlignCenter className="h-4 w-4" />
         </button>
         <button
           type="button"
