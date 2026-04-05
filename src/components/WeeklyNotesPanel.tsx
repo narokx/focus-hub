@@ -9,10 +9,13 @@ import Highlight from '@tiptap/extension-highlight';
 import {
   Bold,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Heading1,
   Heading2,
   Italic,
   List,
+  Plus,
   Underline as UnderlineIcon,
 } from 'lucide-react';
 
@@ -81,7 +84,6 @@ const FontSize = Extension.create({
   },
 });
 
-
 const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
 
 const EDITOR_CLASSES = [
@@ -98,17 +100,29 @@ const EDITOR_CLASSES = [
 
 interface WeeklyNotesPanelProps {
   content: string;
-  onUpdateNote: (content: string) => void;
+  pages: string[];
+  currentPageIndex: number;
+  onSaveCurrentPage: (content: string) => void;
+  onSetPage: (index: number) => void;
+  onAddPage: () => void;
   isLoading: boolean;
 }
 
-export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNotesPanelProps) {
+export function WeeklyNotesPanel({
+  content,
+  pages,
+  currentPageIndex,
+  onSaveCurrentPage,
+  onSetPage,
+  onAddPage,
+  isLoading,
+}: WeeklyNotesPanelProps) {
   const userIsInteracting = useRef(false);
-  
-  const onUpdateNoteRef = useRef(onUpdateNote);
+
+  const onSaveCurrentPageRef = useRef(onSaveCurrentPage);
   useEffect(() => {
-    onUpdateNoteRef.current = onUpdateNote;
-  }, [onUpdateNote]);
+    onSaveCurrentPageRef.current = onSaveCurrentPage;
+  }, [onSaveCurrentPage]);
 
   const editor = useEditor({
     extensions: [
@@ -138,7 +152,7 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
       if (transaction.docChanged && userIsInteracting.current) {
-        onUpdateNoteRef.current(tiptapEditor.getHTML());
+        onSaveCurrentPageRef.current(tiptapEditor.getHTML());
       }
     },
     onFocus: () => {
@@ -149,9 +163,29 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
   useEffect(() => {
     if (!editor) return;
     if (editor.getHTML() !== content) {
+      const shouldRefocus = editor.isFocused;
       editor.commands.setContent(content, { emitUpdate: false });
+      if (shouldRefocus) {
+        requestAnimationFrame(() => editor.commands.focus('end'));
+      }
     }
   }, [content, editor]);
+
+  const totalPages = Math.max(1, pages.length);
+  const canGoPrev = currentPageIndex > 0;
+  const canGoNext = currentPageIndex < totalPages - 1;
+
+  const navigateTo = (nextIndex: number) => {
+    if (!editor) return;
+    onSaveCurrentPage(editor.getHTML());
+    onSetPage(nextIndex);
+  };
+
+  const handleAddPage = () => {
+    if (!editor) return;
+    onSaveCurrentPage(editor.getHTML());
+    onAddPage();
+  };
 
   if (!editor) {
     return <div className="h-full -m-4" />;
@@ -289,6 +323,40 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
 
       <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={(event) => event.stopPropagation()}>
         <EditorContent editor={editor} className="h-full border-0" />
+      </div>
+
+      <div className="flex items-center justify-between border-t bg-muted/40 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => navigateTo(currentPageIndex - 1)}
+          disabled={!canGoPrev}
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        <div className="text-xs font-medium text-muted-foreground">Page {currentPageIndex + 1} / {totalPages}</div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => navigateTo(currentPageIndex + 1)}
+            disabled={!canGoNext}
+            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Next page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleAddPage}
+            className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="Add page"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <style>{`

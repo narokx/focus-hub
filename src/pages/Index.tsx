@@ -128,8 +128,12 @@ export default function Index() {
 
   const {
     content: weeklyNoteContent,
+    pages: weeklyNotePages,
+    currentPageIndex: weeklyNotePageIndex,
     loading: notesLoading,
-    updateNote,
+    saveCurrentPage: saveWeeklyPage,
+    setPage: setWeeklyPage,
+    addPage: addWeeklyPage,
     refresh: refreshNotes,
   } = useSupabaseNotes();
 
@@ -873,7 +877,15 @@ export default function Index() {
               <button onClick={() => setIsNotesOpen(false)} className="p-1 rounded-md hover:bg-secondary text-muted-foreground"><X className="w-5 h-5"/></button>
             </div>
             <div className="flex-1 overflow-auto">
-              <WeeklyNotesPanel content={weeklyNoteContent} onUpdateNote={updateNote} isLoading={notesLoading} />
+              <WeeklyNotesPanel
+                content={weeklyNoteContent}
+                pages={weeklyNotePages}
+                currentPageIndex={weeklyNotePageIndex}
+                onSaveCurrentPage={saveWeeklyPage}
+                onSetPage={setWeeklyPage}
+                onAddPage={addWeeklyPage}
+                isLoading={notesLoading}
+              />
             </div>
           </div>
         )}
@@ -1108,7 +1120,11 @@ export default function Index() {
           >
             <WeeklyNotesPanel
               content={weeklyNoteContent}
-              onUpdateNote={updateNote}
+              pages={weeklyNotePages}
+              currentPageIndex={weeklyNotePageIndex}
+              onSaveCurrentPage={saveWeeklyPage}
+              onSetPage={setWeeklyPage}
+              onAddPage={addWeeklyPage}
               isLoading={notesLoading}
             />
           </FloatingWindow>

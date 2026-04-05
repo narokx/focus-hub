@@ -283,6 +283,7 @@ export type Database = {
           content: string
           id: string
           note_key: string
+          pages: Json
           updated_at: string
           user_id: string
         }
@@ -290,6 +291,7 @@ export type Database = {
           content?: string
           id?: string
           note_key: string
+          pages?: Json
           updated_at?: string
           user_id: string
         }
@@ -297,6 +299,7 @@ export type Database = {
           content?: string
           id?: string
           note_key?: string
+          pages?: Json
           updated_at?: string
           user_id?: string
         }
@@ -307,6 +310,7 @@ export type Database = {
           content: string
           id: string
           last_client_id: string | null
+          pages: Json
           updated_at: string
           user_id: string
         }
@@ -314,6 +318,7 @@ export type Database = {
           content?: string
           id?: string
           last_client_id?: string | null
+          pages?: Json
           updated_at?: string
           user_id: string
         }
@@ -321,6 +326,7 @@ export type Database = {
           content?: string
           id?: string
           last_client_id?: string | null
+          pages?: Json
           updated_at?: string
           user_id?: string
         }

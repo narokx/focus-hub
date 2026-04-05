@@ -193,8 +193,8 @@ function DraggableSlotTask({
   const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
   const noteId = toTaskNoteKey(task.taskId || task.id) || `${slot.id}-${task.taskId || task.id}`;
-  const { note } = useTaskNote(noteId);
-  const hasNotes = !!note?.trim();
+  const { pages } = useTaskNote(noteId);
+  const hasNotes = pages.some((page) => page.trim().length > 0);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${droppablePrefix}-slottask-${slot.id}`,
