@@ -320,6 +320,25 @@ export function useTaskNote(taskId: string | null) {
     });
   }, [taskId, queuePersist]);
 
+  const deletePage = useCallback((index: number) => {
+    if (!taskId) return;
+
+    setPages((prev) => {
+      const safe = normalizePages(prev);
+      if (safe.length <= 1) {
+        return safe;
+      }
+
+      const boundedIndex = Math.min(Math.max(index, 0), safe.length - 1);
+      const next = safe.filter((_, pageIndex) => pageIndex !== boundedIndex);
+      const nextIndex = Math.max(0, Math.min(boundedIndex - 1, next.length - 1));
+      setCurrentPageIndex(nextIndex);
+      saveLocalPageIndex(taskId, nextIndex);
+      queuePersist(next);
+      return next;
+    });
+  }, [taskId, queuePersist]);
+
   useEffect(() => {
     return () => {
       const currentTaskId = activeTaskRef.current;
@@ -342,6 +361,7 @@ export function useTaskNote(taskId: string | null) {
     saveCurrentPage,
     setPage,
     addPage,
+    deletePage,
     save: saveCurrentPage,
   };
 }

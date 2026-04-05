@@ -17,6 +17,7 @@ import {
   Italic,
   List,
   Plus,
+  Trash2,
   Underline as UnderlineIcon,
   X,
 } from 'lucide-react';
@@ -95,7 +96,7 @@ interface TaskNotesModalProps {
 
 export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNotesModalProps) {
   useEscapeStack(true, onClose);
-  const { pages, currentPageIndex, note, saveCurrentPage, setPage, addPage } = useTaskNote(taskId);
+  const { pages, currentPageIndex, note, saveCurrentPage, setPage, addPage, deletePage } = useTaskNote(taskId);
   const isMobile = useIsMobile();
   const [size, setSize] = useState(() => {
     try {
@@ -212,6 +213,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   };
 
   const totalPages = Math.max(1, pages.length);
+  const canDeletePage = totalPages > 1;
 
   const toolbar = editor && (
     <div className="flex items-center gap-1 border-b bg-background/95 px-3 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
@@ -295,6 +297,18 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
           }}
         >
           <ChevronRight className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!canDeletePage}
+          onClick={() => {
+            if (!window.confirm('Are you sure you want to delete this page?')) return;
+            deletePage(currentPageIndex);
+          }}
+          title={canDeletePage ? 'Delete current page' : 'Cannot delete the only page'}
+        >
+          <Trash2 className="h-4 w-4" />
         </button>
         <button
           type="button"

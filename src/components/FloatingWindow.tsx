@@ -79,6 +79,8 @@ export function FloatingWindow({
   const [zIndex, setZIndex] = useState(() => getNextWindowZIndex());
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(title);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const preFullscreenRef = useRef<{ position: { x: number; y: number }; size: { width: number; height: number } } | null>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -181,10 +183,11 @@ export function FloatingWindow({
   }, [isDragging, onPositionChange, stopDragging]);
 
   const handleResizeStart = useCallback(() => {
+    if (isFullscreen) return;
     bringToFront();
     setIsResizing(true);
     setIsDragging(false);
-  }, [bringToFront]);
+  }, [bringToFront, isFullscreen]);
 
   const handleResizeStop = useCallback((_e: unknown, _dir: unknown, ref: HTMLElement) => {
     const newSize = { width: ref.offsetWidth, height: ref.offsetHeight };
@@ -206,7 +209,33 @@ export function FloatingWindow({
     }
   };
 
-  const enableResize: Enable = minimized ? {
+  const toggleFullscreen = useCallback(() => {
+    bringToFront();
+    setIsEditingTitle(false);
+    setIsFullscreen((prev) => {
+      if (prev) {
+        const snapshot = preFullscreenRef.current;
+        if (snapshot) {
+          onPositionChange?.(snapshot.position);
+          onSizeChange?.(snapshot.size);
+        }
+        return false;
+      }
+
+      preFullscreenRef.current = {
+        position: latestPositionRef.current,
+        size,
+      };
+      onPositionChange?.({ x: 0, y: 0 });
+      onSizeChange?.({ width: window.innerWidth, height: window.innerHeight });
+      return true;
+    });
+  }, [bringToFront, onPositionChange, onSizeChange, size]);
+
+  const enableResize: Enable = isFullscreen ? {
+    top: false, right: false, bottom: false, left: false,
+    topRight: false, bottomRight: false, bottomLeft: false, topLeft: false,
+  } : minimized ? {
     top: false, right: true, bottom: false, left: true,
     topRight: false, bottomRight: false, bottomLeft: false, topLeft: false,
   } : {
@@ -216,16 +245,16 @@ export function FloatingWindow({
 
   return (
     <div
-      className="absolute"
-      style={{ left: position.x, top: position.y, zIndex }}
+      className={cn(isFullscreen ? 'fixed inset-0' : 'absolute')}
+      style={isFullscreen ? { zIndex } : { left: position.x, top: position.y, zIndex }}
       onMouseDownCapture={bringToFront}
     >
       <Resizable
-        size={minimized ? { width: size.width, height: 44 } : size}
+        size={isFullscreen ? { width: '100vw', height: '100vh' } : minimized ? { width: size.width, height: 44 } : size}
         minWidth={minimized ? 200 : minWidth}
         minHeight={minimized ? 44 : minHeight}
-        maxWidth={maxWidth}
-        maxHeight={minimized ? 44 : maxHeight}
+        maxWidth={isFullscreen ? Number.POSITIVE_INFINITY : maxWidth}
+        maxHeight={isFullscreen ? Number.POSITIVE_INFINITY : minimized ? 44 : maxHeight}
         enable={enableResize}
         onResizeStart={handleResizeStart}
         onResizeStop={handleResizeStop}
@@ -247,7 +276,15 @@ export function FloatingWindow({
         }}
       >
         <div className={cn('window-panel flex flex-col h-full', className)}>
-          <div ref={dragHandleRef} className="window-header flex-shrink-0" onPointerDown={handlePointerDown}>
+          <div
+            ref={dragHandleRef}
+            className="window-header flex-shrink-0"
+            onPointerDown={isFullscreen ? undefined : handlePointerDown}
+            onDoubleClick={(event) => {
+              if ((event.target as HTMLElement).closest('.no-drag')) return;
+              toggleFullscreen();
+            }}
+          >
             <div className="flex items-center gap-2">
               {icon}
               {isEditingTitle ? (
