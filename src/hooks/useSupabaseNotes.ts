@@ -18,7 +18,7 @@ function createClientId() {
 
 function normalizePages(value: unknown): string[] {
   if (Array.isArray(value)) {
-    const cleaned = value.map((page) => (typeof page === 'string' ? page : '')).filter((_, idx, arr) => idx < arr.length);
+    const cleaned = value.map((page) => (typeof page === 'string' ? page : ''));
     return cleaned.length > 0 ? cleaned : [''];
   }
 
