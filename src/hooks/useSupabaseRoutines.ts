@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Routine, QuickTask, SubtaskData, TimeSlot, generateDefaultTimeSlots, parseTimeTo24h } from '@/types';
 import { resolveTaskId } from '@/lib/resolveTaskId';
 import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotOrder';
+import { enrichRowsWithTasks } from '@/lib/enrichRowsWithTasks';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 
@@ -14,29 +15,51 @@ function isMissingLockedColumnError(error: any): boolean {
 }
 
 async function fetchRoutineSlotsWithLegacyFallback() {
-  const withLocked = await supabase
+  const withLockedJoin = await supabase
     .from('routine_time_slots')
     .select('id, routine_id, start_time, end_time, task_id, subtasks, locked, tasks(id, name, color)')
     .order('start_time', { ascending: true });
 
-  if (!withLocked.error) {
-    return { data: withLocked.data || [], hasLockedColumn: true };
+  if (!withLockedJoin.error) return { data: withLockedJoin.data || [], hasLockedColumn: true };
+
+  const withoutLockedJoin = isMissingLockedColumnError(withLockedJoin.error)
+    ? await supabase
+        .from('routine_time_slots')
+        .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
+        .order('start_time', { ascending: true })
+    : null;
+
+  if (withoutLockedJoin && !withoutLockedJoin.error) {
+    return { data: withoutLockedJoin.data || [], hasLockedColumn: false };
   }
 
-  if (!isMissingLockedColumnError(withLocked.error)) {
-    return { data: null, error: withLocked.error, hasLockedColumn: false };
-  }
-
-  const withoutLocked = await supabase
+  const withLockedNoJoin = await supabase
     .from('routine_time_slots')
-    .select('id, routine_id, start_time, end_time, task_id, subtasks, tasks(id, name, color)')
+    .select('id, routine_id, start_time, end_time, task_id, subtasks, locked')
     .order('start_time', { ascending: true });
 
-  if (withoutLocked.error) {
-    return { data: null, error: withoutLocked.error, hasLockedColumn: false };
+  if (!withLockedNoJoin.error) {
+    const enrichmentResult = await enrichRowsWithTasks(withLockedNoJoin.data || []);
+    if (enrichmentResult.error) return { data: null, error: enrichmentResult.error, hasLockedColumn: true };
+    return { data: enrichmentResult.data || [], hasLockedColumn: true };
   }
 
-  return { data: withoutLocked.data || [], hasLockedColumn: false };
+  if (!isMissingLockedColumnError(withLockedNoJoin.error)) {
+    return { data: null, error: withLockedNoJoin.error, hasLockedColumn: false };
+  }
+
+  const withoutLockedNoJoin = await supabase
+    .from('routine_time_slots')
+    .select('id, routine_id, start_time, end_time, task_id, subtasks')
+    .order('start_time', { ascending: true });
+
+  if (withoutLockedNoJoin.error) {
+    return { data: null, error: withoutLockedNoJoin.error, hasLockedColumn: false };
+  }
+
+  const enrichmentResult = await enrichRowsWithTasks(withoutLockedNoJoin.data || []);
+  if (enrichmentResult.error) return { data: null, error: enrichmentResult.error, hasLockedColumn: false };
+  return { data: enrichmentResult.data || [], hasLockedColumn: false };
 }
 
 async function insertRoutineSlotsWithLegacyFallback(rows: any[]) {
