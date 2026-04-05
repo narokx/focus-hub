@@ -246,7 +246,7 @@ export function FloatingWindow({
   return (
     <div
       className={cn(isFullscreen ? 'fixed inset-0' : 'absolute')}
-      style={isFullscreen ? { zIndex: Math.max(zIndex, 9999) } : { left: position.x, top: position.y, zIndex }}
+      style={isFullscreen ? { zIndex } : { left: position.x, top: position.y, zIndex }}
       onMouseDownCapture={bringToFront}
     >
       <Resizable
