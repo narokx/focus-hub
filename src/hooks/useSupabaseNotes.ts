@@ -22,7 +22,7 @@ export function useSupabaseNotes() {
   const isReady = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef('');
-  const clientIdRef = useRef('');
+  const clientIdRef = useRef(createClientId());
 
   useEffect(() => {
     latestContentRef.current = content;
