@@ -37,7 +37,7 @@ export function useSupabaseNotes() {
       realtimeIgnoreTimeoutRef.current = setTimeout(() => {
         ignoreNextRealtimeUpdate.current = false;
         realtimeIgnoreTimeoutRef.current = null;
-      }, 500);
+      }, 2000);
 
       const { data, error } = await supabase
         .from('user_notes')
