@@ -104,6 +104,7 @@ interface WeeklyNotesPanelProps {
 
 export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNotesPanelProps) {
   const userIsInteracting = useRef(false);
+  const lastLocalContentRef = useRef(content);
   
   const onUpdateNoteRef = useRef(onUpdateNote);
   useEffect(() => {
@@ -138,16 +139,25 @@ export function WeeklyNotesPanel({ content, onUpdateNote, isLoading }: WeeklyNot
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
       if (transaction.docChanged && userIsInteracting.current) {
-        onUpdateNoteRef.current(tiptapEditor.getHTML());
+        const nextContent = tiptapEditor.getHTML();
+        lastLocalContentRef.current = nextContent;
+        onUpdateNoteRef.current(nextContent);
       }
     },
     onFocus: () => {
       userIsInteracting.current = true;
     },
+    onBlur: () => {
+      userIsInteracting.current = false;
+    },
   });
 
   useEffect(() => {
     if (!editor) return;
+    if (content === lastLocalContentRef.current) {
+      return;
+    }
+    lastLocalContentRef.current = content;
     if (editor.getHTML() !== content) {
       editor.commands.setContent(content, { emitUpdate: false });
     }
