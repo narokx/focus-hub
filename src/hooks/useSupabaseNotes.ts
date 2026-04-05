@@ -170,6 +170,10 @@ export function useSupabaseNotes() {
         (payload) => {
           if (ignoreNextRealtimeUpdate.current) {
             ignoreNextRealtimeUpdate.current = false;
+            if (realtimeIgnoreTimeoutRef.current) {
+              clearTimeout(realtimeIgnoreTimeoutRef.current);
+              realtimeIgnoreTimeoutRef.current = null;
+            }
             return;
           }
 
