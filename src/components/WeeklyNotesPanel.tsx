@@ -31,10 +31,6 @@ declare module '@tiptap/core' {
       setTextAlign: (alignment: 'left' | 'center') => ReturnType;
       unsetTextAlign: () => ReturnType;
     };
-    indent: {
-      increaseIndent: () => ReturnType;
-      decreaseIndent: () => ReturnType;
-    };
   }
 }
 
@@ -143,101 +139,17 @@ const TextAlign = Extension.create({
   },
 });
 
-const INDENT_STEP_REM = 2;
-const MAX_INDENT_LEVEL = 8;
+const INDENT_STYLE_PATTERN = /(?:^|;)\s*margin-inline-start\s*:[^;]+;?/gi;
+const INDENT_DATA_ATTR_PATTERN = /\sdata-indent-level=(['"]).*?\1/gi;
 
-const Indent = Extension.create({
-  name: 'indent',
-
-  addOptions() {
-    return {
-      types: ['paragraph', 'heading'],
-    };
-  },
-
-  addGlobalAttributes() {
-    return [
-      {
-        types: this.options.types,
-        attributes: {
-          indentLevel: {
-            default: 0,
-            parseHTML: (element: HTMLElement) => {
-              const indentLevel = Number.parseInt(element.getAttribute('data-indent-level') ?? '0', 10);
-              return Number.isNaN(indentLevel) ? 0 : Math.max(0, Math.min(indentLevel, MAX_INDENT_LEVEL));
-            },
-            renderHTML: (attributes: { indentLevel?: number }) => {
-              const indentLevel = attributes.indentLevel ?? 0;
-              if (!indentLevel) {
-                return {};
-              }
-
-              return {
-                'data-indent-level': indentLevel,
-                style: `margin-inline-start: ${indentLevel * INDENT_STEP_REM}rem`,
-              };
-            },
-          },
-        },
-      },
-    ];
-  },
-
-  addCommands() {
-    const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
-      const { $from } = state.selection;
-      for (let depth = $from.depth; depth > 0; depth -= 1) {
-        const nodeName = $from.node(depth).type.name;
-        if (nodeName === 'listItem' || nodeName === 'taskItem') {
-          return nodeName;
-        }
-      }
-      return null;
-    };
-
-    const adjustIndent =
-      (delta: number) =>
-      ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
-        const { $from } = state.selection;
-        const listItemType = getActiveListItemType(state);
-
-        if (listItemType) {
-          return delta > 0 ? editor.commands.sinkListItem(listItemType) : editor.commands.liftListItem(listItemType);
-        }
-
-        const nodeType = $from.parent.type.name;
-        if (!this.options.types.includes(nodeType)) {
-          return false;
-        }
-
-        const currentLevel = Number($from.parent.attrs.indentLevel ?? 0);
-        const nextLevel = Math.max(0, Math.min(MAX_INDENT_LEVEL, currentLevel + delta));
-        if (currentLevel === nextLevel) {
-          return false;
-        }
-
-        return commands.updateAttributes(nodeType, { indentLevel: nextLevel });
-      };
-
-    return {
-      increaseIndent:
-        () =>
-        (props) =>
-          adjustIndent(1)(props),
-      decreaseIndent:
-        () =>
-        (props) =>
-          adjustIndent(-1)(props),
-    };
-  },
-
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => this.editor.commands.increaseIndent(),
-      'Shift-Tab': () => this.editor.commands.decreaseIndent(),
-    };
-  },
-});
+const sanitizeIndentMarkup = (html: string) =>
+  html
+    .replace(INDENT_DATA_ATTR_PATTERN, '')
+    .replace(/style=(['"])(.*?)\1/gi, (_, quote: string, styleValue: string) => {
+      const nextStyle = styleValue.replace(INDENT_STYLE_PATTERN, '').replace(/\s*;\s*/g, '; ').trim();
+      const normalizedStyle = nextStyle.replace(/^;\s*|\s*;$/g, '').trim();
+      return normalizedStyle ? `style=${quote}${normalizedStyle}${quote}` : '';
+    });
 
 const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
 
@@ -293,25 +205,49 @@ export function WeeklyNotesPanel({
         nested: true,
         HTMLAttributes: {
           class: 'flex items-start gap-3 mb-1.5',
+          tabindex: -1,
         },
       }),
       TextStyle,
       FontSize,
       TextAlign,
-      Indent,
       Underline,
       Highlight.configure({ multicolor: true }),
     ],
-    content,
+    content: sanitizeIndentMarkup(content),
     immediatelyRender: false,
     editorProps: {
       attributes: {
         class: EDITOR_CLASSES,
       },
+      handleKeyDown: (view, event) => {
+        if (event.key !== 'Tab') {
+          return false;
+        }
+
+        const { $from } = view.state.selection;
+        let listItemNodeName: 'listItem' | 'taskItem' | null = null;
+        for (let depth = $from.depth; depth > 0; depth -= 1) {
+          const nodeName = $from.node(depth).type.name;
+          if (nodeName === 'listItem' || nodeName === 'taskItem') {
+            listItemNodeName = nodeName;
+            break;
+          }
+        }
+
+        if (!listItemNodeName || !editor) {
+          return false;
+        }
+
+        event.preventDefault();
+        return event.shiftKey
+          ? editor.commands.liftListItem(listItemNodeName)
+          : editor.commands.sinkListItem(listItemNodeName);
+      },
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
       if (transaction.docChanged && userIsInteracting.current) {
-        onSaveCurrentPageRef.current(tiptapEditor.getHTML());
+        onSaveCurrentPageRef.current(sanitizeIndentMarkup(tiptapEditor.getHTML()));
       }
     },
     onFocus: () => {
@@ -323,7 +259,7 @@ export function WeeklyNotesPanel({
     if (!editor) return;
     if (editor.getHTML() !== content) {
       const shouldRefocus = editor.isFocused;
-      editor.commands.setContent(content, { emitUpdate: false });
+      editor.commands.setContent(sanitizeIndentMarkup(content), { emitUpdate: false });
       if (shouldRefocus) {
         requestAnimationFrame(() => editor.commands.focus('end'));
       }
@@ -336,13 +272,13 @@ export function WeeklyNotesPanel({
 
   const navigateTo = (nextIndex: number) => {
     if (!editor) return;
-    onSaveCurrentPage(editor.getHTML());
+    onSaveCurrentPage(sanitizeIndentMarkup(editor.getHTML()));
     onSetPage(nextIndex);
   };
 
   const handleAddPage = () => {
     if (!editor) return;
-    onSaveCurrentPage(editor.getHTML());
+    onSaveCurrentPage(sanitizeIndentMarkup(editor.getHTML()));
     onAddPage();
   };
 
