@@ -13,6 +13,8 @@ export function useSupabaseNotes() {
   const isReady = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestContentRef = useRef('');
+  const ignoreNextRealtimeUpdate = useRef(false);
+  const realtimeIgnoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     latestContentRef.current = content;
@@ -24,31 +26,43 @@ export function useSupabaseNotes() {
     return Number.isFinite(parsed) ? parsed : 0;
   }, []);
 
-  const persistNote = useCallback(async (nextContent: string) => {
-  if (!user) return;
+  const persistNote = useCallback(
+    async (nextContent: string) => {
+      if (!user) return;
 
-  const { data, error } = await supabase
-    .from('user_notes')
-    .upsert(
-      { 
-        user_id: user.id, 
-        content: nextContent,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: 'user_id' }
-    )
-    .select('id')
-    .maybeSingle();
+      ignoreNextRealtimeUpdate.current = true;
+      if (realtimeIgnoreTimeoutRef.current) {
+        clearTimeout(realtimeIgnoreTimeoutRef.current);
+      }
+      realtimeIgnoreTimeoutRef.current = setTimeout(() => {
+        ignoreNextRealtimeUpdate.current = false;
+        realtimeIgnoreTimeoutRef.current = null;
+      }, 2000);
 
-  if (error) {
-    console.error('Failed to persist weekly notes:', error);
-    return;
-  }
+      const { data, error } = await supabase
+        .from('user_notes')
+        .upsert(
+          {
+            user_id: user.id,
+            content: nextContent,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' }
+        )
+        .select('id')
+        .maybeSingle();
 
-  if (data?.id && data.id !== noteId) {
-    setNoteId(data.id);
-  }
-}, [user, noteId]);
+      if (error) {
+        console.error('Failed to persist weekly notes:', error);
+        return;
+      }
+
+      if (data?.id && data.id !== noteId) {
+        setNoteId(data.id);
+      }
+    },
+    [user, noteId]
+  );
   
   const updateNote = useCallback((nextContent: string) => {
     if (!isReady.current || loading) return;
@@ -154,6 +168,15 @@ export function useSupabaseNotes() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
+          if (ignoreNextRealtimeUpdate.current) {
+            ignoreNextRealtimeUpdate.current = false;
+            if (realtimeIgnoreTimeoutRef.current) {
+              clearTimeout(realtimeIgnoreTimeoutRef.current);
+              realtimeIgnoreTimeoutRef.current = null;
+            }
+            return;
+          }
+
           const nextContent = (payload.new as { content?: string }).content ?? '';
           const nextUpdatedAtRaw = (payload.new as { updated_at?: string }).updated_at;
           const nextUpdatedAt = nextUpdatedAtRaw ? Date.parse(nextUpdatedAtRaw) : Date.now();
@@ -177,6 +200,9 @@ export function useSupabaseNotes() {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
+      }
+      if (realtimeIgnoreTimeoutRef.current) {
+        clearTimeout(realtimeIgnoreTimeoutRef.current);
       }
     };
   }, []);
