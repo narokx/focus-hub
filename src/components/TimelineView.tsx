@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { Plus, Trash2, X, Pencil, FileText, Star, Layers, Clock3, Lock, Unlock } from 'lucide-react';
 import { QuickTask, SubtaskData, TimeSlot, TaskColor, getColorValue, parseTimeTo24h } from '@/types';
@@ -43,14 +43,24 @@ function TimeRangePickerField({
   const normalizedEnd = parseTimeTo24h(endValue);
   const [open, setOpen] = useState(false);
   const [activeField, setActiveField] = useState<'startTime' | 'endTime'>('startTime');
+  const [popoverRenderKey, setPopoverRenderKey] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const effectRunCountRef = useRef(0);
+  const cleanupCountRef = useRef(0);
 
   const activeValue = activeField === 'startTime' ? normalizedStart : normalizedEnd;
   const [hour, minute] = activeValue.split(':');
 
   const handleOpenChange = (nextOpen: boolean) => {
+    console.debug('[TimeRangePickerField] onOpenChange', {
+      nextOpen,
+      currentOpen: open,
+      popoverRenderKey,
+    });
     setOpen(nextOpen);
     if (nextOpen) {
       setActiveField('startTime');
+      setPopoverRenderKey((prev) => prev + 1);
     }
   };
 
@@ -67,70 +77,115 @@ function TimeRangePickerField({
     if (activeField === 'startTime') {
       setActiveField('endTime');
     } else {
+      console.debug('[TimeRangePickerField] Closing picker after end time selection');
       setOpen(false);
     }
   };
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
-          aria-label="Open time range picker"
-        >
-          <span>{normalizedStart} - {normalizedEnd}</span>
-          <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-auto p-2 space-y-2">
-        <div className="flex gap-1">
-          <button
-            type="button"
-            className={cn(
-              'px-2 py-1 rounded text-xs border',
-              activeField === 'startTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
-            )}
-            onClick={() => setActiveField('startTime')}
-          >
-            Start
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'px-2 py-1 rounded text-xs border',
-              activeField === 'endTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
-            )}
-            onClick={() => setActiveField('endTime')}
-          >
-            End
-          </button>
-        </div>
+  useEffect(() => {
+    effectRunCountRef.current += 1;
+    console.debug('[TimeRangePickerField] useEffect(open) run', {
+      runCount: effectRunCountRef.current,
+      open,
+    });
 
-        <div className="flex gap-2">
-          <select
-            className="h-28 w-14 bg-background border border-input rounded text-xs"
-            value={hour}
-            onChange={(e) => updatePart('hour', e.target.value)}
-            size={6}
+    if (!open) {
+      return;
+    }
+
+    const handleDocumentPointerDown = (event: PointerEvent) => {
+      const targetNode = event.target as Node | null;
+      if (!targetNode) return;
+      if (!wrapperRef.current?.contains(targetNode)) {
+        console.debug('[TimeRangePickerField] Outside click detected -> closing');
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        console.debug('[TimeRangePickerField] Escape pressed -> closing');
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true);
+    document.addEventListener('keydown', handleEscape);
+    console.debug('[TimeRangePickerField] listeners attached');
+
+    return () => {
+      cleanupCountRef.current += 1;
+      document.removeEventListener('pointerdown', handleDocumentPointerDown, true);
+      document.removeEventListener('keydown', handleEscape);
+      console.debug('[TimeRangePickerField] listeners cleaned up', {
+        cleanupCount: cleanupCountRef.current,
+        effectRunCount: effectRunCountRef.current,
+      });
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef}>
+      <Popover key={popoverRenderKey} open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-transparent border border-transparent hover:border-input focus:border-input rounded px-1 py-0 focus:outline-none focus:ring-1 focus:ring-ring"
+            aria-label="Open time range picker"
           >
-            {PICKER_HOURS.map((h) => (
-              <option key={h} value={h}>{h}</option>
-            ))}
-          </select>
-          <select
-            className="h-28 w-14 bg-background border border-input rounded text-xs"
-            value={minute}
-            onChange={(e) => updatePart('minute', e.target.value)}
-            size={6}
-          >
-            {PICKER_MINUTES.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </div>
-      </PopoverContent>
-    </Popover>
+            <span>{normalizedStart} - {normalizedEnd}</span>
+            <Clock3 className="w-2.5 h-2.5 text-muted-foreground/70" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-2 space-y-2">
+          <div className="flex gap-1">
+            <button
+              type="button"
+              className={cn(
+                'px-2 py-1 rounded text-xs border',
+                activeField === 'startTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
+              )}
+              onClick={() => setActiveField('startTime')}
+            >
+              Start
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2 py-1 rounded text-xs border',
+                activeField === 'endTime' ? 'bg-accent border-primary text-foreground' : 'border-input text-muted-foreground'
+              )}
+              onClick={() => setActiveField('endTime')}
+            >
+              End
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <select
+              className="h-28 w-14 bg-background border border-input rounded text-xs"
+              value={hour}
+              onChange={(e) => updatePart('hour', e.target.value)}
+              size={6}
+            >
+              {PICKER_HOURS.map((h) => (
+                <option key={h} value={h}>{h}</option>
+              ))}
+            </select>
+            <select
+              className="h-28 w-14 bg-background border border-input rounded text-xs"
+              value={minute}
+              onChange={(e) => updatePart('minute', e.target.value)}
+              size={6}
+            >
+              {PICKER_MINUTES.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 
