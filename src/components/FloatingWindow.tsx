@@ -233,8 +233,8 @@ export function FloatingWindow({
   }, [bringToFront, onPositionChange, onSizeChange, size]);
 
   const fullscreenSize = {
-    width: typeof window === 'undefined' ? size.width : window.innerWidth,
-    height: typeof window === 'undefined' ? size.height : window.innerHeight,
+    width: '100%',
+    height: '100%',
   };
 
   const enableResize: Enable | false = isFullscreen ? false : minimized ? {
