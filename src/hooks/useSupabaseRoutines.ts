@@ -14,12 +14,12 @@ function isMissingLockedColumnError(error: any): boolean {
 }
 
 async function fetchRoutineSlotsWithLegacyFallback() {
-  const enrichWithTasks = async (rows: any[]) => {
+  const enrichWithTasks = async (rows: any[], hasLockedColumn: boolean) => {
     const taskIds = Array.from(new Set(rows.map((row) => row.task_id).filter(Boolean)));
     if (taskIds.length === 0) return rows.map((row) => ({ ...row, tasks: null }));
 
     const { data: tasks, error: tasksError } = await supabase.from('tasks').select('id, name, color').in('id', taskIds);
-    if (tasksError) return { data: null, error: tasksError, hasLockedColumn: false };
+    if (tasksError) return { data: null, error: tasksError, hasLockedColumn };
 
     const taskMap = new Map((tasks || []).map((task) => [task.id, task]));
     return rows.map((row) => ({ ...row, tasks: row.task_id ? taskMap.get(row.task_id) || null : null }));
@@ -49,7 +49,7 @@ async function fetchRoutineSlotsWithLegacyFallback() {
     .order('start_time', { ascending: true });
 
   if (!withLockedNoJoin.error) {
-    const enriched = await enrichWithTasks(withLockedNoJoin.data || []);
+    const enriched = await enrichWithTasks(withLockedNoJoin.data || [], true);
     if (Array.isArray(enriched)) return { data: enriched, hasLockedColumn: true };
     return enriched;
   }
@@ -67,7 +67,7 @@ async function fetchRoutineSlotsWithLegacyFallback() {
     return { data: null, error: withoutLockedNoJoin.error, hasLockedColumn: false };
   }
 
-  const enriched = await enrichWithTasks(withoutLockedNoJoin.data || []);
+  const enriched = await enrichWithTasks(withoutLockedNoJoin.data || [], false);
   if (Array.isArray(enriched)) return { data: enriched, hasLockedColumn: false };
   return enriched;
 }
