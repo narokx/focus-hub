@@ -327,6 +327,9 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
     onFocus: () => {
       userIsInteracting.current = true;
     },
+    onBlur: () => {
+      userIsInteracting.current = false;
+    },
     onCreate: ({ editor: tiptapEditor }) => {
       editorRef.current = tiptapEditor;
     },
@@ -337,6 +340,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
 
   useEffect(() => {
     if (!editor) return;
+    if (userIsInteracting.current) return;
     if (note !== lastSavedContentRef.current && editor.getHTML() !== note) {
       const wasFocused = editor.isFocused;
       editor.commands.setContent(note, { emitUpdate: false });

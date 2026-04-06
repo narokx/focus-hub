@@ -385,6 +385,9 @@ export function WeeklyNotesPanel({
     onFocus: () => {
       userIsInteracting.current = true;
     },
+    onBlur: () => {
+      userIsInteracting.current = false;
+    },
     onCreate: ({ editor: tiptapEditor }) => {
       editorRef.current = tiptapEditor;
     },
@@ -395,6 +398,7 @@ export function WeeklyNotesPanel({
 
   useEffect(() => {
     if (!editor) return;
+    if (userIsInteracting.current) return;
     if (content !== lastSavedContentRef.current && editor.getHTML() !== content) {
       const shouldRefocus = editor.isFocused;
       editor.commands.setContent(content, { emitUpdate: false });
