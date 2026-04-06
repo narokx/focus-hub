@@ -393,6 +393,56 @@ export function WeeklyNotesPanel({
     },
   });
 
+  // DEBUG: Add this inside the component, before returning JSX
+  useEffect(() => {
+    if (!editor) return;
+
+    const debugLog = (label: string, data?: any) => {
+      console.log(`[NOTES-DEBUG] ${new Date().toISOString().slice(11, 23)} ${label}`, data || '');
+    };
+
+    // Log content changes (from props sync)
+    const originalSetContent = editor.commands.setContent;
+    (editor.commands as any).setContent = (...args: any[]) => {
+      debugLog('setContent called', { args, currentHtml: editor.getHTML().slice(0, 100) });
+      return originalSetContent.apply(editor.commands, args as [any, any?]);
+    };
+
+    // Log transactions
+    const handleTransaction = ({ transaction }: { transaction: any }) => {
+      if (transaction.docChanged) {
+        debugLog('transaction', {
+          steps: transaction.steps.length,
+          mapping: transaction.mapping.maps.length,
+          origin: transaction.getMeta('origin') || 'unknown',
+        });
+      }
+    };
+    editor.on('transaction', handleTransaction);
+
+    // Log selection changes (cursor jumps)
+    const handleSelectionUpdate = ({ editor: e }: { editor: any }) => {
+      const { from, to } = e.state.selection;
+      debugLog('selectionUpdate', { from, to, isEmpty: from === to });
+    };
+    editor.on('selectionUpdate', handleSelectionUpdate);
+
+    // Log keydown events we care about
+    const handleKeyDebug = (event: KeyboardEvent) => {
+      if (event.key === 'Backspace' || event.key === 'Tab' || (event.ctrlKey && event.key === 'z')) {
+        debugLog(`keydown: ${event.key}`, { ctrl: event.ctrlKey, shift: event.shiftKey, target: event.target });
+      }
+    };
+    document.addEventListener('keydown', handleKeyDebug);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDebug);
+      editor.off('transaction', handleTransaction);
+      editor.off('selectionUpdate', handleSelectionUpdate);
+      (editor.commands as any).setContent = originalSetContent;
+    };
+  }, [editor]);
+
   useEffect(() => {
     if (!editor) return;
     if (content !== lastSavedContentRef.current && editor.getHTML() !== content) {
