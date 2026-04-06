@@ -127,20 +127,9 @@ const Indent = Extension.create({
   },
 
   addCommands() {
-    const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
-      const { $from } = state.selection;
-      for (let depth = $from.depth; depth > 0; depth -= 1) {
-        const nodeName = $from.node(depth).type.name;
-        if (nodeName === 'listItem' || nodeName === 'taskItem') {
-          return nodeName;
-        }
-      }
-      return null;
-    };
-
     const adjustIndent =
       (delta: number) =>
-      ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
+      ({ state, commands }: { state: any; commands: any }) => {
         const { $from } = state.selection;
         const listItemType = getActiveListItemType(state);
 
@@ -173,17 +162,52 @@ const Indent = Extension.create({
           adjustIndent(-1)(props),
     };
   },
-
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => this.editor.commands.increaseIndent(),
-      'Shift-Tab': () => this.editor.commands.decreaseIndent(),
-    };
-  },
 });
 
 const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
 const EDITOR_CLASSES = 'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-3';
+
+const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const nodeName = $from.node(depth).type.name;
+    if (nodeName === 'listItem' || nodeName === 'taskItem') {
+      return nodeName;
+    }
+  }
+  return null;
+};
+
+const isAtStartOfNestedListItem = (state: any) => {
+  const { selection } = state;
+  if (!selection.empty || selection.$from.parentOffset !== 0) {
+    return false;
+  }
+
+  const { $from } = selection;
+  let listItemDepth: number | null = null;
+
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const nodeName = $from.node(depth).type.name;
+    if (nodeName === 'listItem' || nodeName === 'taskItem') {
+      listItemDepth = depth;
+      break;
+    }
+  }
+
+  if (listItemDepth == null) {
+    return false;
+  }
+
+  for (let depth = listItemDepth - 1; depth > 0; depth -= 1) {
+    const nodeName = $from.node(depth).type.name;
+    if (nodeName === 'listItem' || nodeName === 'taskItem') {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 interface TaskNotesModalProps {
   taskId: string;
@@ -218,6 +242,8 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   const dragRef = React.useRef<{ sx: number; sy: number; ix: number; iy: number } | null>(null);
   const resizeRef = React.useRef<{ sx: number; sy: number; iw: number; ih: number } | null>(null);
   const userIsInteracting = useRef(false);
+  const lastSavedContentRef = useRef(note);
+  const editorRef = useRef<any>(null);
 
   const editor = useEditor({
     extensions: [
@@ -245,29 +271,80 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
       attributes: {
         class: EDITOR_CLASSES,
       },
+      handleKeyDown: (_view, event) => {
+        const currentEditor = editorRef.current;
+        if (!currentEditor) {
+          return false;
+        }
+
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          const listItemType = getActiveListItemType(currentEditor.state);
+
+          if (event.shiftKey) {
+            if (listItemType) {
+              currentEditor.commands.liftListItem(listItemType);
+              return true;
+            }
+
+            currentEditor.commands.decreaseIndent();
+            return true;
+          }
+
+          if (listItemType) {
+            currentEditor.commands.sinkListItem(listItemType);
+            return true;
+          }
+
+          currentEditor.commands.increaseIndent();
+          return true;
+        }
+
+        if (event.key === 'Backspace' && isAtStartOfNestedListItem(currentEditor.state)) {
+          const listItemType = getActiveListItemType(currentEditor.state);
+          if (listItemType) {
+            event.preventDefault();
+            currentEditor.commands.liftListItem(listItemType);
+            return true;
+          }
+        }
+
+        return false;
+      },
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
       if (transaction.docChanged && userIsInteracting.current) {
-        saveCurrentPage(tiptapEditor.getHTML());
+        const html = tiptapEditor.getHTML();
+        lastSavedContentRef.current = html;
+        saveCurrentPage(html);
       }
     },
     onFocus: () => {
       userIsInteracting.current = true;
     },
+    onCreate: ({ editor: tiptapEditor }) => {
+      editorRef.current = tiptapEditor;
+    },
+    onDestroy: () => {
+      editorRef.current = null;
+    },
   });
 
   useEffect(() => {
     if (!editor) return;
-    if (editor.getHTML() !== note) {
+    if (note !== lastSavedContentRef.current && editor.getHTML() !== note) {
       const wasFocused = editor.isFocused;
       editor.commands.setContent(note, { emitUpdate: false });
+      lastSavedContentRef.current = note;
       if (wasFocused) requestAnimationFrame(() => editor.commands.focus('end'));
     }
   }, [editor, note]);
 
   const flushCurrentPage = () => {
     if (!editor) return;
-    saveCurrentPage(editor.getHTML());
+    const html = editor.getHTML();
+    lastSavedContentRef.current = html;
+    saveCurrentPage(html);
   };
 
   const handleDragStart = (e: React.MouseEvent) => {
@@ -335,25 +412,25 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
           </option>
         ))}
       </select>
-      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Bold">
+      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Bold">
         <Bold className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Italic">
+      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Italic">
         <Italic className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Underline">
+      <button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Underline">
         <UnderlineIcon className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Heading 1">
+      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Heading 1">
         <Heading1 className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Heading 2">
+      <button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Heading 2">
         <Heading2 className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Bullets">
+      <button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Bullets">
         <List className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => editor.chain().focus().toggleTaskList().run()} className="rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Task list">
+      <button type="button" onClick={() => editor.chain().focus().toggleTaskList().run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Task list">
         <CheckSquare className="h-4 w-4" />
       </button>
       <div className="ml-1 flex items-center gap-1">
@@ -362,7 +439,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
             key={color}
             type="button"
             onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-            className="h-4 w-4 rounded-full border border-border transition hover:scale-110"
+            className="h-4 w-4 rounded-full border border-border hover:scale-110"
             style={{ backgroundColor: color }}
             aria-label={`Toggle ${color} highlight`}
           />
@@ -411,7 +488,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
         </button>
         <button
           type="button"
-          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={() => {
             flushCurrentPage();
             addPage();
