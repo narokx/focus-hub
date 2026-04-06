@@ -316,7 +316,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
       if (transaction.docChanged && userIsInteracting.current) {
         const html = tiptapEditor.getHTML();
         lastSavedContentRef.current = html;
-        saveCurrentPage(html);
+        saveCurrentPageRef.current(html);
       }
     },
     onFocus: () => {
