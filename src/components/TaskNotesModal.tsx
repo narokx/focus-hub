@@ -244,6 +244,11 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   const userIsInteracting = useRef(false);
   const lastSavedContentRef = useRef(note);
   const editorRef = useRef<any>(null);
+  const saveCurrentPageRef = useRef(saveCurrentPage);
+
+  useEffect(() => {
+    saveCurrentPageRef.current = saveCurrentPage;
+  }, [saveCurrentPage]);
 
   const editor = useEditor({
     extensions: [
