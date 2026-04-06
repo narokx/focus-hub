@@ -184,20 +184,9 @@ const Indent = Extension.create({
   },
 
   addCommands() {
-    const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
-      const { $from } = state.selection;
-      for (let depth = $from.depth; depth > 0; depth -= 1) {
-        const nodeName = $from.node(depth).type.name;
-        if (nodeName === 'listItem' || nodeName === 'taskItem') {
-          return nodeName;
-        }
-      }
-      return null;
-    };
-
     const adjustIndent =
       (delta: number) =>
-      ({ editor, state, commands }: { editor: any; state: any; commands: any }) => {
+      ({ state, commands }: { state: any; commands: any }) => {
         const { $from } = state.selection;
         const listItemType = getActiveListItemType(state);
 
@@ -230,13 +219,6 @@ const Indent = Extension.create({
           adjustIndent(-1)(props),
     };
   },
-
-  addKeyboardShortcuts() {
-    return {
-      Tab: () => this.editor.commands.increaseIndent(),
-      'Shift-Tab': () => this.editor.commands.decreaseIndent(),
-    };
-  },
 });
 
 const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
@@ -252,6 +234,48 @@ const EDITOR_CLASSES = [
   '[&_li[data-type="taskItem"][data-checked="true"]>div>p]:line-through',
   '[&_li[data-type="taskItem"][data-checked="true"]>div>p]:text-muted-foreground',
 ].join(' ');
+
+const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
+  const { $from } = state.selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const nodeName = $from.node(depth).type.name;
+    if (nodeName === 'listItem' || nodeName === 'taskItem') {
+      return nodeName;
+    }
+  }
+  return null;
+};
+
+const isAtStartOfNestedListItem = (state: any) => {
+  const { selection } = state;
+  if (!selection.empty || selection.$from.parentOffset !== 0) {
+    return false;
+  }
+
+  const { $from } = selection;
+  let listItemDepth: number | null = null;
+
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const nodeName = $from.node(depth).type.name;
+    if (nodeName === 'listItem' || nodeName === 'taskItem') {
+      listItemDepth = depth;
+      break;
+    }
+  }
+
+  if (listItemDepth == null) {
+    return false;
+  }
+
+  for (let depth = listItemDepth - 1; depth > 0; depth -= 1) {
+    const nodeName = $from.node(depth).type.name;
+    if (nodeName === 'listItem' || nodeName === 'taskItem') {
+      return true;
+    }
+  }
+
+  return false;
+};
 
 interface WeeklyNotesPanelProps {
   content: string;
@@ -275,6 +299,8 @@ export function WeeklyNotesPanel({
   isLoading,
 }: WeeklyNotesPanelProps) {
   const userIsInteracting = useRef(false);
+  const lastSavedContentRef = useRef(content);
+  const editorRef = useRef<any>(null);
 
   const onSaveCurrentPageRef = useRef(onSaveCurrentPage);
   useEffect(() => {
@@ -308,22 +334,71 @@ export function WeeklyNotesPanel({
       attributes: {
         class: EDITOR_CLASSES,
       },
+      handleKeyDown: (_view, event) => {
+        const currentEditor = editorRef.current;
+        if (!currentEditor) {
+          return false;
+        }
+
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          const listItemType = getActiveListItemType(currentEditor.state);
+
+          if (event.shiftKey) {
+            if (listItemType) {
+              currentEditor.commands.liftListItem(listItemType);
+              return true;
+            }
+
+            currentEditor.commands.decreaseIndent();
+            return true;
+          }
+
+          if (listItemType) {
+            currentEditor.commands.sinkListItem(listItemType);
+            return true;
+          }
+
+          currentEditor.commands.increaseIndent();
+          return true;
+        }
+
+        if (event.key === 'Backspace' && isAtStartOfNestedListItem(currentEditor.state)) {
+          const listItemType = getActiveListItemType(currentEditor.state);
+          if (listItemType) {
+            event.preventDefault();
+            currentEditor.commands.liftListItem(listItemType);
+            return true;
+          }
+        }
+
+        return false;
+      },
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
       if (transaction.docChanged && userIsInteracting.current) {
-        onSaveCurrentPageRef.current(tiptapEditor.getHTML());
+        const html = tiptapEditor.getHTML();
+        lastSavedContentRef.current = html;
+        onSaveCurrentPageRef.current(html);
       }
     },
     onFocus: () => {
       userIsInteracting.current = true;
     },
+    onCreate: ({ editor: tiptapEditor }) => {
+      editorRef.current = tiptapEditor;
+    },
+    onDestroy: () => {
+      editorRef.current = null;
+    },
   });
 
   useEffect(() => {
     if (!editor) return;
-    if (editor.getHTML() !== content) {
+    if (content !== lastSavedContentRef.current && editor.getHTML() !== content) {
       const shouldRefocus = editor.isFocused;
       editor.commands.setContent(content, { emitUpdate: false });
+      lastSavedContentRef.current = content;
       if (shouldRefocus) {
         requestAnimationFrame(() => editor.commands.focus('end'));
       }
@@ -336,13 +411,17 @@ export function WeeklyNotesPanel({
 
   const navigateTo = (nextIndex: number) => {
     if (!editor) return;
-    onSaveCurrentPage(editor.getHTML());
+    const html = editor.getHTML();
+    lastSavedContentRef.current = html;
+    onSaveCurrentPage(html);
     onSetPage(nextIndex);
   };
 
   const handleAddPage = () => {
     if (!editor) return;
-    onSaveCurrentPage(editor.getHTML());
+    const html = editor.getHTML();
+    lastSavedContentRef.current = html;
+    onSaveCurrentPage(html);
     onAddPage();
   };
 
@@ -389,7 +468,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('bold')
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -401,7 +480,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('italic')
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -413,7 +492,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('underline')
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -428,7 +507,7 @@ export function WeeklyNotesPanel({
             const isCentered = editor.isActive({ textAlign: 'center' });
             editor.chain().focus().setTextAlign(isCentered ? 'left' : 'center').run();
           }}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive({ textAlign: 'center' })
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -440,7 +519,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('heading', { level: 1 })
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -452,7 +531,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('heading', { level: 2 })
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -464,7 +543,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('bulletList')
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -476,7 +555,7 @@ export function WeeklyNotesPanel({
         <button
           type="button"
           onClick={() => editor.chain().focus().toggleTaskList().run()}
-          className={`rounded-md p-2 transition hover:bg-muted ${
+          className={`rounded-md p-2 hover:bg-muted ${
             editor.isActive('taskList')
               ? 'bg-muted text-foreground'
               : 'text-muted-foreground hover:text-foreground'
@@ -491,7 +570,7 @@ export function WeeklyNotesPanel({
               key={color}
               type="button"
               onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-              className={`h-4 w-4 rounded-full border border-border transition ${
+              className={`h-4 w-4 rounded-full border border-border ${
                 editor.isActive('highlight', { color })
                   ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
                   : 'hover:scale-110'
