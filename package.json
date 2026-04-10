@@ -46,10 +46,13 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@supabase/supabase-js": "^2.99.0",
     "@tanstack/react-query": "^5.83.0",
+    "@tiptap/core": "^2.27.2",
+    "@tiptap/extension-highlight": "^2.26.1",
     "@tiptap/extension-task-item": "^2.26.1",
     "@tiptap/extension-task-list": "^2.26.1",
-    "@tiptap/react": "^2.26.1",
-    "@tiptap/starter-kit": "^2.26.1",
+    "@tiptap/extension-underline": "^2.26.1",
+    "@tiptap/react": "^2.27.2",
+    "@tiptap/starter-kit": "^2.27.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -70,9 +73,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
-    "zod": "^3.25.76",
-    "@tiptap/extension-highlight": "^2.26.1",
-    "@tiptap/extension-underline": "^2.26.1"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",

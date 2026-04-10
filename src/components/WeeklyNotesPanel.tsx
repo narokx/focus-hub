@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Extension, Mark, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -285,6 +285,7 @@ interface WeeklyNotesPanelProps {
   onSetPage: (index: number) => void;
   onAddPage: () => void;
   onDeletePage: (index: number) => void;
+  onReorderPages: (fromIndex: number, toIndex: number) => void;
   isLoading: boolean;
 }
 
@@ -296,11 +297,14 @@ export function WeeklyNotesPanel({
   onSetPage,
   onAddPage,
   onDeletePage,
+  onReorderPages,
   isLoading,
 }: WeeklyNotesPanelProps) {
   const userIsInteracting = useRef(false);
   const lastSavedContentRef = useRef(content);
   const editorRef = useRef<any>(null);
+  const [draggedPageIndex, setDraggedPageIndex] = useState<number | null>(null);
+  const [dropInsertIndex, setDropInsertIndex] = useState<number | null>(null);
 
   const onSaveCurrentPageRef = useRef(onSaveCurrentPage);
   useEffect(() => {
@@ -435,6 +439,30 @@ export function WeeklyNotesPanel({
     if (!editor || !canDeletePage) return;
     if (!window.confirm('Are you sure you want to delete this page?')) return;
     onDeletePage(currentPageIndex);
+  };
+
+  const getPagePreview = (pageContent: string) => {
+    const plain = pageContent
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return plain || '(empty)';
+  };
+
+  const handleDropAt = (insertIndex: number) => {
+    if (draggedPageIndex == null) return;
+    onReorderPages(draggedPageIndex, insertIndex);
+    setDraggedPageIndex(null);
+    setDropInsertIndex(null);
+  };
+
+  const resolveInsertIndexFromThumbnail = (
+    event: React.DragEvent<HTMLButtonElement>,
+    thumbnailIndex: number
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const midpoint = rect.left + rect.width / 2;
+    return event.clientX < midpoint ? thumbnailIndex : thumbnailIndex + 1;
   };
 
   if (!editor) {
@@ -590,7 +618,83 @@ export function WeeklyNotesPanel({
         <EditorContent editor={editor} className="h-full border-0" />
       </div>
 
-      <div className="flex items-center justify-between border-t bg-muted/40 px-3 py-2">
+      <div className="border-t bg-muted/40 px-3 py-2">
+        <div className="mb-2 overflow-x-auto pb-1">
+          <div className="flex min-w-max items-end gap-2">
+            {pages.map((page, index) => (
+              <Fragment key={`weekly-page-thumb-wrap-${index}`}>
+                <div
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                    setDropInsertIndex(index);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleDropAt(index);
+                  }}
+                  className={`h-12 w-1 shrink-0 rounded transition ${
+                    dropInsertIndex === index ? 'bg-primary/80' : 'bg-transparent'
+                  }`}
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggedPageIndex(index);
+                    event.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                    const insertIndex = resolveInsertIndexFromThumbnail(event, index);
+                    setDropInsertIndex(insertIndex);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const insertIndex =
+                      dropInsertIndex ?? resolveInsertIndexFromThumbnail(event, index);
+                    handleDropAt(insertIndex);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedPageIndex(null);
+                    setDropInsertIndex(null);
+                  }}
+                  onClick={() => navigateTo(index)}
+                  className={`h-12 w-20 shrink-0 overflow-hidden rounded border p-1 text-left transition ${
+                    currentPageIndex === index
+                      ? 'border-primary bg-background'
+                      : 'border-border/70 bg-background/70 hover:border-primary/50'
+                  }`}
+                  title={`Page ${index + 1}`}
+                >
+                  <div className="mb-1 text-[10px] font-semibold text-muted-foreground">P{index + 1}</div>
+                  <div className="line-clamp-2 text-[10px] leading-3 text-foreground/80">
+                    {getPagePreview(page)}
+                  </div>
+                </button>
+              </Fragment>
+            ))}
+            <div
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
+                setDropInsertIndex(pages.length);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleDropAt(pages.length);
+              }}
+              className={`h-12 w-1 shrink-0 rounded transition ${
+                dropInsertIndex === pages.length ? 'bg-primary/80' : 'bg-transparent'
+              }`}
+              aria-hidden="true"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={() => navigateTo(currentPageIndex - 1)}
@@ -631,6 +735,7 @@ export function WeeklyNotesPanel({
           >
             <Plus className="h-4 w-4" />
           </button>
+        </div>
         </div>
       </div>
 
