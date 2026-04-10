@@ -184,6 +184,43 @@ export function useSupabaseNotes() {
     });
   }, [loading, queuePersist]);
 
+  const reorderPages = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (!isReady.current || loading) return;
+
+      setPages((prev) => {
+        const safe = normalizePages(prev);
+        if (safe.length <= 1) return safe;
+
+        const from = Math.max(0, Math.min(fromIndex, safe.length - 1));
+        const insertion = Math.max(0, Math.min(toIndex, safe.length));
+
+        const next = [...safe];
+        const [moved] = next.splice(from, 1);
+        const target = from < insertion ? insertion - 1 : insertion;
+        if (from === target) return safe;
+        next.splice(target, 0, moved);
+
+        setCurrentPageIndex((current) => {
+          let updated = current;
+          if (current === from) {
+            updated = target;
+          } else if (from < target && current > from && current <= target) {
+            updated = current - 1;
+          } else if (from > target && current >= target && current < from) {
+            updated = current + 1;
+          }
+          localStorage.setItem(LOCAL_NOTES_PAGE_INDEX_KEY, String(updated));
+          return updated;
+        });
+
+        queuePersist(next);
+        return next;
+      });
+    },
+    [loading, queuePersist]
+  );
+
   const fetchOrCreateNote = useCallback(async () => {
     isReady.current = false;
 
@@ -334,6 +371,7 @@ export function useSupabaseNotes() {
     setPage,
     addPage,
     deletePage,
+    reorderPages,
     refresh: fetchOrCreateNote,
   };
 }
