@@ -197,6 +197,8 @@ export default function Index() {
 
   // History for undo/redo
   const history = useHistory(state);
+  const isAppDataLoading = tasksLoading || routinesLoading || calendarLoading;
+  const historyInitializedRef = React.useRef(false);
 
   // Serialize undo/redo DB sync to avoid interleaving mutations
   const undoRedoQueueRef = React.useRef<Promise<void>>(Promise.resolve());
@@ -204,11 +206,23 @@ export default function Index() {
   // Push state to history whenever state changes
   const prevStateRef = React.useRef(state);
   useEffect(() => {
+    if (isAppDataLoading) {
+      prevStateRef.current = state;
+      return;
+    }
+
+    if (!historyInitializedRef.current) {
+      history.reset(state);
+      prevStateRef.current = state;
+      historyInitializedRef.current = true;
+      return;
+    }
+
     if (prevStateRef.current !== state) {
       history.push(state);
       prevStateRef.current = state;
     }
-  }, [state]);
+  }, [state, history, isAppDataLoading]);
 
   const enqueueCalendarHistorySync = useCallback((fromState: typeof state, toState: typeof state) => {
     if (!user) return;

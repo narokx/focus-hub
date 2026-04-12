@@ -17,6 +17,12 @@ export function useHistory(initialState: AppState) {
     skipPushCountRef.current += n;
   }, []);
 
+  const reset = useCallback((state: AppState) => {
+    skipPushCountRef.current = 0;
+    setHistory([state]);
+    setIndex(0);
+  }, []);
+
   const push = useCallback((state: AppState) => {
     if (skipPushCountRef.current > 0) {
       skipPushCountRef.current -= 1;
@@ -51,5 +57,5 @@ export function useHistory(initialState: AppState) {
     return history[newIndex];
   }, [canRedo, index, history]);
 
-  return { push, undo, redo, canUndo, canRedo, skipNextPushes };
+  return useMemo(() => ({ push, undo, redo, canUndo, canRedo, skipNextPushes, reset }), [push, undo, redo, canUndo, canRedo, skipNextPushes, reset]);
 }
