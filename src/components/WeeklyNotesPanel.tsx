@@ -483,7 +483,7 @@ export function WeeklyNotesPanel({
           type="button"
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
-          className="rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Undo note edit"
           title="Undo"
         >
