@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { AppState } from '@/types';
 
 const MAX_HISTORY = 50;
