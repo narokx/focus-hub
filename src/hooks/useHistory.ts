@@ -57,5 +57,5 @@ export function useHistory(initialState: AppState) {
     return history[newIndex];
   }, [canRedo, index, history]);
 
-  return { push, undo, redo, canUndo, canRedo, skipNextPushes, reset };
+  return useMemo(() => ({ push, undo, redo, canUndo, canRedo, skipNextPushes, reset }), [push, undo, redo, canUndo, canRedo, skipNextPushes, reset]);
 }
