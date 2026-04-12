@@ -17,7 +17,9 @@ import {
   Italic,
   List,
   Plus,
+  Redo2,
   Trash2,
+  Undo2,
   Underline as UnderlineIcon,
 } from 'lucide-react';
 
@@ -471,12 +473,32 @@ export function WeeklyNotesPanel({
 
   return (
     <div className="h-full -m-4 flex flex-col">
-      <div className="sticky top-0 z-10 flex items-center gap-1 border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="sticky top-0 z-10 flex items-center gap-1 overflow-x-auto border-b bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         {isLoading && (
           <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
             Syncing…
           </span>
         )}
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().undo().run()}
+          disabled={!editor.can().undo()}
+          className="rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Undo note edit"
+          title="Undo"
+        >
+          <Undo2 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => editor.chain().focus().redo().run()}
+          disabled={!editor.can().redo()}
+          className="rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Redo note edit"
+          title="Redo"
+        >
+          <Redo2 className="h-4 w-4" />
+        </button>
         <select
           value={editor.getAttributes('textStyle').fontSize || '1rem'}
           onChange={(event) => {
