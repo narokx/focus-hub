@@ -493,7 +493,7 @@ export function WeeklyNotesPanel({
           type="button"
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
-          className="rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          className="shrink-0 rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
           aria-label="Redo note edit"
           title="Redo"
         >
