@@ -16,6 +16,7 @@ import {
   Heading2,
   Italic,
   List,
+  Palette,
   Plus,
   Redo2,
   Trash2,
@@ -223,7 +224,27 @@ const Indent = Extension.create({
   },
 });
 
-const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
+const highlightColors = [
+  '#4f4600',
+  '#14532d',
+  '#6b214b',
+  '#1e3a8a',
+  '#fef08a',
+  '#bbf7d0',
+  '#fbcfe8',
+  '#bfdbfe',
+];
+
+const highlightTextColors: Record<string, string> = {
+  '#4f4600': '#f9fafb',
+  '#14532d': '#f9fafb',
+  '#6b214b': '#f9fafb',
+  '#1e3a8a': '#f9fafb',
+  '#fef08a': '#1f2937',
+  '#bbf7d0': '#1f2937',
+  '#fbcfe8': '#1f2937',
+  '#bfdbfe': '#1f2937',
+};
 
 const EDITOR_CLASSES = [
   'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4',
@@ -307,6 +328,7 @@ export function WeeklyNotesPanel({
   const editorRef = useRef<any>(null);
   const [draggedPageIndex, setDraggedPageIndex] = useState<number | null>(null);
   const [dropInsertIndex, setDropInsertIndex] = useState<number | null>(null);
+  const [isHighlightPaletteOpen, setIsHighlightPaletteOpen] = useState(false);
 
   const onSaveCurrentPageRef = useRef(onSaveCurrentPage);
   useEffect(() => {
@@ -618,21 +640,40 @@ export function WeeklyNotesPanel({
         >
           <CheckSquare className="h-4 w-4" />
         </button>
-        <div className="ml-2 flex items-center gap-1">
-          {highlightColors.map((color) => (
-            <button
-              key={color}
-              type="button"
-              onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-              className={`h-4 w-4 rounded-full border border-border ${
-                editor.isActive('highlight', { color })
-                  ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
-                  : 'hover:scale-110'
-              }`}
-              style={{ backgroundColor: color }}
-              aria-label={`Toggle ${color} highlight`}
-            />
-          ))}
+        <div className="relative ml-2">
+          <button
+            type="button"
+            onClick={() => setIsHighlightPaletteOpen((current) => !current)}
+            className={`rounded-md p-2 hover:bg-muted ${
+              editor.isActive('highlight')
+                ? 'bg-muted text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+            aria-label="Toggle highlight colors"
+          >
+            <Palette className="h-4 w-4" />
+          </button>
+          {isHighlightPaletteOpen ? (
+            <div className="absolute left-0 top-full z-20 mt-2 flex items-center gap-1 rounded-md border bg-background/95 p-2 shadow-lg backdrop-blur">
+              {highlightColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => {
+                    editor.chain().focus().toggleHighlight({ color }).run();
+                    setIsHighlightPaletteOpen(false);
+                  }}
+                  className={`h-4 w-4 rounded-full border border-border ${
+                    editor.isActive('highlight', { color })
+                      ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                      : 'hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Toggle ${color} highlight`}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -767,6 +808,12 @@ export function WeeklyNotesPanel({
           color: #9ca3af !important;
           opacity: 0.6;
         }
+        ${Object.entries(highlightTextColors)
+          .map(
+            ([color, textColor]) =>
+              `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
+          )
+          .join('\n')}
       `}</style>
     </div>
   );

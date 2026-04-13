@@ -16,6 +16,7 @@ import {
   Heading2,
   Italic,
   List,
+  Palette,
   Plus,
   Trash2,
   Underline as UnderlineIcon,
@@ -164,7 +165,26 @@ const Indent = Extension.create({
   },
 });
 
-const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
+const highlightColors = [
+  '#4f4600',
+  '#14532d',
+  '#6b214b',
+  '#1e3a8a',
+  '#fef08a',
+  '#bbf7d0',
+  '#fbcfe8',
+  '#bfdbfe',
+];
+const highlightTextColors: Record<string, string> = {
+  '#4f4600': '#f9fafb',
+  '#14532d': '#f9fafb',
+  '#6b214b': '#f9fafb',
+  '#1e3a8a': '#f9fafb',
+  '#fef08a': '#1f2937',
+  '#bbf7d0': '#1f2937',
+  '#fbcfe8': '#1f2937',
+  '#bfdbfe': '#1f2937',
+};
 const EDITOR_CLASSES = 'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-3';
 
 const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
@@ -239,6 +259,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
     }
   });
   const [isDragging, setIsDragging] = useState(false);
+  const [isHighlightPaletteOpen, setIsHighlightPaletteOpen] = useState(false);
   const dragRef = React.useRef<{ sx: number; sy: number; ix: number; iy: number } | null>(null);
   const resizeRef = React.useRef<{ sx: number; sy: number; iw: number; ih: number } | null>(null);
   const userIsInteracting = useRef(false);
@@ -442,17 +463,42 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
       <button type="button" onClick={() => editor.chain().focus().toggleTaskList().run()} className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Task list">
         <CheckSquare className="h-4 w-4" />
       </button>
-      <div className="ml-1 flex items-center gap-1">
-        {highlightColors.map((color) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-            className="h-4 w-4 rounded-full border border-border hover:scale-110"
-            style={{ backgroundColor: color }}
-            aria-label={`Toggle ${color} highlight`}
-          />
-        ))}
+      <div className="relative ml-1">
+        <button
+          type="button"
+          onClick={() => setIsHighlightPaletteOpen((current) => !current)}
+          className={cn(
+            'rounded-md p-2 hover:bg-muted',
+            editor.isActive('highlight')
+              ? 'bg-muted text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          )}
+          aria-label="Toggle highlight colors"
+        >
+          <Palette className="h-4 w-4" />
+        </button>
+        {isHighlightPaletteOpen ? (
+          <div className="absolute left-0 top-full z-20 mt-2 flex items-center gap-1 rounded-md border bg-background/95 p-2 shadow-lg backdrop-blur">
+            {highlightColors.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => {
+                  editor.chain().focus().toggleHighlight({ color }).run();
+                  setIsHighlightPaletteOpen(false);
+                }}
+                className={cn(
+                  'h-4 w-4 rounded-full border border-border',
+                  editor.isActive('highlight', { color })
+                    ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                    : 'hover:scale-110',
+                )}
+                style={{ backgroundColor: color }}
+                aria-label={`Toggle ${color} highlight`}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -538,6 +584,14 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
         </div>
 
         {pagination}
+        <style>{`
+          ${Object.entries(highlightTextColors)
+            .map(
+              ([color, textColor]) =>
+                `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
+            )
+            .join('\n')}
+        `}</style>
       </div>
     );
   }
@@ -589,6 +643,14 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
             <path d="M2 8L8 2M5 8L8 5M8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </div>
+        <style>{`
+          ${Object.entries(highlightTextColors)
+            .map(
+              ([color, textColor]) =>
+                `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
+            )
+            .join('\n')}
+        `}</style>
       </div>
     </div>
   );
