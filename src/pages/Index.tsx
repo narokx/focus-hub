@@ -199,9 +199,26 @@ export default function Index() {
   const history = useHistory(state);
   const isAppDataLoading = tasksLoading || routinesLoading || calendarLoading;
   const historyInitializedRef = React.useRef(false);
+  const hasUserInteractedRef = React.useRef(false);
 
   // Serialize undo/redo DB sync to avoid interleaving mutations
   const undoRedoQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    const markInteracted = () => {
+      hasUserInteractedRef.current = true;
+    };
+
+    window.addEventListener('pointerdown', markInteracted, { capture: true });
+    window.addEventListener('keydown', markInteracted, { capture: true });
+    window.addEventListener('touchstart', markInteracted, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', markInteracted, { capture: true });
+      window.removeEventListener('keydown', markInteracted, { capture: true });
+      window.removeEventListener('touchstart', markInteracted, { capture: true });
+    };
+  }, []);
 
   // Push state to history whenever state changes
   const prevStateRef = React.useRef(state);
@@ -219,7 +236,11 @@ export default function Index() {
     }
 
     if (prevStateRef.current !== state) {
-      history.push(state);
+      if (hasUserInteractedRef.current) {
+        history.push(state);
+      } else {
+        history.reset(state);
+      }
       prevStateRef.current = state;
     }
   }, [state, history, isAppDataLoading]);
