@@ -16,12 +16,15 @@ import {
   Heading2,
   Italic,
   List,
+  Palette,
   Plus,
   Redo2,
   Trash2,
   Undo2,
   Underline as UnderlineIcon,
 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -223,7 +226,27 @@ const Indent = Extension.create({
   },
 });
 
-const highlightColors = ['#fef08a', '#bbf7d0', '#fbcfe8', '#bfdbfe'];
+const highlightColors = [
+  '#4f4600',
+  '#14532d',
+  '#6b214b',
+  '#1e3a8a',
+  '#fef08a',
+  '#bbf7d0',
+  '#fbcfe8',
+  '#bfdbfe',
+];
+
+const highlightTextColors: Record<string, string> = {
+  '#4f4600': '#f9fafb',
+  '#14532d': '#f9fafb',
+  '#6b214b': '#f9fafb',
+  '#1e3a8a': '#f9fafb',
+  '#fef08a': '#1f2937',
+  '#bbf7d0': '#1f2937',
+  '#fbcfe8': '#1f2937',
+  '#bfdbfe': '#1f2937',
+};
 
 const EDITOR_CLASSES = [
   'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4',
@@ -289,6 +312,12 @@ interface WeeklyNotesPanelProps {
   onDeletePage: (index: number) => void;
   onReorderPages: (fromIndex: number, toIndex: number) => void;
   isLoading: boolean;
+  onHistoryAvailabilityChange?: (history: {
+    canUndo: boolean;
+    canRedo: boolean;
+    undo: () => void;
+    redo: () => void;
+  }) => void;
 }
 
 export function WeeklyNotesPanel({
@@ -301,12 +330,15 @@ export function WeeklyNotesPanel({
   onDeletePage,
   onReorderPages,
   isLoading,
+  onHistoryAvailabilityChange,
 }: WeeklyNotesPanelProps) {
+  const isMobile = useIsMobile();
   const userIsInteracting = useRef(false);
   const lastSavedContentRef = useRef(content);
   const editorRef = useRef<any>(null);
   const [draggedPageIndex, setDraggedPageIndex] = useState<number | null>(null);
   const [dropInsertIndex, setDropInsertIndex] = useState<number | null>(null);
+  const [isHighlightPaletteOpen, setIsHighlightPaletteOpen] = useState(false);
 
   const onSaveCurrentPageRef = useRef(onSaveCurrentPage);
   useEffect(() => {
@@ -382,7 +414,7 @@ export function WeeklyNotesPanel({
       },
     },
     onUpdate: ({ editor: tiptapEditor, transaction }) => {
-      if (transaction.docChanged && userIsInteracting.current) {
+      if (transaction.docChanged) {
         const html = tiptapEditor.getHTML();
         lastSavedContentRef.current = html;
         onSaveCurrentPageRef.current(html);
@@ -414,6 +446,32 @@ export function WeeklyNotesPanel({
       }
     }
   }, [content, editor]);
+
+  useEffect(() => {
+    if (!editor || !onHistoryAvailabilityChange) return;
+
+    const emitHistoryState = () => {
+      onHistoryAvailabilityChange({
+        canUndo: editor.can().undo(),
+        canRedo: editor.can().redo(),
+        undo: () => {
+          editor.chain().focus().undo().run();
+        },
+        redo: () => {
+          editor.chain().focus().redo().run();
+        },
+      });
+    };
+
+    emitHistoryState();
+    editor.on('transaction', emitHistoryState);
+    editor.on('selectionUpdate', emitHistoryState);
+
+    return () => {
+      editor.off('transaction', emitHistoryState);
+      editor.off('selectionUpdate', emitHistoryState);
+    };
+  }, [editor, onHistoryAvailabilityChange]);
 
   const totalPages = Math.max(1, pages.length);
   const canGoPrev = currentPageIndex > 0;
@@ -479,26 +537,30 @@ export function WeeklyNotesPanel({
             Syncing…
           </span>
         )}
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().undo().run()}
-          disabled={!editor.can().undo()}
-          className="shrink-0 rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Undo note edit"
-          title="Undo"
-        >
-          <Undo2 className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => editor.chain().focus().redo().run()}
-          disabled={!editor.can().redo()}
-          className="shrink-0 rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          aria-label="Redo note edit"
-          title="Redo"
-        >
-          <Redo2 className="h-4 w-4" />
-        </button>
+        {isMobile ? (
+          <>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().undo().run()}
+              disabled={!editor.can().undo()}
+              className="shrink-0 rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Undo note edit"
+              title="Undo"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => editor.chain().focus().redo().run()}
+              disabled={!editor.can().redo()}
+              className="shrink-0 rounded-md p-2 text-muted-foreground transition hover:bg-muted enabled:hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+              aria-label="Redo note edit"
+              title="Redo"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+          </>
+        ) : null}
         <select
           value={editor.getAttributes('textStyle').fontSize || '1rem'}
           onChange={(event) => {
@@ -618,22 +680,47 @@ export function WeeklyNotesPanel({
         >
           <CheckSquare className="h-4 w-4" />
         </button>
-        <div className="ml-2 flex items-center gap-1">
-          {highlightColors.map((color) => (
+        <Popover open={isHighlightPaletteOpen} onOpenChange={setIsHighlightPaletteOpen}>
+          <PopoverTrigger asChild>
             <button
-              key={color}
               type="button"
-              onClick={() => editor.chain().focus().toggleHighlight({ color }).run()}
-              className={`h-4 w-4 rounded-full border border-border ${
-                editor.isActive('highlight', { color })
-                  ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
-                  : 'hover:scale-110'
+              className={`rounded-md p-2 hover:bg-muted ${
+                editor.isActive('highlight')
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
-              style={{ backgroundColor: color }}
-              aria-label={`Toggle ${color} highlight`}
-            />
-          ))}
-        </div>
+              aria-label="Toggle highlight colors"
+            >
+              <Palette className="h-4 w-4" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            side="bottom"
+            sideOffset={8}
+            className="w-max border bg-background/95 p-2 shadow-lg backdrop-blur"
+          >
+            <div className="flex flex-nowrap items-center gap-1">
+              {highlightColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => {
+                    editor.chain().focus().toggleHighlight({ color }).run();
+                    setIsHighlightPaletteOpen(false);
+                  }}
+                  className={`h-4 w-4 rounded-full border border-border ${
+                    editor.isActive('highlight', { color })
+                      ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                      : 'hover:scale-110'
+                  }`}
+                  style={{ backgroundColor: color }}
+                  aria-label={`Toggle ${color} highlight`}
+                />
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto" onKeyDown={(event) => event.stopPropagation()}>
@@ -767,6 +854,12 @@ export function WeeklyNotesPanel({
           color: #9ca3af !important;
           opacity: 0.6;
         }
+        ${Object.entries(highlightTextColors)
+          .map(
+            ([color, textColor]) =>
+              `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
+          )
+          .join('\n')}
       `}</style>
     </div>
   );
