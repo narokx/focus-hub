@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -65,6 +65,12 @@ const MINIMIZED_STORAGE_KEY: Record<WindowKey, string> = {
 
 export default function Index() {
   const { user } = useAuth();
+  const [weeklyNotesHistoryState, setWeeklyNotesHistoryState] = useState<{
+    canUndo: boolean;
+    canRedo: boolean;
+    undo: () => void;
+    redo: () => void;
+  } | null>(null);
 
   const {
     tasks: supabaseTasks,
@@ -199,9 +205,27 @@ export default function Index() {
   const history = useHistory(state);
   const isAppDataLoading = tasksLoading || routinesLoading || calendarLoading;
   const historyInitializedRef = React.useRef(false);
+  const hasUserInteractedRef = React.useRef(false);
+  const historyPushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Serialize undo/redo DB sync to avoid interleaving mutations
   const undoRedoQueueRef = React.useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    const markInteracted = () => {
+      hasUserInteractedRef.current = true;
+    };
+
+    window.addEventListener('pointerdown', markInteracted, { capture: true });
+    window.addEventListener('keydown', markInteracted, { capture: true });
+    window.addEventListener('touchstart', markInteracted, { capture: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', markInteracted, { capture: true });
+      window.removeEventListener('keydown', markInteracted, { capture: true });
+      window.removeEventListener('touchstart', markInteracted, { capture: true });
+    };
+  }, []);
 
   // Push state to history whenever state changes
   const prevStateRef = React.useRef(state);
@@ -219,10 +243,38 @@ export default function Index() {
     }
 
     if (prevStateRef.current !== state) {
-      history.push(state);
+      if (hasUserInteractedRef.current) {
+        if (historyPushTimeoutRef.current) {
+          clearTimeout(historyPushTimeoutRef.current);
+        }
+        historyPushTimeoutRef.current = setTimeout(() => {
+          history.push(state);
+          historyPushTimeoutRef.current = null;
+        }, 120);
+      } else {
+        if (historyPushTimeoutRef.current) {
+          clearTimeout(historyPushTimeoutRef.current);
+          historyPushTimeoutRef.current = null;
+        }
+        history.reset(state);
+      }
       prevStateRef.current = state;
     }
   }, [state, history, isAppDataLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (historyPushTimeoutRef.current) {
+        clearTimeout(historyPushTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isNotesOpen) {
+      setWeeklyNotesHistoryState(null);
+    }
+  }, [isNotesOpen]);
 
   const enqueueCalendarHistorySync = useCallback((fromState: typeof state, toState: typeof state) => {
     if (!user) return;
@@ -244,28 +296,32 @@ export default function Index() {
   }, [user, fetchCalendar]);
 
   const handleUndo = useCallback(() => {
+    if (isNotesOpen && weeklyNotesHistoryState?.canUndo) {
+      weeklyNotesHistoryState.undo();
+      return;
+    }
+
     const from = state;
     const prev = history.undo();
     if (!prev) return;
 
-    // We will restore state (skip is handled by history.undo()), then fetchCalendar() will normalize ids.
-    // Skip that follow-up push so we don't kill the redo stack.
-    history.skipNextPushes(1);
-
     restoreState(prev);
     enqueueCalendarHistorySync(from, prev);
-  }, [state, history, restoreState, enqueueCalendarHistorySync]);
+  }, [isNotesOpen, weeklyNotesHistoryState, state, history, restoreState, enqueueCalendarHistorySync]);
 
   const handleRedo = useCallback(() => {
+    if (isNotesOpen && weeklyNotesHistoryState?.canRedo) {
+      weeklyNotesHistoryState.redo();
+      return;
+    }
+
     const from = state;
     const next = history.redo();
     if (!next) return;
 
-    history.skipNextPushes(1);
-
     restoreState(next);
     enqueueCalendarHistorySync(from, next);
-  }, [state, history, restoreState, enqueueCalendarHistorySync]);
+  }, [isNotesOpen, weeklyNotesHistoryState, state, history, restoreState, enqueueCalendarHistorySync]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -733,7 +789,7 @@ export default function Index() {
             <div className="flex items-center gap-1">
               <button
                 onClick={handleUndo}
-                disabled={!history.canUndo}
+                disabled={!(history.canUndo || (isNotesOpen && !!weeklyNotesHistoryState?.canUndo))}
                 className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
                 title="Undo (Ctrl+Z)"
               >
@@ -741,7 +797,7 @@ export default function Index() {
               </button>
               <button
                 onClick={handleRedo}
-                disabled={!history.canRedo}
+                disabled={!(history.canRedo || (isNotesOpen && !!weeklyNotesHistoryState?.canRedo))}
                 className="p-1.5 rounded-md hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
                 title="Redo (Ctrl+Shift+Z)"
               >
@@ -903,6 +959,7 @@ export default function Index() {
                 onDeletePage={deleteWeeklyPage}
                 onReorderPages={reorderWeeklyPages}
                 isLoading={notesLoading}
+                onHistoryAvailabilityChange={setWeeklyNotesHistoryState}
               />
             </div>
           </div>
@@ -931,7 +988,7 @@ export default function Index() {
           <div className="ml-2 flex items-center gap-2">
             <button
               onClick={handleUndo}
-              disabled={!history.canUndo}
+              disabled={!(history.canUndo || (isNotesOpen && !!weeklyNotesHistoryState?.canUndo))}
               className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
               title="Undo (Ctrl+Z)"
             >
@@ -939,7 +996,7 @@ export default function Index() {
             </button>
             <button
               onClick={handleRedo}
-              disabled={!history.canRedo}
+              disabled={!(history.canRedo || (isNotesOpen && !!weeklyNotesHistoryState?.canRedo))}
               className="p-1.5 rounded-md hover:bg-card transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
               title="Redo (Ctrl+Shift+Z)"
             >
@@ -1146,6 +1203,7 @@ export default function Index() {
               onDeletePage={deleteWeeklyPage}
               onReorderPages={reorderWeeklyPages}
               isLoading={notesLoading}
+              onHistoryAvailabilityChange={setWeeklyNotesHistoryState}
             />
           </FloatingWindow>
         )}

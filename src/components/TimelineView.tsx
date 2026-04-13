@@ -64,10 +64,12 @@ function TimeRangePickerField({
 
     onChange(activeField, nextTime);
 
-    if (activeField === 'startTime') {
-      setActiveField('endTime');
-    } else {
-      setOpen(false);
+    if (part === 'minute') {
+      if (activeField === 'startTime') {
+        setActiveField('endTime');
+      } else {
+        setOpen(false);
+      }
     }
   };
 
