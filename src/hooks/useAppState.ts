@@ -27,6 +27,15 @@ const defaultWindowTitles = {
   weeklyNotes: 'Weekly Notes',
 };
 
+function hasMeaningfulChange<T>(prevValue: T, nextValue: T): boolean {
+  if (prevValue === nextValue) return false;
+  try {
+    return JSON.stringify(prevValue) !== JSON.stringify(nextValue);
+  } catch {
+    return true;
+  }
+}
+
 const getDefaultState = (): AppState => ({
   quickTasks: defaultQuickTasks,
   routines: [
@@ -110,7 +119,7 @@ export function useAppState(
   useEffect(() => {
     if (externalQuickTasks !== undefined) {
       setState(prev => {
-        if (prev.quickTasks === externalQuickTasks) return prev;
+        if (!hasMeaningfulChange(prev.quickTasks, externalQuickTasks)) return prev;
         return { ...prev, quickTasks: externalQuickTasks };
       });
     }
@@ -120,7 +129,7 @@ export function useAppState(
   useEffect(() => {
     if (externalRoutines !== undefined) {
       setState(prev => {
-        if (prev.routines === externalRoutines) return prev;
+        if (!hasMeaningfulChange(prev.routines, externalRoutines)) return prev;
         return { ...prev, routines: externalRoutines };
       });
     }
@@ -130,7 +139,7 @@ export function useAppState(
   useEffect(() => {
     if (externalCalendar !== undefined) {
       setState(prev => {
-        if (prev.calendar === externalCalendar) return prev;
+        if (!hasMeaningfulChange(prev.calendar, externalCalendar)) return prev;
         return { ...prev, calendar: externalCalendar };
       });
     }
