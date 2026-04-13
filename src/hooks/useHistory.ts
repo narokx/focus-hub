@@ -6,11 +6,12 @@ const MAX_HISTORY = 50;
 export function useHistory(initialState: AppState) {
   const [history, setHistory] = useState<AppState[]>([initialState]);
   const [index, setIndex] = useState(0);
+  const [hasUndone, setHasUndone] = useState(false);
   // How many upcoming push() calls should be ignored (used during undo/redo and any follow-up normalization updates)
   const skipPushCountRef = useRef(0);
 
   const canUndo = index > 0;
-  const canRedo = index < history.length - 1;
+  const canRedo = hasUndone && index < history.length - 1;
 
   const skipNextPushes = useCallback((count = 1) => {
     const n = Math.max(0, count);
@@ -21,6 +22,7 @@ export function useHistory(initialState: AppState) {
     skipPushCountRef.current = 0;
     setHistory([state]);
     setIndex(0);
+    setHasUndone(false);
   }, []);
 
   const push = useCallback((state: AppState) => {
@@ -37,6 +39,7 @@ export function useHistory(initialState: AppState) {
       return newHistory;
     });
     setIndex(prev => Math.min(prev + 1, MAX_HISTORY - 1));
+    setHasUndone(false);
   }, [index]);
 
   const undo = useCallback(() => {
@@ -45,6 +48,7 @@ export function useHistory(initialState: AppState) {
     skipPushCountRef.current += 1;
     const newIndex = index - 1;
     setIndex(newIndex);
+    setHasUndone(true);
     return history[newIndex];
   }, [canUndo, index, history]);
 
@@ -54,8 +58,9 @@ export function useHistory(initialState: AppState) {
     skipPushCountRef.current += 1;
     const newIndex = index + 1;
     setIndex(newIndex);
+    setHasUndone(newIndex < history.length - 1);
     return history[newIndex];
-  }, [canRedo, index, history]);
+  }, [canRedo, index, history.length, history]);
 
   return useMemo(() => ({ push, undo, redo, canUndo, canRedo, skipNextPushes, reset }), [push, undo, redo, canUndo, canRedo, skipNextPushes, reset]);
 }
