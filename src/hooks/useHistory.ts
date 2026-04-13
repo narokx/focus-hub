@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { AppState } from '@/types';
 
 const MAX_HISTORY = 50;
@@ -8,6 +8,11 @@ export function useHistory(initialState: AppState) {
   const [index, setIndex] = useState(0);
   // How many upcoming push() calls should be ignored (used during undo/redo and any follow-up normalization updates)
   const skipPushCountRef = useRef(0);
+  const timelineRef = useRef<{ history: AppState[]; index: number }>({ history: [initialState], index: 0 });
+
+  useEffect(() => {
+    timelineRef.current = { history, index };
+  }, [history, index]);
 
   const canUndo = index > 0;
   const canRedo = index < history.length - 1;
@@ -19,6 +24,7 @@ export function useHistory(initialState: AppState) {
 
   const reset = useCallback((state: AppState) => {
     skipPushCountRef.current = 0;
+    timelineRef.current = { history: [state], index: 0 };
     setHistory([state]);
     setIndex(0);
   }, []);
@@ -29,33 +35,41 @@ export function useHistory(initialState: AppState) {
       return;
     }
 
-    setHistory(prev => {
-      // Slice off any redo states
-      const newHistory = [...prev.slice(0, index + 1), state];
-      // Limit size
-      if (newHistory.length > MAX_HISTORY) newHistory.shift();
-      return newHistory;
+    setHistory(prevHistory => {
+      const currentIndex = timelineRef.current.index;
+      const nextHistory = [...prevHistory.slice(0, currentIndex + 1), state];
+      if (nextHistory.length > MAX_HISTORY) {
+        nextHistory.shift();
+      }
+
+      const nextIndex = nextHistory.length - 1;
+      timelineRef.current = { history: nextHistory, index: nextIndex };
+      setIndex(nextIndex);
+      return nextHistory;
     });
-    setIndex(prev => Math.min(prev + 1, MAX_HISTORY - 1));
-  }, [index]);
+  }, []);
 
   const undo = useCallback(() => {
-    if (!canUndo) return null;
+    const { history: currentHistory, index: currentIndex } = timelineRef.current;
+    if (currentIndex <= 0) return null;
     // Skip the push that will happen due to restoreState(prev)
     skipPushCountRef.current += 1;
-    const newIndex = index - 1;
+    const newIndex = currentIndex - 1;
+    timelineRef.current = { history: currentHistory, index: newIndex };
     setIndex(newIndex);
-    return history[newIndex];
-  }, [canUndo, index, history]);
+    return currentHistory[newIndex];
+  }, []);
 
   const redo = useCallback(() => {
-    if (!canRedo) return null;
+    const { history: currentHistory, index: currentIndex } = timelineRef.current;
+    if (currentIndex >= currentHistory.length - 1) return null;
     // Skip the push that will happen due to restoreState(next)
     skipPushCountRef.current += 1;
-    const newIndex = index + 1;
+    const newIndex = currentIndex + 1;
+    timelineRef.current = { history: currentHistory, index: newIndex };
     setIndex(newIndex);
-    return history[newIndex];
-  }, [canRedo, index, history]);
+    return currentHistory[newIndex];
+  }, []);
 
   return useMemo(() => ({ push, undo, redo, canUndo, canRedo, skipNextPushes, reset }), [push, undo, redo, canUndo, canRedo, skipNextPushes, reset]);
 }
