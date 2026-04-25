@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { highlightColors, highlightTextColorCss } from '@/lib/highlightPalette';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -225,28 +226,6 @@ const Indent = Extension.create({
     };
   },
 });
-
-const highlightColors = [
-  '#4f4600',
-  '#14532d',
-  '#6b214b',
-  '#1e3a8a',
-  '#fef08a',
-  '#bbf7d0',
-  '#fbcfe8',
-  '#bfdbfe',
-];
-
-const highlightTextColors: Record<string, string> = {
-  '#4f4600': '#f9fafb',
-  '#14532d': '#f9fafb',
-  '#6b214b': '#f9fafb',
-  '#1e3a8a': '#f9fafb',
-  '#fef08a': '#1f2937',
-  '#bbf7d0': '#1f2937',
-  '#fbcfe8': '#1f2937',
-  '#bfdbfe': '#1f2937',
-};
 
 const EDITOR_CLASSES = [
   'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-4',
@@ -854,12 +833,7 @@ export function WeeklyNotesPanel({
           color: #9ca3af !important;
           opacity: 0.6;
         }
-        ${Object.entries(highlightTextColors)
-          .map(
-            ([color, textColor]) =>
-              `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
-          )
-          .join('\n')}
+        ${highlightTextColorCss}
       `}</style>
     </div>
   );

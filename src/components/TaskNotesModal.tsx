@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { highlightColors, highlightTextColorCss } from '@/lib/highlightPalette';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTaskNote } from '@/hooks/useTaskNote';
 import { useEscapeStack } from '@/hooks/useEscapeStack';
@@ -166,26 +167,6 @@ const Indent = Extension.create({
   },
 });
 
-const highlightColors = [
-  '#4f4600',
-  '#14532d',
-  '#6b214b',
-  '#1e3a8a',
-  '#fef08a',
-  '#bbf7d0',
-  '#fbcfe8',
-  '#bfdbfe',
-];
-const highlightTextColors: Record<string, string> = {
-  '#4f4600': '#f9fafb',
-  '#14532d': '#f9fafb',
-  '#6b214b': '#f9fafb',
-  '#1e3a8a': '#f9fafb',
-  '#fef08a': '#1f2937',
-  '#bbf7d0': '#1f2937',
-  '#fbcfe8': '#1f2937',
-  '#bfdbfe': '#1f2937',
-};
 const EDITOR_CLASSES = 'prose prose-sm dark:prose-invert max-w-none min-h-full focus:outline-none p-3';
 
 const getActiveListItemType = (state: any): 'listItem' | 'taskItem' | null => {
@@ -592,12 +573,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
 
         {pagination}
         <style>{`
-          ${Object.entries(highlightTextColors)
-            .map(
-              ([color, textColor]) =>
-                `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
-            )
-            .join('\n')}
+          ${highlightTextColorCss}
         `}</style>
       </div>
     );
@@ -651,12 +627,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
           </svg>
         </div>
         <style>{`
-          ${Object.entries(highlightTextColors)
-            .map(
-              ([color, textColor]) =>
-                `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`,
-            )
-            .join('\n')}
+          ${highlightTextColorCss}
         `}</style>
       </div>
     </div>
