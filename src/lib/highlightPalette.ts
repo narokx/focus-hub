@@ -9,7 +9,9 @@ export const highlightColors = [
   '#bfdbfe',
 ] as const;
 
-export const highlightTextColors: Record<string, string> = {
+type HighlightColor = (typeof highlightColors)[number];
+
+export const highlightTextColors: Record<HighlightColor, string> = {
   '#4f4600': '#f9fafb',
   '#14532d': '#f9fafb',
   '#6b214b': '#f9fafb',
