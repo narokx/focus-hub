@@ -21,5 +21,5 @@ export const highlightTextColors: Record<string, string> = {
 };
 
 export const highlightTextColorCss = Object.entries(highlightTextColors)
-  .map(([color, textColor]) => `.prose mark[style*="background-color: ${color}"] { color: ${textColor}; }`)
+  .map(([color, textColor]) => '.prose mark[style*="background-color: ' + color + '" i] { color: ' + textColor + '; }')
   .join('\n');
