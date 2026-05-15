@@ -77,6 +77,14 @@ async function insertCalendarEventsWithLegacyFallback(rows: any[]) {
   return supabase.from('calendar_events').insert(legacyRows);
 }
 
+async function clearCalendarEventTaskPreservingSlot(eventId: string) {
+  const updateRes = await supabase
+    .from('calendar_events')
+    .update({ task_id: null, completed: false, subtasks: [] as any })
+    .eq('id', eventId);
+  return updateRes;
+}
+
 function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: TimeSlot[] = []): TimeSlot[] {
   const safeBase = Array.isArray(defaultSlots) ? defaultSlots : [];
   const safeEvents = Array.isArray(eventSlots) ? eventSlots : [];
@@ -714,10 +722,13 @@ export function useSupabaseCalendar() {
       };
     });
 
-    // DB: clear the event task (or delete it)
+    // DB: clear the event task while preserving the slot boundaries
     const isDbSlot = !slotId.startsWith('ts-');
     if (isDbSlot) {
-      await supabase.from('calendar_events').delete().eq('id', slotId);
+      const clearRes = await clearCalendarEventTaskPreservingSlot(slotId);
+      if (clearRes.error) {
+        console.error('Failed to clear calendar event task:', clearRes.error);
+      }
     }
 
     // Add to buffer
@@ -911,10 +922,13 @@ export function useSupabaseCalendar() {
       return newState;
     });
 
-    // DB: delete source event, insert target event
+    // DB: clear source event task, then assign target
     const isSourceDb = !sourceSlotId.startsWith('ts-');
     if (isSourceDb) {
-      await supabase.from('calendar_events').delete().eq('id', sourceSlotId);
+      const clearRes = await clearCalendarEventTaskPreservingSlot(sourceSlotId);
+      if (clearRes.error) {
+        console.error('Failed to clear source calendar event task:', clearRes.error);
+      }
     }
 
     const targetDay = calendar[targetDate] || { date: targetDate, tasks: [], timeSlots: generateDefaultTimeSlots() };
