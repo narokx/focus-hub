@@ -71,52 +71,23 @@ async function insertCalendarEventsWithLegacyFallback(rows: any[]) {
   return supabase.from('calendar_events').insert(legacyRows);
 }
 
-function mergeEventsIntoTimeline(defaultSlots: TimeSlot[], eventSlots: TimeSlot[]): TimeSlot[] {
-  const sortedBase = [...defaultSlots].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-  const sortedEvents = [...eventSlots].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-  const updatedSlots: TimeSlot[] = [];
+function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: TimeSlot[] = []): TimeSlot[] {
+  const safeBase = Array.isArray(defaultSlots) ? defaultSlots : [];
+  const safeEvents = Array.isArray(eventSlots) ? eventSlots : [];
+  const sortedBase = [...safeBase].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+  const sortedEvents = [...safeEvents].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
-  for (const slot of sortedBase) {
+  const nonOverlappingBase = sortedBase.filter(slot => {
     const slotStart = timeToMinutes(slot.startTime);
     const slotEnd = timeToMinutes(slot.endTime);
-    const isEmpty = !slot.task;
-    let segments: TimeSlot[] = [slot];
-
-    for (const event of sortedEvents) {
+    return !sortedEvents.some(event => {
       const eventStart = timeToMinutes(event.startTime);
       const eventEnd = timeToMinutes(event.endTime);
-      const overlaps = slotStart < eventEnd && slotEnd > eventStart;
-      if (!overlaps) continue;
+      return slotStart < eventEnd && slotEnd > eventStart;
+    });
+  });
 
-      if (!isEmpty) {
-        segments = [];
-        break;
-      }
-
-      const nextSegments: TimeSlot[] = [];
-      for (const segment of segments) {
-        const segStart = timeToMinutes(segment.startTime);
-        const segEnd = timeToMinutes(segment.endTime);
-        const segOverlaps = segStart < eventEnd && segEnd > eventStart;
-        if (!segOverlaps) {
-          nextSegments.push(segment);
-          continue;
-        }
-
-        if (segStart < eventStart) {
-          nextSegments.push({ ...segment, endTime: event.startTime });
-        }
-        if (segEnd > eventEnd) {
-          nextSegments.push({ ...segment, id: `${segment.id}-post-${event.id}`, startTime: event.endTime });
-        }
-      }
-      segments = nextSegments;
-    }
-
-    updatedSlots.push(...segments);
-  }
-
-  return [...updatedSlots, ...sortedEvents].sort((a, b) => {
+  return [...nonOverlappingBase, ...sortedEvents].sort((a, b) => {
     const startDiff = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
     if (startDiff !== 0) return startDiff;
     return timeToMinutes(a.endTime) - timeToMinutes(b.endTime);
@@ -185,7 +156,7 @@ export function useSupabaseCalendar() {
 
       // Build time slots from DB events overlaid on defaults
       const defaultSlots = generateDefaultTimeSlots();
-      const eventSlots: TimeSlot[] = dayEvents.map(e => {
+      const eventSlots: TimeSlot[] = (dayEvents || []).map(e => {
         const task = e.tasks as any;
         return {
           id: e.id,
