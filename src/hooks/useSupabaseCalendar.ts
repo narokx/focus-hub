@@ -12,7 +12,13 @@ const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 function isMissingLockedColumnError(error: any): boolean {
   const message = String(error?.message || '').toLowerCase();
   const details = String(error?.details || '').toLowerCase();
-  return (message.includes('locked') || details.includes('locked')) && (message.includes('column') || details.includes('column'));
+  const hint = String(error?.hint || '').toLowerCase();
+  const combined = `${message} ${details} ${hint}`;
+  return combined.includes('locked') && (
+    combined.includes('column') ||
+    combined.includes('schema cache') ||
+    combined.includes('could not find')
+  );
 }
 
 async function fetchCalendarEventsWithLegacyFallback(userId: string) {
@@ -103,6 +109,7 @@ export function useSupabaseCalendar() {
   // Fetch calendar data from Supabase for all dates
   const fetchCalendar = useCallback(async () => {
     if (!user) return;
+    try {
 
     const [bufferRes, eventsRes] = await Promise.all([
       supabase
@@ -178,8 +185,20 @@ export function useSupabaseCalendar() {
       cal[date] = { date, tasks, timeSlots: timeSlots.map(normalizeSlotLock), dayColor, isCustomColor };
     }
 
-    setCalendar(cal);
-    return cal;
+      setCalendar(cal);
+      return cal;
+    } catch (error) {
+      console.error('Failed to fetch calendar data:', error);
+      setCalendar(prev => {
+        const fallback = { ...prev };
+        const today = new Date().toISOString().slice(0, 10);
+        if (!fallback[today]) {
+          fallback[today] = { date: today, tasks: [], timeSlots: generateDefaultTimeSlots() };
+        }
+        return fallback;
+      });
+      return undefined;
+    }
   }, [user]);
 
   // Silent one-time sync from localStorage
@@ -381,6 +400,7 @@ export function useSupabaseCalendar() {
       return { ...prev, [date]: { ...dayData, tasks: dayData.tasks.filter(t => t.id !== taskId) } };
     });
 
+    if (!taskId || taskId.startsWith('temp-dt-')) return;
     const { error } = await supabase.from('daily_task_buffer').delete().eq('id', taskId);
     if (error) {
       console.error('Failed to remove day task:', error);
@@ -1019,6 +1039,7 @@ export function useSupabaseCalendar() {
 
   const applyRoutineToDay = useCallback(async (date: string, routine: { tasks: any[]; timeSlots: TimeSlot[]; color?: string }) => {
     if (!user) return;
+    try {
 
     const routineTaskSlots = (routine.timeSlots || []).filter(s => s.task);
 
@@ -1074,6 +1095,7 @@ export function useSupabaseCalendar() {
           },
         };
       });
+      await fetchCalendar();
       return;
     }
 
@@ -1202,7 +1224,15 @@ export function useSupabaseCalendar() {
         return;
       }
     }
-  }, [user, calendar, updateDayColor]);
+    await fetchCalendar();
+    } catch (error) {
+      console.error('applyRoutineToDay failed:', error);
+      setCalendar(prev => ({
+        ...prev,
+        [date]: prev[date] || { date, tasks: [], timeSlots: generateDefaultTimeSlots() },
+      }));
+    }
+  }, [user, calendar, updateDayColor, fetchCalendar]);
 
   // Batch apply routine to multiple dates with atomic DELETE/INSERT for each
   const batchApplyRoutine = useCallback(async (dates: string[], routine: { tasks: any[]; timeSlots: TimeSlot[]; color?: string }) => {
