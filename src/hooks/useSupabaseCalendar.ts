@@ -12,7 +12,13 @@ const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 function isMissingLockedColumnError(error: any): boolean {
   const message = String(error?.message || '').toLowerCase();
   const details = String(error?.details || '').toLowerCase();
-  return (message.includes('locked') || details.includes('locked')) && (message.includes('column') || details.includes('column'));
+  const hint = String(error?.hint || '').toLowerCase();
+  const combined = `${message} ${details} ${hint}`;
+  return combined.includes('locked') && (
+    combined.includes('column') ||
+    combined.includes('schema cache') ||
+    combined.includes('could not find')
+  );
 }
 
 async function fetchCalendarEventsWithLegacyFallback(userId: string) {
@@ -71,6 +77,37 @@ async function insertCalendarEventsWithLegacyFallback(rows: any[]) {
   return supabase.from('calendar_events').insert(legacyRows);
 }
 
+async function clearCalendarEventTaskPreservingSlot(eventId: string) {
+  const updateRes = await supabase
+    .from('calendar_events')
+    .update({ task_id: null, completed: false, subtasks: [] as any })
+    .eq('id', eventId);
+  return updateRes;
+}
+
+function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: TimeSlot[] = []): TimeSlot[] {
+  const safeBase = Array.isArray(defaultSlots) ? defaultSlots : [];
+  const safeEvents = Array.isArray(eventSlots) ? eventSlots : [];
+  const sortedBase = [...safeBase].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+  const sortedEvents = [...safeEvents].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+
+  const nonOverlappingBase = sortedBase.filter(slot => {
+    const slotStart = timeToMinutes(slot.startTime);
+    const slotEnd = timeToMinutes(slot.endTime);
+    return !sortedEvents.some(event => {
+      const eventStart = timeToMinutes(event.startTime);
+      const eventEnd = timeToMinutes(event.endTime);
+      return slotStart < eventEnd && slotEnd > eventStart;
+    });
+  });
+
+  return [...nonOverlappingBase, ...sortedEvents].sort((a, b) => {
+    const startDiff = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+    if (startDiff !== 0) return startDiff;
+    return timeToMinutes(a.endTime) - timeToMinutes(b.endTime);
+  });
+}
+
 export function useSupabaseCalendar() {
   const { user } = useAuth();
   const [calendar, setCalendar] = useState<Record<string, DayData>>({});
@@ -80,6 +117,7 @@ export function useSupabaseCalendar() {
   // Fetch calendar data from Supabase for all dates
   const fetchCalendar = useCallback(async () => {
     if (!user) return;
+    try {
 
     const [bufferRes, eventsRes] = await Promise.all([
       supabase
@@ -133,47 +171,42 @@ export function useSupabaseCalendar() {
 
       // Build time slots from DB events overlaid on defaults
       const defaultSlots = generateDefaultTimeSlots();
-      let timeSlots: TimeSlot[];
-
-      if (dayEvents.length > 0) {
-        // Create slots from events (assigned tasks)
-        const eventSlots: TimeSlot[] = dayEvents.map(e => {
-          const task = e.tasks as any;
-          return {
-            id: e.id,
-            startTime: parseTimeTo24h(e.start_time),
-            endTime: parseTimeTo24h(e.end_time),
-            locked: !!(e as any).locked,
-            task: task ? {
-              id: `dst-${e.id}`,
-              taskId: task.id,
-              name: task.name,
-              color: task.color || '#3B82F6',
-              completed: e.completed || false,
-              subtasks: Array.isArray((e as any).subtasks) ? ((e as any).subtasks as SubtaskData[]) : undefined,
-            } : null,
-          };
-        });
-
-        // Merge: use event slots for matching times, defaults for the rest
-        timeSlots = defaultSlots.map(ds => {
-          const match = eventSlots.find(es => es.startTime === ds.startTime && es.endTime === ds.endTime);
-          return match || ds;
-        });
-
-        // Add any event slots that don't match default times
-        const defaultTimeKeys = new Set(defaultSlots.map(s => `${s.startTime}-${s.endTime}`));
-        const extraSlots = eventSlots.filter(es => !defaultTimeKeys.has(`${es.startTime}-${es.endTime}`));
-        timeSlots = [...timeSlots, ...extraSlots];
-      } else {
-        timeSlots = defaultSlots;
-      }
+      const eventSlots: TimeSlot[] = (dayEvents || []).map(e => {
+        const task = e.tasks as any;
+        return {
+          id: e.id,
+          startTime: parseTimeTo24h(e.start_time),
+          endTime: parseTimeTo24h(e.end_time),
+          locked: !!(e as any).locked,
+          task: task ? {
+            id: `dst-${e.id}`,
+            taskId: task.id,
+            name: task.name,
+            color: task.color || '#3B82F6',
+            completed: e.completed || false,
+            subtasks: Array.isArray((e as any).subtasks) ? ((e as any).subtasks as SubtaskData[]) : undefined,
+          } : null,
+        };
+      });
+      const timeSlots = mergeEventsIntoTimeline(defaultSlots, eventSlots);
 
       cal[date] = { date, tasks, timeSlots: timeSlots.map(normalizeSlotLock), dayColor, isCustomColor };
     }
 
-    setCalendar(cal);
-    return cal;
+      setCalendar(cal);
+      return cal;
+    } catch (error) {
+      console.error('Failed to fetch calendar data:', error);
+      setCalendar(prev => {
+        const fallback = { ...prev };
+        const today = new Date().toISOString().slice(0, 10);
+        if (!fallback[today]) {
+          fallback[today] = { date: today, tasks: [], timeSlots: generateDefaultTimeSlots() };
+        }
+        return fallback;
+      });
+      return undefined;
+    }
   }, [user]);
 
   // Silent one-time sync from localStorage
@@ -375,6 +408,7 @@ export function useSupabaseCalendar() {
       return { ...prev, [date]: { ...dayData, tasks: dayData.tasks.filter(t => t.id !== taskId) } };
     });
 
+    if (!taskId || taskId.startsWith('temp-dt-')) return;
     const { error } = await supabase.from('daily_task_buffer').delete().eq('id', taskId);
     if (error) {
       console.error('Failed to remove day task:', error);
@@ -688,10 +722,13 @@ export function useSupabaseCalendar() {
       };
     });
 
-    // DB: clear the event task (or delete it)
+    // DB: clear the event task while preserving the slot boundaries
     const isDbSlot = !slotId.startsWith('ts-');
     if (isDbSlot) {
-      await supabase.from('calendar_events').delete().eq('id', slotId);
+      const clearRes = await clearCalendarEventTaskPreservingSlot(slotId);
+      if (clearRes.error) {
+        console.error('Failed to clear calendar event task:', clearRes.error);
+      }
     }
 
     // Add to buffer
@@ -885,10 +922,13 @@ export function useSupabaseCalendar() {
       return newState;
     });
 
-    // DB: delete source event, insert target event
+    // DB: clear source event task, then assign target
     const isSourceDb = !sourceSlotId.startsWith('ts-');
     if (isSourceDb) {
-      await supabase.from('calendar_events').delete().eq('id', sourceSlotId);
+      const clearRes = await clearCalendarEventTaskPreservingSlot(sourceSlotId);
+      if (clearRes.error) {
+        console.error('Failed to clear source calendar event task:', clearRes.error);
+      }
     }
 
     const targetDay = calendar[targetDate] || { date: targetDate, tasks: [], timeSlots: generateDefaultTimeSlots() };
@@ -1013,6 +1053,7 @@ export function useSupabaseCalendar() {
 
   const applyRoutineToDay = useCallback(async (date: string, routine: { tasks: any[]; timeSlots: TimeSlot[]; color?: string }) => {
     if (!user) return;
+    try {
 
     const routineTaskSlots = (routine.timeSlots || []).filter(s => s.task);
 
@@ -1068,16 +1109,12 @@ export function useSupabaseCalendar() {
           },
         };
       });
+      await fetchCalendar();
       return;
     }
 
     const routineStartMinutes = Math.min(...routineTaskSlots.map(s => timeToMinutes(s.startTime)));
     const routineEndMinutes = Math.max(...routineTaskSlots.map(s => timeToMinutes(s.endTime)));
-
-    const routineStartTime =
-      routineTaskSlots.find(s => timeToMinutes(s.startTime) === routineStartMinutes)?.startTime || '00:00';
-    const routineEndTime =
-      routineTaskSlots.find(s => timeToMinutes(s.endTime) === routineEndMinutes)?.endTime || '23:59';
 
     // Step 1: Atomic DELETE for this date:
     // - Buffer rows are fully replaced
@@ -1131,80 +1168,6 @@ export function useSupabaseCalendar() {
 
     setCalendar(prev => {
       const existing = prev[date] || { date, tasks: [], timeSlots: generateDefaultTimeSlots() };
-      const updatedSlots: TimeSlot[] = [];
-
-      for (const slot of existing.timeSlots || []) {
-        const sStart = timeToMinutes(slot.startTime);
-        const sEnd = timeToMinutes(slot.endTime);
-
-        // Outside routine window: preserve completely unchanged
-        if (sEnd <= routineStartMinutes || sStart >= routineEndMinutes) {
-          updatedSlots.push(slot);
-          continue;
-        }
-
-        const isEmpty = !slot.task;
-
-        if (isEmpty) {
-          const spansTop =
-            sStart < routineStartMinutes && sEnd > routineStartMinutes && sEnd <= routineEndMinutes;
-          const spansBottom =
-            sStart >= routineStartMinutes && sStart < routineEndMinutes && sEnd > routineEndMinutes;
-          const spansBoth = sStart < routineStartMinutes && sEnd > routineEndMinutes;
-          const fullyInside = sStart >= routineStartMinutes && sEnd <= routineEndMinutes;
-
-          if (fullyInside) {
-            // Remove empty slots fully inside the routine's window
-            continue;
-          }
-
-          if (spansTop) {
-            // Top boundary: trim end to routine start
-            updatedSlots.push({
-              ...slot,
-              endTime: routineStartTime,
-            });
-            continue;
-          }
-
-          if (spansBottom) {
-            // Bottom boundary: trim start to routine end
-            updatedSlots.push({
-              ...slot,
-              startTime: routineEndTime,
-            });
-            continue;
-          }
-
-          if (spansBoth) {
-            // Slot covers the entire routine window – split into two preserved segments
-            updatedSlots.push(
-              {
-                ...slot,
-                endTime: routineStartTime,
-              },
-              {
-                ...slot,
-                id: `${slot.id}-post-routine`,
-                startTime: routineEndTime,
-              },
-            );
-            continue;
-          }
-
-          // Any other partial case: preserve as-is
-          updatedSlots.push(slot);
-          continue;
-        }
-
-        // Slots with tasks that intersect the routine window are removed so
-        // the routine can take over that region.
-        const intersectsRoutine = sStart < routineEndMinutes && sEnd > routineStartMinutes;
-        if (!intersectsRoutine) {
-          updatedSlots.push(slot);
-        }
-      }
-
       // Inject routine's time slots as new calendar slots
       const routineSlotsAsDaySlots: TimeSlot[] = routineTaskSlots.map(s => ({
         id: `ts-routine-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -1219,7 +1182,7 @@ export function useSupabaseCalendar() {
         },
       }));
 
-      const mergedSlots = [...updatedSlots, ...routineSlotsAsDaySlots].sort(
+      const mergedSlots = mergeEventsIntoTimeline(existing.timeSlots || [], routineSlotsAsDaySlots).sort(
         (a, b) => getTimeWeight(a.startTime) - getTimeWeight(b.startTime),
       );
 
@@ -1275,7 +1238,15 @@ export function useSupabaseCalendar() {
         return;
       }
     }
-  }, [user, calendar, updateDayColor]);
+    await fetchCalendar();
+    } catch (error) {
+      console.error('applyRoutineToDay failed:', error);
+      setCalendar(prev => ({
+        ...prev,
+        [date]: prev[date] || { date, tasks: [], timeSlots: generateDefaultTimeSlots() },
+      }));
+    }
+  }, [user, calendar, updateDayColor, fetchCalendar]);
 
   // Batch apply routine to multiple dates with atomic DELETE/INSERT for each
   const batchApplyRoutine = useCallback(async (dates: string[], routine: { tasks: any[]; timeSlots: TimeSlot[]; color?: string }) => {
