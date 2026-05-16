@@ -9,6 +9,27 @@ import { enrichRowsWithTasks } from '@/lib/enrichRowsWithTasks';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
 
+const getTimelineSortWeight = (timeStr: string) => {
+  const [hour, minute] = timeStr.split(':').map(Number);
+  const adjustedHour = hour < 4 ? hour + 24 : hour;
+  return adjustedHour * 60 + minute;
+};
+
+
+const TIMELINE_DEBUG_KEY = 'focushub:timeline-debug';
+
+type SlotOrigin = 'persisted-db-event' | 'synthesized-placeholder' | 'inferred-gap-fill' | 'optimistic-local-state' | 'normalization-split-pass';
+
+function timelineDebugEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(TIMELINE_DEBUG_KEY) === '1';
+}
+
+function logTimelineSlotOrigin(context: string, slot: TimeSlot, origin: SlotOrigin, extra: Record<string, any> = {}) {
+  if (!timelineDebugEnabled()) return;
+  console.debug('[timeline-origin]', { context, origin, slotId: slot.id, start: slot.startTime, end: slot.endTime, locked: !!slot.locked, hasTask: !!slot.task, ...extra });
+}
+
 function isMissingLockedColumnError(error: any): boolean {
   const message = String(error?.message || '').toLowerCase();
   const details = String(error?.details || '').toLowerCase();
@@ -88,25 +109,40 @@ async function clearCalendarEventTaskPreservingSlot(eventId: string) {
 function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: TimeSlot[] = []): TimeSlot[] {
   const safeBase = Array.isArray(defaultSlots) ? defaultSlots : [];
   const safeEvents = Array.isArray(eventSlots) ? eventSlots : [];
-  const sortedBase = [...safeBase].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
-  const sortedEvents = [...safeEvents].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
-  const nonOverlappingBase = sortedBase.filter(slot => {
+  if (safeEvents.length === 0) {
+    const synthesized = [...safeBase].sort((a, b) => getTimelineSortWeight(a.startTime) - getTimelineSortWeight(b.startTime));
+    synthesized.forEach((slot) => logTimelineSlotOrigin('rebuild/no-events', slot, 'synthesized-placeholder'));
+    return synthesized;
+  }
+
+  const nonOverlappingBase = safeBase.filter((slot) => {
     const slotStart = timeToMinutes(slot.startTime);
     const slotEnd = timeToMinutes(slot.endTime);
-    return !sortedEvents.some(event => {
+    return !safeEvents.some((event) => {
       const eventStart = timeToMinutes(event.startTime);
       const eventEnd = timeToMinutes(event.endTime);
       return slotStart < eventEnd && slotEnd > eventStart;
     });
   });
 
-  return [...nonOverlappingBase, ...sortedEvents].sort((a, b) => {
-    const startDiff = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+  const merged = [...nonOverlappingBase, ...safeEvents].sort((a, b) => {
+    const startDiff = getTimelineSortWeight(a.startTime) - getTimelineSortWeight(b.startTime);
     if (startDiff !== 0) return startDiff;
-    return timeToMinutes(a.endTime) - timeToMinutes(b.endTime);
+    return getTimelineSortWeight(a.endTime) - getTimelineSortWeight(b.endTime);
   });
+
+  merged.forEach((slot) => {
+    const isFromBase = nonOverlappingBase.some((baseSlot) => baseSlot.id === slot.id);
+    const origin: SlotOrigin = isFromBase
+      ? 'synthesized-placeholder'
+      : (slot.task ? 'persisted-db-event' : 'inferred-gap-fill');
+    logTimelineSlotOrigin('rebuild/events-present', slot, origin);
+  });
+
+  return merged;
 }
+
 
 export function useSupabaseCalendar() {
   const { user } = useAuth();
@@ -188,6 +224,7 @@ export function useSupabaseCalendar() {
           } : null,
         };
       });
+      eventSlots.forEach(slot => logTimelineSlotOrigin('fetch/db-map', slot, slot.task ? 'persisted-db-event' : 'inferred-gap-fill'));
       const timeSlots = mergeEventsIntoTimeline(defaultSlots, eventSlots);
 
       cal[date] = { date, tasks, timeSlots: timeSlots.map(normalizeSlotLock), dayColor, isCustomColor };
@@ -1044,13 +1081,6 @@ export function useSupabaseCalendar() {
 
 
   // Helper to calculate the sorting weight of a time string 'HH:mm'
-  const getTimeWeight = (timeStr: string) => {
-    const [hour, minute] = timeStr.split(':').map(Number);
-    // 04:00 AM is the absolute start; anything earlier is treated as "next day"
-    const adjustedHour = hour < 4 ? hour + 24 : hour;
-    return adjustedHour * 60 + minute;
-  };
-
   const applyRoutineToDay = useCallback(async (date: string, routine: { tasks: any[]; timeSlots: TimeSlot[]; color?: string }) => {
     if (!user) return;
     try {
@@ -1182,9 +1212,13 @@ export function useSupabaseCalendar() {
         },
       }));
 
+      routineSlotsAsDaySlots.forEach(slot => logTimelineSlotOrigin('apply-routine/optimistic', slot, 'optimistic-local-state'))
+
       const mergedSlots = mergeEventsIntoTimeline(existing.timeSlots || [], routineSlotsAsDaySlots).sort(
-        (a, b) => getTimeWeight(a.startTime) - getTimeWeight(b.startTime),
+        (a, b) => getTimelineSortWeight(a.startTime) - getTimelineSortWeight(b.startTime),
       );
+
+      mergedSlots.forEach(slot => logTimelineSlotOrigin('apply-routine/normalized', slot, 'normalization-split-pass'));
 
       return {
         ...prev,
