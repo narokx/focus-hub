@@ -8,6 +8,7 @@ import { normalizeSlotLock, sortTimeSlotsRespectingLocks } from '@/lib/timeSlotO
 import { enrichRowsWithTasks } from '@/lib/enrichRowsWithTasks';
 
 const LOCAL_STORAGE_KEY = 'productivity-heatmap-state';
+const DEBUG_CALENDAR = true; // Set to false to silence logs globally
 
 
 const TIMELINE_DEBUG_KEY = 'focushub:timeline-debug';
@@ -22,6 +23,24 @@ function timelineDebugEnabled(): boolean {
 function logTimelineSlotOrigin(context: string, slot: TimeSlot, origin: SlotOrigin, extra: Record<string, any> = {}) {
   if (!timelineDebugEnabled()) return;
   console.debug('[timeline-origin]', { context, origin, slotId: slot.id, start: slot.startTime, end: slot.endTime, locked: !!slot.locked, hasTask: !!slot.task, ...extra });
+}
+
+function logTimelineTelemetry(safeBase: TimeSlot[], safeEvents: TimeSlot[], finalTimeline: TimeSlot[]) {
+  if (!DEBUG_CALENDAR) return;
+  
+  console.group("🧠 TIMELINE DATASTREAM TELEMETRY");
+  console.log("1. Synthesized Base Slots Count:", safeBase.length);
+  console.log("2. Raw DB Events Received Count:", safeEvents.length);
+  console.log("3. Raw DB Payload:", safeEvents.map(e => ({ id: e.id, start: e.startTime, end: e.endTime, hasTask: !!e.task })));
+  console.log("4. Final Reconstructed Timeline Count:", finalTimeline.length);
+  console.log("5. Final Render Payload:", finalTimeline.map(t => ({
+    id: t.id,
+    start: t.startTime,
+    end: t.endTime,
+    hasTask: !!t.task,
+    taskName: t.task?.name || 'EMPTY'
+  })));
+  console.groupEnd();
 }
 
 function splitEventsAndGapFill(slots: TimeSlot[]): { events: TimeSlot[]; placeholders: TimeSlot[] } {
@@ -132,7 +151,9 @@ function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: Time
     logTimelineSlotOrigin('rebuild/events-present', slot, origin);
   });
 
-  return sortedEvents;
+  const finalTimeline = sortedEvents;
+  logTimelineTelemetry(safeBase, safeEvents, finalTimeline);
+  return finalTimeline;
 }
 
 export function useSupabaseCalendar() {
