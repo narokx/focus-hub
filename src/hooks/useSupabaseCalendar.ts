@@ -24,19 +24,6 @@ function logTimelineSlotOrigin(context: string, slot: TimeSlot, origin: SlotOrig
   console.debug('[timeline-origin]', { context, origin, slotId: slot.id, start: slot.startTime, end: slot.endTime, locked: !!slot.locked, hasTask: !!slot.task, ...extra });
 }
 
-function splitEventsAndGapFill(slots: TimeSlot[]): { events: TimeSlot[]; placeholders: TimeSlot[] } {
-  const events: TimeSlot[] = [];
-  const placeholders: TimeSlot[] = [];
-  for (const slot of slots) {
-    if (slot.task) {
-      events.push(slot);
-    } else {
-      placeholders.push(slot);
-    }
-  }
-  return { events, placeholders };
-}
-
 
 function isMissingLockedColumnError(error: any): boolean {
   const message = String(error?.message || '').toLowerCase();
@@ -117,22 +104,33 @@ async function clearCalendarEventTaskPreservingSlot(eventId: string) {
 function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: TimeSlot[] = []): TimeSlot[] {
   const safeBase = Array.isArray(defaultSlots) ? defaultSlots : [];
   const safeEvents = Array.isArray(eventSlots) ? eventSlots : [];
-  const { events, placeholders } = splitEventsAndGapFill(safeEvents);
-  const sortedEvents = [...events, ...placeholders].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
-  if (sortedEvents.length === 0) {
+  if (safeEvents.length === 0) {
     const synthesized = [...safeBase].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
     synthesized.forEach((slot) => logTimelineSlotOrigin('rebuild/no-events', slot, 'synthesized-placeholder'));
     return synthesized;
   }
 
-  // Persisted DB events are the source of truth; placeholders are volatile UI scaffolding only.
-  sortedEvents.forEach((slot) => {
-    const origin: SlotOrigin = slot.task ? 'persisted-db-event' : 'inferred-gap-fill';
-    logTimelineSlotOrigin('rebuild/events-present', slot, origin);
+  const mergedBase = safeBase.map((defaultSlot) => {
+    const match = safeEvents.find(
+      (eventSlot) => eventSlot.startTime === defaultSlot.startTime && eventSlot.endTime === defaultSlot.endTime,
+    );
+    const slot = match || defaultSlot;
+    const origin: SlotOrigin = match
+      ? (match.task ? 'persisted-db-event' : 'inferred-gap-fill')
+      : 'synthesized-placeholder';
+    logTimelineSlotOrigin('rebuild/merge-base', slot, origin);
+    return slot;
   });
 
-  return sortedEvents;
+  const defaultTimeKeys = new Set(safeBase.map((slot) => `${slot.startTime}-${slot.endTime}`));
+  const extraSlots = safeEvents.filter((eventSlot) => !defaultTimeKeys.has(`${eventSlot.startTime}-${eventSlot.endTime}`));
+  extraSlots.forEach((slot) => {
+    const origin: SlotOrigin = slot.task ? 'persisted-db-event' : 'inferred-gap-fill';
+    logTimelineSlotOrigin('rebuild/merge-extra', slot, origin);
+  });
+
+  return [...mergedBase, ...extraSlots].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 }
 
 export function useSupabaseCalendar() {
