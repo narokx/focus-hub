@@ -68,7 +68,16 @@ async function replaceDateInSupabase(args: { userId: string; date: string; targe
   });
 
   if (bufferRows.length > 0) {
-    const ins = await supabase.from('daily_task_buffer').insert(bufferRows);
+    const payload = bufferRows;
+    const cleanPayload = payload.map(row => {
+      const { id, ...rowWithoutId } = row;
+      // If the ID is null, undefined, or a frontend temporary ID, strip it out so Supabase generates a new one
+      if (!id || String(id).startsWith('temp-')) {
+        return rowWithoutId;
+      }
+      return row;
+    });
+    const ins = await supabase.from('daily_task_buffer').insert(cleanPayload);
     if (ins.error) throw ins.error;
   } else if (targetDay?.dayColor) {
     // Preserve day-level color even when there are no buffer tasks
