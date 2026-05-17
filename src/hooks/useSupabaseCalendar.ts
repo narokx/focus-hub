@@ -138,6 +138,18 @@ function mergeEventsIntoTimeline(defaultSlots: TimeSlot[] = [], eventSlots: Time
   const safeEvents = Array.isArray(eventSlots) ? eventSlots : [];
   const { events, placeholders } = splitEventsAndGapFill(safeEvents);
   const sortedEvents = [...events, ...placeholders].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+  const hasAnyActiveTasks = sortedEvents.some(
+    (slot) => slot.task !== null && slot.task !== undefined
+  );
+  if (!hasAnyActiveTasks) {
+    const synthesized = [...safeBase].sort(
+      (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
+    );
+    synthesized.forEach((slot) =>
+      logTimelineSlotOrigin('rebuild/no-active-tasks', slot, 'synthesized-placeholder')
+    );
+    return synthesized;
+  }
 
   if (sortedEvents.length === 0) {
     const synthesized = [...safeBase].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
