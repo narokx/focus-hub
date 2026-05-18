@@ -24,10 +24,19 @@ interface FloatingWindowProps {
 }
 
 const BASE_WINDOW_Z_INDEX = 20;
+const MAX_WINDOW_Z_INDEX = 9000;
 let highestWindowZIndex = BASE_WINDOW_Z_INDEX;
 
 const getNextWindowZIndex = () => {
   highestWindowZIndex += 1;
+
+  // Keep floating windows below global popup layers (dialogs/popovers).
+  // Without this bound, repeated drag/focus events can push window z-index values
+  // above modal layers, causing confirmation popups to appear underneath tabs.
+  if (highestWindowZIndex >= MAX_WINDOW_Z_INDEX) {
+    highestWindowZIndex = BASE_WINDOW_Z_INDEX + 1;
+  }
+
   return highestWindowZIndex;
 };
 
