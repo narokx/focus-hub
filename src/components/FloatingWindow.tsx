@@ -219,6 +219,8 @@ export function FloatingWindow({
   };
 
   const toggleFullscreen = useCallback(() => {
+    if (minimized) return;
+
     bringToFront();
     setIsEditingTitle(false);
     setIsFullscreen((prev) => {
@@ -239,7 +241,7 @@ export function FloatingWindow({
       onSizeChange?.({ width: window.innerWidth, height: window.innerHeight });
       return true;
     });
-  }, [bringToFront, onPositionChange, onSizeChange, size]);
+  }, [bringToFront, minimized, onPositionChange, onSizeChange, size]);
 
   const fullscreenSize = {
     width: '100%',
@@ -325,13 +327,23 @@ export function FloatingWindow({
             <div className="flex items-center gap-1">
               {headerActions}
               <button
+                disabled={minimized}
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleFullscreen();
                 }}
-                className="no-drag p-1 rounded hover:bg-secondary/60 text-muted-foreground hover:text-foreground transition-colors"
-                title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                className={cn(
+                  'no-drag p-1 rounded text-muted-foreground transition-colors',
+                  minimized
+                    ? 'opacity-40 cursor-not-allowed'
+                    : 'hover:bg-secondary/60 hover:text-foreground',
+                )}
+                title={minimized
+                  ? 'Fullscreen unavailable while minimized'
+                  : isFullscreen
+                    ? 'Exit fullscreen'
+                    : 'Enter fullscreen'}
               >
                 {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
