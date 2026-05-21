@@ -342,6 +342,61 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   });
 
   useEffect(() => {
+    if (!editor?.view) return;
+    const dom = editor.view.dom;
+
+    const handleCheckboxClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (
+        !(target instanceof HTMLInputElement) ||
+        target.type !== 'checkbox'
+      ) return;
+
+      const listItem = target.closest('li[data-type="taskItem"]');
+      if (!listItem) return;
+
+      // Resolve position BEFORE intercepting the event.
+      // Only block the event if we can guarantee we will handle the toggle.
+      const view = editor.view;
+      let taskItemPos = -1;
+      let taskItemNode = null;
+
+      try {
+        const posInside = view.posAtDOM(listItem, 0);
+        const $pos = view.state.doc.resolve(posInside);
+        for (let depth = $pos.depth; depth > 0; depth--) {
+          if ($pos.node(depth).type.name === 'taskItem') {
+            taskItemNode = $pos.node(depth);
+            taskItemPos = $pos.before(depth);
+            break;
+          }
+        }
+      } catch {
+        return; // Position resolution failed — let native behavior through.
+      }
+
+      if (taskItemPos === -1 || !taskItemNode) return;
+
+      // Only now intercept: stop the event from reaching the checkbox,
+      // which prevents the change event and Tiptap's .chain().focus() call.
+      e.stopPropagation();
+      e.preventDefault();
+
+      view.dispatch(
+        view.state.tr.setNodeMarkup(taskItemPos, undefined, {
+          ...taskItemNode.attrs,
+          checked: !taskItemNode.attrs.checked,
+        })
+      );
+    };
+
+    dom.addEventListener('click', handleCheckboxClick, { capture: true });
+    return () => {
+      dom.removeEventListener('click', handleCheckboxClick, { capture: true });
+    };
+  }, [editor]);
+
+  useEffect(() => {
     if (!editor) return;
     if (userIsInteracting.current) return;
     if (note !== lastSavedContentRef.current && editor.getHTML() !== note) {
