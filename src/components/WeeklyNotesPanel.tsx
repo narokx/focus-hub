@@ -351,6 +351,65 @@ export function WeeklyNotesPanel({
       attributes: {
         class: EDITOR_CLASSES,
       },
+      handleDOMEvents: {
+        pointerdown: (view, event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLInputElement)) {
+            return false;
+          }
+
+          if (target.type !== 'checkbox') {
+            return false;
+          }
+
+          const listItemElement = target.closest('li[data-type="taskItem"]');
+          if (!listItemElement) {
+            return false;
+          }
+
+          event.preventDefault();
+
+          const position = view.posAtDOM(listItemElement, 0);
+          const node = view.state.doc.nodeAt(position);
+          if (!node || node.type.name !== 'taskItem') {
+            return true;
+          }
+
+          const tr = view.state.tr.setNodeMarkup(position, undefined, {
+            ...node.attrs,
+            checked: !node.attrs.checked,
+          });
+
+          const resolveClosestScrollableContainer = (element: HTMLElement | null) => {
+            let current: HTMLElement | null = element;
+            while (current && current !== document.body) {
+              const { overflowY } = window.getComputedStyle(current);
+              const isScrollable = /(auto|scroll|overlay)/.test(overflowY);
+              if (isScrollable && current.scrollHeight > current.clientHeight) {
+                return current;
+              }
+              current = current.parentElement;
+            }
+            return null;
+          };
+
+          // Synchronous layout preservation for mobile WebKit:
+          // 1) Save current viewport + panel scroll offsets before dispatch.
+          // 2) Dispatch the PM transaction (this mutates DOM and can trigger a native jump).
+          // 3) Immediately restore scroll offsets on the next line to prevent visible snapping.
+          const viewportScrollY = window.scrollY;
+          const scrollContainer = resolveClosestScrollableContainer(view.dom as HTMLElement);
+          const containerScrollTop = scrollContainer?.scrollTop ?? null;
+
+          view.dispatch(tr);
+          window.scrollTo(window.scrollX, viewportScrollY);
+          if (scrollContainer && containerScrollTop != null) {
+            scrollContainer.scrollTop = containerScrollTop;
+          }
+
+          return true;
+        },
+      },
       handleKeyDown: (_view, event) => {
         const currentEditor = editorRef.current;
         if (!currentEditor) {
