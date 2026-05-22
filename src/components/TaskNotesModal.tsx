@@ -342,6 +342,72 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
   });
 
   useEffect(() => {
+    if (!editor?.view) return;
+    const dom = editor.view.dom;
+
+    const handleClickCapture = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      const taskItem = target.closest('li[data-type="taskItem"]');
+      if (!taskItem) return;
+
+      // CRITICAL: Only intercept if the user tapped the checkbox or its wrapping label.
+      // If they tapped the text content, allow the event to pass so they can edit the text.
+      const isCheckboxClick = target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'checkbox';
+      const isLabelClick = target.tagName === 'LABEL' || target.closest('label') !== null;
+
+      if (!isCheckboxClick && !isLabelClick) {
+        return;
+      }
+
+      // Annihilate the native event. This stops the native checkbox mutation,
+      // bypasses WebKit's caret-reconciliation scroll, and blinds Tiptap's internal focus chain.
+      e.preventDefault();
+      e.stopPropagation();
+
+      const view = editor.view;
+      let taskItemPos = -1;
+      let taskItemNode = null;
+
+      try {
+        const posInside = view.posAtDOM(taskItem, 0);
+        const $pos = view.state.doc.resolve(posInside);
+
+        for (let depth = $pos.depth; depth > 0; depth--) {
+          if ($pos.node(depth).type.name === 'taskItem') {
+            taskItemNode = $pos.node(depth);
+            taskItemPos = $pos.before(depth);
+            break;
+          }
+        }
+      } catch {
+        return;
+      }
+
+      if (taskItemPos === -1 || !taskItemNode) return;
+
+      const nextChecked = !taskItemNode.attrs.checked;
+
+      // Manually dispatch the ProseMirror transaction as the single source of truth
+      const tr = view.state.tr.setNodeMarkup(taskItemPos, undefined, {
+        ...taskItemNode.attrs,
+        checked: nextChecked,
+      });
+
+      // Explicitly instruct ProseMirror to avoid scroll mapping
+      tr.setMeta('preventScroll', true);
+      view.dispatch(tr);
+    };
+
+    dom.addEventListener('click', handleClickCapture, { capture: true });
+
+    return () => {
+      dom.removeEventListener('click', handleClickCapture, { capture: true });
+    };
+  }, [editor]);
+
+  useEffect(() => {
     if (!editor) return;
     if (userIsInteracting.current) return;
     if (note !== lastSavedContentRef.current && editor.getHTML() !== note) {
