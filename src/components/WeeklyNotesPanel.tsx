@@ -414,6 +414,83 @@ export function WeeklyNotesPanel({
   });
 
   useEffect(() => {
+    if (!editor?.view) return;
+    const dom = editor.view.dom;
+    
+    let touchStartY = 0;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.type === 'checkbox') {
+        touchStartY = e.clientY;
+      }
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') return;
+
+      // Allow scrolling: if the finger moved vertically more than 10px, abort the toggle
+      if (Math.abs(e.clientY - touchStartY) > 10) return;
+
+      const listItem = target.closest('li[data-type="taskItem"]');
+      if (!listItem) return;
+
+      const view = editor.view;
+      let taskItemPos = -1;
+      let taskItemNode = null;
+
+      try {
+        const posInside = view.posAtDOM(listItem, 0);
+        const $pos = view.state.doc.resolve(posInside);
+        for (let depth = $pos.depth; depth > 0; depth--) {
+          if ($pos.node(depth).type.name === 'taskItem') {
+            taskItemNode = $pos.node(depth);
+            taskItemPos = $pos.before(depth);
+            break;
+          }
+        }
+      } catch {
+        return;
+      }
+
+      if (taskItemPos === -1 || !taskItemNode) return;
+
+      // Prevent native focus shift and native input toggling
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Dispatch pure ProseMirror transaction without scrolling or blurring
+      const tr = view.state.tr.setNodeMarkup(taskItemPos, undefined, {
+        ...taskItemNode.attrs,
+        checked: !taskItemNode.attrs.checked,
+      });
+      
+      // Prevent ProseMirror from attempting to scroll the selection into view
+      tr.setMeta('preventScroll', true);
+      view.dispatch(tr);
+    };
+
+    const suppressClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.type === 'checkbox') {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    dom.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    dom.addEventListener('pointerup', handlePointerUp, { capture: true });
+    dom.addEventListener('click', suppressClick, { capture: true });
+
+    return () => {
+      dom.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      dom.removeEventListener('pointerup', handlePointerUp, { capture: true });
+      dom.removeEventListener('click', suppressClick, { capture: true });
+    };
+  }, [editor]);
+
+  useEffect(() => {
     if (!editor) return;
     if (userIsInteracting.current) return;
     if (content !== lastSavedContentRef.current && editor.getHTML() !== content) {
