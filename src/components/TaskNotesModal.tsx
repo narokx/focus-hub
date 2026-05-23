@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { Extension, Mark, mergeAttributes } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import TaskItem from '@tiptap/extension-task-item';
+import { SafeTaskItem } from './editor/SafeTaskItem';
 import TaskList from '@tiptap/extension-task-list';
 import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
@@ -261,7 +261,7 @@ export function TaskNotesModal({ taskId, taskName, taskColor, onClose }: TaskNot
           class: 'list-none p-0 m-0',
         },
       }),
-      TaskItem.configure({
+      SafeTaskItem.configure({
         nested: true,
         HTMLAttributes: {
           class: 'flex items-start gap-3 mb-1.5',
