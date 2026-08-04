@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 interface RoutinesPanelProps {
   routines: Routine[];
   onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
@@ -37,6 +38,7 @@ function RoutineItemContent({
   routine,
   onUpdateRoutine,
   onAddRoutine,
+  onDuplicateRoutine,
   onDeleteRoutine,
   onRemoveTaskFromRoutine,
   onAddRoutineTimeSlot,
@@ -61,6 +63,7 @@ function RoutineItemContent({
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
   onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
   onAddRoutineTimeSlot: (routineId: string) => void;
@@ -123,7 +126,7 @@ function RoutineItemContent({
               <Pencil className="mr-2 h-3.5 w-3.5" />
               Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onAddRoutine(`${routine.name} copy`)}>
+            <DropdownMenuItem onClick={() => onDuplicateRoutine(routine)}>
               <Copy className="mr-2 h-3.5 w-3.5" />
               Duplicate
             </DropdownMenuItem>
@@ -250,6 +253,7 @@ function DraggableRoutineItem(props: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
   onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
   onAddRoutineTimeSlot: (routineId: string) => void;
@@ -295,6 +299,7 @@ function SortableRoutineItem(props: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
   onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
   onAddRoutineTimeSlot: (routineId: string) => void;
@@ -350,6 +355,7 @@ function SortableRoutineItem(props: {
 export function RoutinesPanel({
   routines,
   onAddRoutine,
+  onDuplicateRoutine,
   onUpdateRoutine,
   onDeleteRoutine,
   onRemoveTaskFromRoutine,
@@ -427,6 +433,7 @@ export function RoutinesPanel({
                 routine={routine}
                 onUpdateRoutine={onUpdateRoutine}
                 onAddRoutine={onAddRoutine}
+                onDuplicateRoutine={onDuplicateRoutine}
                 onDeleteRoutine={onDeleteRoutine}
                 onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
                 onAddRoutineTimeSlot={onAddRoutineTimeSlot}
@@ -452,6 +459,7 @@ export function RoutinesPanel({
                 routine={routine}
                 onUpdateRoutine={onUpdateRoutine}
                 onAddRoutine={onAddRoutine}
+                onDuplicateRoutine={onDuplicateRoutine}
                 onDeleteRoutine={onDeleteRoutine}
                 onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
                 onAddRoutineTimeSlot={onAddRoutineTimeSlot}

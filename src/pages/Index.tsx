@@ -86,6 +86,7 @@ export default function Index() {
     routines: supabaseRoutines,
     loading: routinesLoading,
     addRoutine,
+    duplicateRoutine,
     updateRoutine,
     deleteRoutine,
     addTaskToRoutine,
@@ -849,6 +850,7 @@ export default function Index() {
               <RoutinesPanel
                 routines={state.routines}
                 onAddRoutine={addRoutine}
+                onDuplicateRoutine={duplicateRoutine}
                 onUpdateRoutine={updateRoutine}
                 onDeleteRoutine={deleteRoutine}
                 onRemoveTaskFromRoutine={removeTaskFromRoutine}
@@ -1053,6 +1055,7 @@ export default function Index() {
           <RoutinesPanel
             routines={state.routines}
             onAddRoutine={addRoutine}
+            onDuplicateRoutine={duplicateRoutine}
             onUpdateRoutine={updateRoutine}
             onDeleteRoutine={deleteRoutine}
             onRemoveTaskFromRoutine={removeTaskFromRoutine}

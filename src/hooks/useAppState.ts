@@ -161,6 +161,36 @@ export function useAppState(
     }));
   }, []);
 
+  const duplicateRoutine = useCallback((routine: Routine) => {
+    const duplicatedId = `r-${Date.now()}`;
+    setState(prev => ({
+      ...prev,
+      routines: [
+        ...prev.routines,
+        {
+          ...routine,
+          id: duplicatedId,
+          name: routine.name,
+          tasks: routine.tasks.map((task, index) => ({
+            ...task,
+            id: `rt-${Date.now()}-${index}`,
+          })),
+          timeSlots: routine.timeSlots.map((slot, index) => ({
+            ...slot,
+            id: `ts-${Date.now()}-${index}`,
+            task: slot.task
+              ? {
+                  ...slot.task,
+                  id: `rst-${Date.now()}-${index}`,
+                  subtasks: slot.task.subtasks?.map(subtask => ({ ...subtask })),
+                }
+              : null,
+          })),
+        },
+      ],
+    }));
+  }, []);
+
   const updateRoutine = useCallback((id: string, updates: Partial<Routine>) => {
     setState(prev => ({
       ...prev,
@@ -670,7 +700,7 @@ export function useAppState(
 
   return {
     state,
-    addRoutine, updateRoutine, deleteRoutine,
+    addRoutine, duplicateRoutine, updateRoutine, deleteRoutine,
     addTaskToRoutine, removeTaskFromRoutine,
     assignTaskToRoutineSlot, addSubtaskToRoutineSlot, removeTaskFromRoutineSlot, moveRoutineSlotToUnassigned,
     addRoutineTimeSlot, deleteRoutineTimeSlot, updateRoutineSlotTime, toggleRoutineSlotLock, updateRoutineSlotTaskName,
