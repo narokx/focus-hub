@@ -172,14 +172,14 @@ export default function Index() {
     // Desktop/Mouse: Activates after a deliberate long-press.
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 500,
+        delay: 400,
         tolerance: 5,
       },
     }),
     // Mobile/Touch: Matches the routine long-press interaction.
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 500,
+        delay: 400,
         tolerance: 5,
       },
     }),
