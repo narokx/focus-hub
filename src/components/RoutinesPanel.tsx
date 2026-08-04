@@ -2,17 +2,19 @@ import React, { useState } from 'react';
 import { useDroppable, useDraggable } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight, Eraser } from 'lucide-react';
+import { Plus, Trash2, Layers, GripVertical, ChevronDown, ChevronRight, Eraser, Pencil, Copy } from 'lucide-react';
 import { Routine, QuickTask, SubtaskData, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
 interface RoutinesPanelProps {
   routines: Routine[];
   onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
@@ -35,6 +37,8 @@ interface RoutinesPanelProps {
 function RoutineItemContent({
   routine,
   onUpdateRoutine,
+  onAddRoutine,
+  onDuplicateRoutine,
   onDeleteRoutine,
   onRemoveTaskFromRoutine,
   onAddRoutineTimeSlot,
@@ -58,6 +62,8 @@ function RoutineItemContent({
 }: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
+  onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
   onAddRoutineTimeSlot: (routineId: string) => void;
@@ -74,8 +80,8 @@ function RoutineItemContent({
   onClearRoutineTimeline?: (routineId: string) => void;
   isOver: boolean;
   isDragging: boolean;
-  dragHandleRef: (node: HTMLElement | null) => void;
-  dragHandleProps: Record<string, any>;
+  dragHandleRef?: (node: HTMLElement | null) => void;
+  dragHandleProps: React.HTMLAttributes<HTMLElement>;
   dropRef: (node: HTMLElement | null) => void;
   style?: React.CSSProperties;
 }) {
@@ -104,13 +110,39 @@ function RoutineItemContent({
       )}
     >
       <div className="flex items-center gap-2 p-2 bg-secondary/30">
-        <div
-          ref={dragHandleRef}
-          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-secondary rounded transition-colors"
-          {...dragHandleProps}
-        >
-          <GripVertical className="w-4 h-4 text-muted-foreground" />
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="p-0.5 hover:bg-secondary rounded transition-colors text-muted-foreground hover:text-foreground"
+              title="Routine options"
+              aria-label={`Open options for ${routine.name}`}
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <Pencil className="mr-2 h-3.5 w-3.5" />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDuplicateRoutine(routine)}>
+              <Copy className="mr-2 h-3.5 w-3.5" />
+              Duplicate
+            </DropdownMenuItem>
+            {onClearRoutineTimeline && (
+              <DropdownMenuItem onClick={() => setShowClearConfirm(true)}>
+                <Eraser className="mr-2 h-3.5 w-3.5" />
+                Clear timeline
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onDeleteRoutine(routine.id)} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 hover:bg-secondary rounded transition-colors">
           {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -131,8 +163,11 @@ function RoutineItemContent({
           />
         ) : (
           <span
-            className="flex-1 text-sm font-medium cursor-pointer hover:text-primary transition-colors"
+            ref={dragHandleRef}
+            className="flex-1 select-none text-sm font-medium cursor-grab active:cursor-grabbing hover:text-primary transition-colors"
+            title="Press and hold to reorder or drag this routine"
             onDoubleClick={() => setIsEditing(true)}
+            {...dragHandleProps}
           >
             {routine.name}
           </span>
@@ -147,18 +182,6 @@ function RoutineItemContent({
         />
 
         <span className="text-xs text-muted-foreground">{totalTasks} tasks</span>
-        {onClearRoutineTimeline && isExpanded && (
-          <button
-            onClick={() => setShowClearConfirm(true)}
-            className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
-            title="Clear timeline"
-          >
-            <Eraser className="w-3.5 h-3.5" />
-          </button>
-        )}
-        <button onClick={() => onDeleteRoutine(routine.id)} className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
       </div>
 
       {isExpanded && (
@@ -229,6 +252,8 @@ function RoutineItemContent({
 function DraggableRoutineItem(props: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
+  onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
   onAddRoutineTimeSlot: (routineId: string) => void;
@@ -273,6 +298,8 @@ function DraggableRoutineItem(props: {
 function SortableRoutineItem(props: {
   routine: Routine;
   onUpdateRoutine: (id: string, updates: Partial<Routine>) => void;
+  onAddRoutine: (name: string) => void;
+  onDuplicateRoutine: (routine: Routine) => void;
   onDeleteRoutine: (id: string) => void;
   onRemoveTaskFromRoutine: (routineId: string, taskId: string) => void;
   onAddRoutineTimeSlot: (routineId: string) => void;
@@ -297,6 +324,7 @@ function SortableRoutineItem(props: {
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -316,7 +344,7 @@ function SortableRoutineItem(props: {
         {...props}
         isOver={isDropOver}
         isDragging={isDragging}
-        dragHandleRef={() => {}}
+        dragHandleRef={setActivatorNodeRef}
         dragHandleProps={{ ...attributes, ...listeners }}
         dropRef={setDropRef}
       />
@@ -327,6 +355,7 @@ function SortableRoutineItem(props: {
 export function RoutinesPanel({
   routines,
   onAddRoutine,
+  onDuplicateRoutine,
   onUpdateRoutine,
   onDeleteRoutine,
   onRemoveTaskFromRoutine,
@@ -403,6 +432,8 @@ export function RoutinesPanel({
                 key={routine.id}
                 routine={routine}
                 onUpdateRoutine={onUpdateRoutine}
+                onAddRoutine={onAddRoutine}
+                onDuplicateRoutine={onDuplicateRoutine}
                 onDeleteRoutine={onDeleteRoutine}
                 onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
                 onAddRoutineTimeSlot={onAddRoutineTimeSlot}
@@ -427,6 +458,8 @@ export function RoutinesPanel({
                 key={routine.id}
                 routine={routine}
                 onUpdateRoutine={onUpdateRoutine}
+                onAddRoutine={onAddRoutine}
+                onDuplicateRoutine={onDuplicateRoutine}
                 onDeleteRoutine={onDeleteRoutine}
                 onRemoveTaskFromRoutine={onRemoveTaskFromRoutine}
                 onAddRoutineTimeSlot={onAddRoutineTimeSlot}
@@ -441,14 +474,14 @@ export function RoutinesPanel({
                 onRemoveSubtaskFromRoutineSlot={onRemoveSubtaskFromRoutineSlot}
                 onUpdateRoutineSubtaskPercentages={onUpdateRoutineSubtaskPercentages}
                 onClearRoutineTimeline={onClearRoutineTimeline}
-                />
+              />
             ))}
           </SortableContext>
         )}
       </div>
 
       <div className="mt-4 pt-3 border-t border-border/50">
-        <p className="text-xs text-muted-foreground text-center">Use grip handle to drag routines to calendar</p>
+        <p className="text-xs text-muted-foreground text-center">Press and hold a routine name to drag or reorder</p>
       </div>
     </div>
   );

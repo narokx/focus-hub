@@ -343,6 +343,84 @@ export function useSupabaseRoutines() {
     await fetchRoutines();
   }, [user, fetchRoutines]);
 
+  const duplicateRoutine = useCallback(async (routine: Routine) => {
+    if (!user) return;
+
+    const tempId = `temp-duplicate-${Date.now()}`;
+    const duplicateName = routine.name;
+    const optimistic: Routine = {
+      ...routine,
+      id: tempId,
+      name: duplicateName,
+      tasks: routine.tasks.map((task, index) => ({
+        ...task,
+        id: `temp-rt-${Date.now()}-${index}`,
+      })),
+      timeSlots: routine.timeSlots.map((slot, index) => ({
+        ...slot,
+        id: `temp-rts-${Date.now()}-${index}`,
+        task: slot.task
+          ? {
+              ...slot.task,
+              id: `temp-rst-${Date.now()}-${index}`,
+              subtasks: slot.task.subtasks?.map(subtask => ({ ...subtask })),
+            }
+          : null,
+      })),
+    };
+
+    setRoutines(prev => [...prev, optimistic]);
+
+    const { data: routineRow, error: routineError } = await supabase
+      .from('routines')
+      .insert({
+        name: duplicateName,
+        color: routine.color,
+        user_id: user.id,
+        order_index: routines.length,
+      })
+      .select('id')
+      .maybeSingle();
+
+    if (routineError || !routineRow) {
+      console.error('Failed to duplicate routine:', routineError);
+      setRoutines(prev => prev.filter(r => r.id !== tempId));
+      return;
+    }
+
+    const taskRows = routine.tasks
+      .filter(task => task.taskId)
+      .map((task, index) => ({
+        routine_id: routineRow.id,
+        task_id: task.taskId,
+        order_index: index,
+      }));
+
+    const slotRows = routine.timeSlots.map(slot => ({
+      routine_id: routineRow.id,
+      start_time: parseTimeTo24h(slot.startTime),
+      end_time: parseTimeTo24h(slot.endTime),
+      task_id: slot.task?.taskId || null,
+      subtasks: slot.task?.subtasks ? slot.task.subtasks.map(subtask => ({ ...subtask })) : null,
+      locked: !!slot.locked,
+    }));
+
+    const [{ error: tasksError }, { error: slotsError }] = await Promise.all([
+      taskRows.length > 0 ? supabase.from('routine_tasks').insert(taskRows) : Promise.resolve({ error: null }),
+      insertRoutineSlotsWithLegacyFallback(slotRows),
+    ]);
+
+    if (tasksError || slotsError) {
+      console.error('Failed to duplicate routine contents:', tasksError || slotsError);
+      await supabase.from('routines').delete().eq('id', routineRow.id);
+      setRoutines(prev => prev.filter(r => r.id !== tempId));
+      await fetchRoutines();
+      return;
+    }
+
+    await fetchRoutines();
+  }, [user, routines.length, fetchRoutines]);
+
   const updateRoutine = useCallback(
     async (id: string, updates: Partial<Routine>) => {
       setRoutines(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)));
@@ -815,6 +893,7 @@ export function useSupabaseRoutines() {
     routines,
     loading,
     addRoutine,
+    duplicateRoutine,
     updateRoutine,
     deleteRoutine,
     addTaskToRoutine,
