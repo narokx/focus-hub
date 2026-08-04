@@ -168,17 +168,18 @@ export default function Index() {
   } | null>(null);
 
   const sensors = useSensors(
-    // Desktop/Mouse: Activates after 5px of movement
+    // Desktop/Mouse: Activates after a deliberate long-press.
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        delay: 500,
+        tolerance: 5,
       },
     }),
-    // Mobile/Touch: Activates only after a 250ms hold
+    // Mobile/Touch: Matches the routine long-press interaction.
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 5, // Allows 5px of jitter during the 250ms hold
+        delay: 500,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor)
