@@ -129,6 +129,7 @@ export default function Index() {
     applyRoutineToDay: applyRoutineToDayCloud,
     batchApplyRoutine,
     clearDayTimeline,
+    moveDayToDay,
     fetchCalendar,
     updateDayColor,
   } = useSupabaseCalendar();
@@ -590,6 +591,17 @@ export default function Index() {
       return;
     }
 
+    // Handle calendar day square drag to another calendar day as a strict move.
+    if (activeData?.type === 'calendar-day' && overData?.type === 'day') {
+      const sourceDate = activeData.date;
+      const targetDate = overData.date;
+      if (sourceDate && targetDate && sourceDate !== targetDate) {
+        moveDayToDay(sourceDate, targetDate);
+        if (selectedDate === sourceDate) setSelectedDate(targetDate);
+      }
+      return;
+    }
+
     // Handle routine drag to calendar cell - show modal for selection
     if (activeData?.type === 'routine' && overData?.type === 'day') {
       setPendingRoutineDrop({
@@ -844,6 +856,7 @@ export default function Index() {
                 }}
                 onClearDayTimeline={clearDayTimeline}
                 onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
+                onMoveDay={moveDayToDay}
               />
             )}
             {mobileTab === 'routines' && (
@@ -1160,6 +1173,7 @@ export default function Index() {
             }}
             onClearDayTimeline={clearDayTimeline}
             onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
+            onMoveDay={moveDayToDay}
           />
         </FloatingWindow>
 

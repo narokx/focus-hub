@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2, GripHorizontal } from 'lucide-react';
 import { DayData, QuickTask, Routine, SubtaskData, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
@@ -37,6 +37,7 @@ interface HeatmapCalendarProps {
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
   onUpdateDayColor?: (date: string, color: string) => void;
+  onMoveDay?: (sourceDate: string, targetDate: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -61,6 +62,7 @@ function DayCell({
   onClick,
   isSelected,
   onUpdateDayColor,
+  onMoveDay,
 }: {
   date: Date;
   dayData?: DayData;
@@ -68,11 +70,22 @@ function DayCell({
   onClick: () => void;
   isSelected: boolean;
   onUpdateDayColor?: (date: string, color: string) => void;
+  onMoveDay?: (sourceDate: string, targetDate: string) => void;
 }) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({
     id: `day-${dateStr}`,
     data: { type: 'day', date: dateStr },
+  });
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragHandleRef,
+    isDragging,
+  } = useDraggable({
+    id: `calendar-day-${dateStr}`,
+    data: { type: 'calendar-day', date: dateStr },
+    disabled: !onMoveDay,
   });
 
   const inMonth = isSameMonth(date, currentMonth);
@@ -106,10 +119,25 @@ function DayCell({
         level === 'high' && 'calendar-cell-high',
         today && 'ring-2 ring-yellow-400 ring-offset-2',
         isSelected && 'ring-2 ring-primary',
-        isOver && 'ring-2 ring-accent-foreground scale-110'
+        isOver && 'ring-2 ring-accent-foreground scale-110',
+        isDragging && 'opacity-50'
       )}
     >
       <div className="flex flex-col items-center gap-0.5">
+        {onMoveDay && (
+          <button
+            ref={setDragHandleRef}
+            type="button"
+            className="absolute top-0.5 right-0.5 rounded-sm p-0.5 text-current opacity-45 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-grab active:cursor-grabbing"
+            aria-label={`Move ${format(date, 'MMMM d')} routine to another day`}
+            title="Drag to move this day's routine"
+            onClick={(e) => e.stopPropagation()}
+            {...listeners}
+            {...attributes}
+          >
+            <GripHorizontal className="w-3 h-3" aria-hidden="true" />
+          </button>
+        )}
         <span className="text-xs font-medium">{format(date, 'd')}</span>
         {taskCount > 0 && <span className="text-[10px] opacity-70">{taskCount}</span>}
       </div>
@@ -154,6 +182,7 @@ export function HeatmapCalendar({
   onApplyRoutine,
   onClearDayTimeline,
   onUpdateDayColor,
+  onMoveDay,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
@@ -343,6 +372,7 @@ export function HeatmapCalendar({
                     onClick={() => onDayClick(dateStr)}
                     isSelected={selectedDate === dateStr}
                     onUpdateDayColor={onUpdateDayColor}
+                    onMoveDay={onMoveDay}
                   />
                 );
               })}

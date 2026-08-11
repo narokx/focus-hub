@@ -1396,6 +1396,107 @@ export function useSupabaseCalendar() {
     await fetchCalendar();
   }, [user, fetchCalendar, updateDayColor]);
 
+
+  const moveDayToDay = useCallback(async (sourceDate: string, targetDate: string) => {
+    if (!user || sourceDate === targetDate) return;
+
+    const sourceDay = calendar[sourceDate];
+    const movedDay: DayData = {
+      date: targetDate,
+      tasks: (sourceDay?.tasks || []).map((task, index) => ({
+        ...task,
+        id: `moved-buffer-${targetDate}-${index}-${Date.now()}`,
+      })),
+      timeSlots: (sourceDay?.timeSlots || generateDefaultTimeSlots()).map((slot, index) => ({
+        ...slot,
+        id: slot.id.startsWith('ts-') ? slot.id : `moved-slot-${targetDate}-${index}-${Date.now()}`,
+        task: slot.task ? { ...slot.task, id: `moved-task-${targetDate}-${index}-${Date.now()}` } : null,
+      })),
+      dayColor: sourceDay?.dayColor,
+      isCustomColor: sourceDay?.isCustomColor,
+    };
+
+    setCalendar(prev => {
+      const next = { ...prev };
+      if ((movedDay.tasks.length || movedDay.timeSlots.some(slot => slot.task) || movedDay.dayColor)) {
+        next[targetDate] = movedDay;
+      } else {
+        delete next[targetDate];
+      }
+      delete next[sourceDate];
+      return next;
+    });
+
+    const [sourceBufferDelete, sourceEventsDelete, targetBufferDelete, targetEventsDelete] = await Promise.all([
+      supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', sourceDate),
+      supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', sourceDate),
+      supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', targetDate),
+      supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', targetDate),
+    ]);
+
+    const deleteError = sourceBufferDelete.error || sourceEventsDelete.error || targetBufferDelete.error || targetEventsDelete.error;
+    if (deleteError) {
+      console.error('Failed to prepare calendar day move:', deleteError);
+      fetchCalendar();
+      return;
+    }
+
+    if (sourceDay) {
+      const bufferRows = (sourceDay.tasks || [])
+        .filter(task => task.taskId)
+        .map((task, orderIndex) => ({
+          user_id: user.id,
+          date: targetDate,
+          task_id: task.taskId,
+          completed: !!task.completed,
+          order_index: orderIndex,
+          day_color: sourceDay.dayColor || null,
+          is_custom_color: !!sourceDay.isCustomColor,
+        }));
+
+      if (sourceDay.dayColor && bufferRows.length === 0) {
+        bufferRows.push({
+          user_id: user.id,
+          date: targetDate,
+          task_id: null,
+          completed: false,
+          order_index: 0,
+          day_color: sourceDay.dayColor,
+          is_custom_color: !!sourceDay.isCustomColor,
+        });
+      }
+
+      const eventRows = (sourceDay.timeSlots || [])
+        .filter(slot => slot.task?.taskId)
+        .map(slot => ({
+          user_id: user.id,
+          date: targetDate,
+          task_id: slot.task!.taskId,
+          start_time: parseTimeTo24h(slot.startTime),
+          end_time: parseTimeTo24h(slot.endTime),
+          completed: !!slot.task!.completed,
+          locked: !!slot.locked,
+          subtasks: slot.task!.subtasks || null,
+        }));
+
+      const bufferInsert = bufferRows.length > 0
+        ? await supabase.from('daily_task_buffer').insert(bufferRows)
+        : { error: null };
+      const eventsInsert = eventRows.length > 0
+        ? await insertCalendarEventsWithLegacyFallback(eventRows)
+        : { error: null };
+
+      const insertError = bufferInsert.error || eventsInsert.error;
+      if (insertError) {
+        console.error('Failed to persist calendar day move:', insertError);
+        fetchCalendar();
+        return;
+      }
+    }
+
+    fetchCalendar();
+  }, [user, calendar, fetchCalendar]);
+
   const clearDayTimeline = useCallback(async (date: string) => {
     if (!user) return;
 
@@ -1444,6 +1545,7 @@ export function useSupabaseCalendar() {
     applyRoutineToDay,
     batchApplyRoutine,
     clearDayTimeline,
+    moveDayToDay,
     fetchCalendar,
   };
 }

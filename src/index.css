@@ -183,7 +183,7 @@
   }
 
   .calendar-cell {
-    @apply aspect-square rounded-md border transition-all cursor-pointer flex items-center justify-center text-xs font-medium;
+    @apply relative aspect-square rounded-md border transition-all cursor-pointer flex items-center justify-center text-xs font-medium;
     @apply hover:ring-2 hover:ring-primary/30 hover:scale-105;
   }
 
