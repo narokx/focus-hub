@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2, GripHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
 import { DayData, QuickTask, Routine, SubtaskData, generateDefaultTimeSlots } from '@/types';
 import { TimelineView } from './TimelineView';
 import { TaskPickerModal } from './TaskPickerModal';
@@ -37,7 +37,7 @@ interface HeatmapCalendarProps {
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
   onUpdateDayColor?: (date: string, color: string) => void;
-  onMoveDay?: (sourceDate: string, targetDate: string) => void;
+  onDuplicateDay?: (sourceDate: string, targetDate: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -55,6 +55,22 @@ function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high'
   return 'high';
 }
 
+
+function shouldStartCalendarDayDrag(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return true;
+
+  return !target.closest([
+    '.ProseMirror',
+    '.tiptap',
+    '[contenteditable="true"]',
+    'button',
+    'input',
+    'textarea',
+    'select',
+    'a[href]',
+  ].join(','));
+}
+
 function DayCell({
   date,
   dayData,
@@ -62,7 +78,7 @@ function DayCell({
   onClick,
   isSelected,
   onUpdateDayColor,
-  onMoveDay,
+  onDuplicateDay,
 }: {
   date: Date;
   dayData?: DayData;
@@ -70,7 +86,7 @@ function DayCell({
   onClick: () => void;
   isSelected: boolean;
   onUpdateDayColor?: (date: string, color: string) => void;
-  onMoveDay?: (sourceDate: string, targetDate: string) => void;
+  onDuplicateDay?: (sourceDate: string, targetDate: string) => void;
 }) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({
@@ -80,13 +96,34 @@ function DayCell({
   const {
     attributes,
     listeners,
-    setNodeRef: setDragHandleRef,
+    setNodeRef: setDraggableNodeRef,
     isDragging,
   } = useDraggable({
     id: `calendar-day-${dateStr}`,
     data: { type: 'calendar-day', date: dateStr },
-    disabled: !onMoveDay,
+    disabled: !onDuplicateDay,
   });
+
+
+  const setDayCellRef = React.useCallback((node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setDraggableNodeRef(node);
+  }, [setNodeRef, setDraggableNodeRef]);
+
+  const filteredListeners = React.useMemo(() => {
+    if (!listeners) return undefined;
+
+    return Object.entries(listeners).reduce<Record<string, (event: React.SyntheticEvent) => void>>((acc, [eventName, handler]) => {
+      if (typeof handler !== 'function') return acc;
+
+      acc[eventName] = (event) => {
+        if (!shouldStartCalendarDayDrag(event.target)) return;
+        handler(event);
+      };
+
+      return acc;
+    }, {});
+  }, [listeners]);
 
   const inMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
@@ -107,9 +144,11 @@ function DayCell({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setDayCellRef}
       onClick={onClick}
       style={style}
+      {...filteredListeners}
+      {...attributes}
       className={cn(
         'calendar-cell',
         !inMonth && 'opacity-30',
@@ -124,20 +163,6 @@ function DayCell({
       )}
     >
       <div className="flex flex-col items-center gap-0.5">
-        {onMoveDay && (
-          <button
-            ref={setDragHandleRef}
-            type="button"
-            className="absolute top-0.5 right-0.5 rounded-sm p-0.5 text-current opacity-45 hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-grab active:cursor-grabbing"
-            aria-label={`Move ${format(date, 'MMMM d')} routine to another day`}
-            title="Drag to move this day's routine"
-            onClick={(e) => e.stopPropagation()}
-            {...listeners}
-            {...attributes}
-          >
-            <GripHorizontal className="w-3 h-3" aria-hidden="true" />
-          </button>
-        )}
         <span className="text-xs font-medium">{format(date, 'd')}</span>
         {taskCount > 0 && <span className="text-[10px] opacity-70">{taskCount}</span>}
       </div>
@@ -182,7 +207,7 @@ export function HeatmapCalendar({
   onApplyRoutine,
   onClearDayTimeline,
   onUpdateDayColor,
-  onMoveDay,
+  onDuplicateDay,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
@@ -372,7 +397,7 @@ export function HeatmapCalendar({
                     onClick={() => onDayClick(dateStr)}
                     isSelected={selectedDate === dateStr}
                     onUpdateDayColor={onUpdateDayColor}
-                    onMoveDay={onMoveDay}
+                    onDuplicateDay={onDuplicateDay}
                   />
                 );
               })}

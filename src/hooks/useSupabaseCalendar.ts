@@ -1397,20 +1397,20 @@ export function useSupabaseCalendar() {
   }, [user, fetchCalendar, updateDayColor]);
 
 
-  const moveDayToDay = useCallback(async (sourceDate: string, targetDate: string) => {
+  const duplicateDayToDay = useCallback(async (sourceDate: string, targetDate: string) => {
     if (!user || sourceDate === targetDate) return;
 
     const sourceDay = calendar[sourceDate];
-    const movedDay: DayData = {
+    const duplicatedDay: DayData = {
       date: targetDate,
       tasks: (sourceDay?.tasks || []).map((task, index) => ({
         ...task,
-        id: `moved-buffer-${targetDate}-${index}-${Date.now()}`,
+        id: `duplicated-buffer-${targetDate}-${index}-${Date.now()}`,
       })),
       timeSlots: (sourceDay?.timeSlots || generateDefaultTimeSlots()).map((slot, index) => ({
         ...slot,
-        id: slot.id.startsWith('ts-') ? slot.id : `moved-slot-${targetDate}-${index}-${Date.now()}`,
-        task: slot.task ? { ...slot.task, id: `moved-task-${targetDate}-${index}-${Date.now()}` } : null,
+        id: slot.id.startsWith('ts-') ? slot.id : `duplicated-slot-${targetDate}-${index}-${Date.now()}`,
+        task: slot.task ? { ...slot.task, id: `duplicated-task-${targetDate}-${index}-${Date.now()}` } : null,
       })),
       dayColor: sourceDay?.dayColor,
       isCustomColor: sourceDay?.isCustomColor,
@@ -1418,25 +1418,22 @@ export function useSupabaseCalendar() {
 
     setCalendar(prev => {
       const next = { ...prev };
-      if ((movedDay.tasks.length || movedDay.timeSlots.some(slot => slot.task) || movedDay.dayColor)) {
-        next[targetDate] = movedDay;
+      if ((duplicatedDay.tasks.length || duplicatedDay.timeSlots.some(slot => slot.task) || duplicatedDay.dayColor)) {
+        next[targetDate] = duplicatedDay;
       } else {
         delete next[targetDate];
       }
-      delete next[sourceDate];
       return next;
     });
 
-    const [sourceBufferDelete, sourceEventsDelete, targetBufferDelete, targetEventsDelete] = await Promise.all([
-      supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', sourceDate),
-      supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', sourceDate),
+    const [targetBufferDelete, targetEventsDelete] = await Promise.all([
       supabase.from('daily_task_buffer').delete().eq('user_id', user.id).eq('date', targetDate),
       supabase.from('calendar_events').delete().eq('user_id', user.id).eq('date', targetDate),
     ]);
 
-    const deleteError = sourceBufferDelete.error || sourceEventsDelete.error || targetBufferDelete.error || targetEventsDelete.error;
+    const deleteError = targetBufferDelete.error || targetEventsDelete.error;
     if (deleteError) {
-      console.error('Failed to prepare calendar day move:', deleteError);
+      console.error('Failed to prepare calendar day duplicate:', deleteError);
       fetchCalendar();
       return;
     }
@@ -1488,7 +1485,7 @@ export function useSupabaseCalendar() {
 
       const insertError = bufferInsert.error || eventsInsert.error;
       if (insertError) {
-        console.error('Failed to persist calendar day move:', insertError);
+        console.error('Failed to persist calendar day duplicate:', insertError);
         fetchCalendar();
         return;
       }
@@ -1545,7 +1542,7 @@ export function useSupabaseCalendar() {
     applyRoutineToDay,
     batchApplyRoutine,
     clearDayTimeline,
-    moveDayToDay,
+    duplicateDayToDay,
     fetchCalendar,
   };
 }
