@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, isFuture, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X, ArrowLeft, Zap, Trash2 } from 'lucide-react';
 import { DayData, QuickTask, Routine, SubtaskData, generateDefaultTimeSlots } from '@/types';
@@ -37,6 +37,7 @@ interface HeatmapCalendarProps {
   onApplyRoutine?: (date: string, routine: Routine) => void;
   onClearDayTimeline?: (date: string) => void;
   onUpdateDayColor?: (date: string, color: string) => void;
+  onDuplicateDay?: (sourceDate: string, targetDate: string) => void;
 }
 
 function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high' {
@@ -54,6 +55,22 @@ function getCompletionLevel(dayData?: DayData): 'empty' | 'low' | 'mid' | 'high'
   return 'high';
 }
 
+
+function shouldStartCalendarDayDrag(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return true;
+
+  return !target.closest([
+    '.ProseMirror',
+    '.tiptap',
+    '[contenteditable="true"]',
+    'button',
+    'input',
+    'textarea',
+    'select',
+    'a[href]',
+  ].join(','));
+}
+
 function DayCell({
   date,
   dayData,
@@ -61,6 +78,7 @@ function DayCell({
   onClick,
   isSelected,
   onUpdateDayColor,
+  onDuplicateDay,
 }: {
   date: Date;
   dayData?: DayData;
@@ -68,12 +86,44 @@ function DayCell({
   onClick: () => void;
   isSelected: boolean;
   onUpdateDayColor?: (date: string, color: string) => void;
+  onDuplicateDay?: (sourceDate: string, targetDate: string) => void;
 }) {
   const dateStr = format(date, 'yyyy-MM-dd');
   const { setNodeRef, isOver } = useDroppable({
     id: `day-${dateStr}`,
     data: { type: 'day', date: dateStr },
   });
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableNodeRef,
+    isDragging,
+  } = useDraggable({
+    id: `calendar-day-${dateStr}`,
+    data: { type: 'calendar-day', date: dateStr },
+    disabled: !onDuplicateDay,
+  });
+
+
+  const setDayCellRef = React.useCallback((node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    setDraggableNodeRef(node);
+  }, [setNodeRef, setDraggableNodeRef]);
+
+  const filteredListeners = React.useMemo(() => {
+    if (!listeners) return undefined;
+
+    return Object.entries(listeners).reduce<Record<string, (event: React.SyntheticEvent) => void>>((acc, [eventName, handler]) => {
+      if (typeof handler !== 'function') return acc;
+
+      acc[eventName] = (event) => {
+        if (!shouldStartCalendarDayDrag(event.target)) return;
+        handler(event);
+      };
+
+      return acc;
+    }, {});
+  }, [listeners]);
 
   const inMonth = isSameMonth(date, currentMonth);
   const today = isToday(date);
@@ -94,9 +144,11 @@ function DayCell({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setDayCellRef}
       onClick={onClick}
       style={style}
+      {...filteredListeners}
+      {...attributes}
       className={cn(
         'calendar-cell',
         !inMonth && 'opacity-30',
@@ -106,7 +158,8 @@ function DayCell({
         level === 'high' && 'calendar-cell-high',
         today && 'ring-2 ring-yellow-400 ring-offset-2',
         isSelected && 'ring-2 ring-primary',
-        isOver && 'ring-2 ring-accent-foreground scale-110'
+        isOver && 'ring-2 ring-accent-foreground scale-110',
+        isDragging && 'opacity-50'
       )}
     >
       <div className="flex flex-col items-center gap-0.5">
@@ -154,6 +207,7 @@ export function HeatmapCalendar({
   onApplyRoutine,
   onClearDayTimeline,
   onUpdateDayColor,
+  onDuplicateDay,
 }: HeatmapCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeListWidth, setTimeListWidth] = useState(280);
@@ -343,6 +397,7 @@ export function HeatmapCalendar({
                     onClick={() => onDayClick(dateStr)}
                     isSelected={selectedDate === dateStr}
                     onUpdateDayColor={onUpdateDayColor}
+                    onDuplicateDay={onDuplicateDay}
                   />
                 );
               })}

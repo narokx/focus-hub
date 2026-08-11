@@ -129,6 +129,7 @@ export default function Index() {
     applyRoutineToDay: applyRoutineToDayCloud,
     batchApplyRoutine,
     clearDayTimeline,
+    duplicateDayToDay,
     fetchCalendar,
     updateDayColor,
   } = useSupabaseCalendar();
@@ -590,6 +591,16 @@ export default function Index() {
       return;
     }
 
+    // Handle calendar day square drag to another calendar day as a duplicate-and-overwrite.
+    if (activeData?.type === 'calendar-day' && overData?.type === 'day') {
+      const sourceDate = activeData.date;
+      const targetDate = overData.date;
+      if (sourceDate && targetDate && sourceDate !== targetDate) {
+        duplicateDayToDay(sourceDate, targetDate);
+      }
+      return;
+    }
+
     // Handle routine drag to calendar cell - show modal for selection
     if (activeData?.type === 'routine' && overData?.type === 'day') {
       setPendingRoutineDrop({
@@ -844,6 +855,7 @@ export default function Index() {
                 }}
                 onClearDayTimeline={clearDayTimeline}
                 onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
+                onDuplicateDay={duplicateDayToDay}
               />
             )}
             {mobileTab === 'routines' && (
@@ -1160,6 +1172,7 @@ export default function Index() {
             }}
             onClearDayTimeline={clearDayTimeline}
             onUpdateDayColor={(date, color) => updateDayColor(date, color, true)}
+            onDuplicateDay={duplicateDayToDay}
           />
         </FloatingWindow>
 
