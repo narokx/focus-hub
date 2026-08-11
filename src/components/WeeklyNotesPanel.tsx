@@ -351,6 +351,78 @@ export function WeeklyNotesPanel({
       attributes: {
         class: EDITOR_CLASSES,
       },
+      handleDOMEvents: {
+        pointerdown: (view, event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLInputElement) || target.type !== 'checkbox') {
+            return false;
+          }
+
+          const taskItemElement = target.closest('li[data-type="taskItem"]');
+          if (!taskItemElement) {
+            return false;
+          }
+
+          event.preventDefault();
+
+          let taskItemPos: number | null = null;
+          const docView = (
+            view as {
+              docView?: {
+                nearestDesc?: (
+                  dom: Node,
+                  onlyNodes?: boolean,
+                ) => { node?: { type?: { name?: string } }; posAtStart?: number } | null;
+              };
+            }
+          ).docView;
+          if (docView?.nearestDesc) {
+            const desc = docView.nearestDesc(taskItemElement, true);
+            if (desc?.node?.type?.name === 'taskItem' && typeof desc.posAtStart === 'number') {
+              taskItemPos = desc.posAtStart;
+            }
+          }
+
+          if (taskItemPos === null) {
+            const coords = {
+              left: event.clientX,
+              top: event.clientY,
+            };
+            const posAtCoords = view.posAtCoords(coords);
+            if (posAtCoords) {
+              let $pos = view.state.doc.resolve(posAtCoords.pos);
+              if ($pos.parent.type.name !== 'taskItem') {
+                for (let depth = $pos.depth; depth > 0; depth -= 1) {
+                  if ($pos.node(depth).type.name === 'taskItem') {
+                    $pos = view.state.doc.resolve($pos.before(depth));
+                    break;
+                  }
+                }
+              }
+              if ($pos.parent.type.name === 'taskItem') {
+                taskItemPos = $pos.before();
+              }
+            }
+          }
+
+          if (taskItemPos === null) {
+            return true;
+          }
+
+          const taskItemNode = view.state.doc.nodeAt(taskItemPos);
+          if (!taskItemNode || taskItemNode.type.name !== 'taskItem') {
+            return true;
+          }
+
+          const checked = Boolean(taskItemNode.attrs.checked);
+          const tr = view.state.tr.setNodeMarkup(taskItemPos, undefined, {
+            ...taskItemNode.attrs,
+            checked: !checked,
+          });
+          view.dispatch(tr);
+          return true;
+        },
+      },
       handleKeyDown: (_view, event) => {
         const currentEditor = editorRef.current;
         if (!currentEditor) {
